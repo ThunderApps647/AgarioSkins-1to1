@@ -213,40 +213,59 @@ struct ShopModalView: View {
                             .padding(14 * s)
                         }
                         .background(MCFSFrame(name: "mcfs-gray"))
-                    } else {
-                        // MenuShop.ccbi 3x2 Category Hub
-                        VStack(spacing: 10 * s) {
-                            Spacer(minLength: 4 * s)
-                            LazyVGrid(columns: columns, spacing: 10 * s) {
-                                shopCategoryCard(icon: "shop-coins", title: "Coins", accent: Color(hex: 0xE59B00), scale: s) {
-                                    withAnimation(.easeOut(duration: 0.15)) { selectedSection = .coins }
-                                }
-                                shopCategoryCard(icon: "shop-dna", title: "DNA", accent: Color(hex: 0x00A6D6), scale: s) {
-                                    withAnimation(.easeOut(duration: 0.15)) { selectedSection = .dna }
-                                }
-                                shopCategoryCard(icon: "shop-potions", title: "Potions", accent: Color(hex: 0x43A81D), scale: s) {
-                                    if let onOpenPotions = onOpenPotions { onOpenPotions() }
-                                    else { onClose() }
-                                }
-                                shopCategoryCard(icon: "shop-skins", title: "Skins", accent: Color(hex: 0x8E44AD), scale: s) {
-                                    if let onOpenSkins = onOpenSkins { onOpenSkins() }
-                                    else { onClose() }
-                                }
-                                shopCategoryCard(icon: "shop-mass", title: "Mass Boosts", accent: Color(hex: 0xE65C00), scale: s) {
-                                    withAnimation(.easeOut(duration: 0.15)) { selectedSection = .boosts }
-                                }
-                                shopCategoryCard(icon: "shop-xp", title: "XP Boosts", accent: Color(hex: 0x0078FE), scale: s) {
-                                    withAnimation(.easeOut(duration: 0.15)) { selectedSection = .xp }
-                                }
-                            }
-                            .padding(.horizontal, 16 * s)
-                            Spacer(minLength: 4 * s)
-                        }
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .background(MCFSFrame(name: "mcfs-gray"))
                     }
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
+
+                if selectedSection == nil {
+                    CCBISceneView(
+                        ccbFile: "MenuShop.ccbi",
+                        context: CCBIBindingContext(
+                            actions: [
+                                "backButtonCallback": onClose,
+                                "_backButton": onClose,
+                                "coinsButtonCallback": { withAnimation(.easeOut(duration: 0.15)) { selectedSection = .coins } },
+                                "_coinsShop": { withAnimation(.easeOut(duration: 0.15)) { selectedSection = .coins } },
+                                "dnaButtonCallback": { withAnimation(.easeOut(duration: 0.15)) { selectedSection = .dna } },
+                                "_dnaShop": { withAnimation(.easeOut(duration: 0.15)) { selectedSection = .dna } },
+                                "potionsButtonCallback": {
+                                    if let onOpenPotions = onOpenPotions { onOpenPotions() }
+                                    else { onClose() }
+                                },
+                                "_potionsShop": {
+                                    if let onOpenPotions = onOpenPotions { onOpenPotions() }
+                                    else { onClose() }
+                                },
+                                "skinsButtonCallback": {
+                                    if let onOpenSkins = onOpenSkins { onOpenSkins() }
+                                    else { onClose() }
+                                },
+                                "_skinsShop": {
+                                    if let onOpenSkins = onOpenSkins { onOpenSkins() }
+                                    else { onClose() }
+                                },
+                                "massButtonCallback": { withAnimation(.easeOut(duration: 0.15)) { selectedSection = .boosts } },
+                                "_massShop": { withAnimation(.easeOut(duration: 0.15)) { selectedSection = .boosts } },
+                                "xpButtonCallback": { withAnimation(.easeOut(duration: 0.15)) { selectedSection = .xp } },
+                                "_xpShop": { withAnimation(.easeOut(duration: 0.15)) { selectedSection = .xp } }
+                            ],
+                            labelOverrides: [
+                                "_coinBar._barCurrencyValue": "\(coins)",
+                                "_dnaBar._barCurrencyValue": "\(dna)"
+                            ],
+                            visibilityOverrides: [
+                                "_vipSubscriptionButton": false,
+                                "_coinsRedBadge": false,
+                                "_dnaRedBadge": false,
+                                "_potionsRedBadge": false,
+                                "_skinsRedBadge": false,
+                                "_massRedBadge": false,
+                                "_xpRedBadge": false
+                            ]
+                        )
+                    )
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                }
             }
         }
     }

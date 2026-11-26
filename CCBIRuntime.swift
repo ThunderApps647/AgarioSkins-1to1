@@ -361,11 +361,35 @@ final class CCBIBinaryReader {
 struct CCBISpriteEntry {
     let image: UIImage
     let designSize: CGSize
+    let pixelScale: CGFloat
 }
 
 struct CCBIMCFSEntry {
     let image: UIImage
     let capInsets: EdgeInsets
+    let cgImage: CGImage
+    let pixelScale: CGFloat
+    let leftF: CGFloat
+    let rightF: CGFloat
+    let topF: CGFloat
+    let bottomF: CGFloat
+
+    func uiImageAndInsets(forUIScale uiScale: CGFloat) -> (UIImage, EdgeInsets) {
+        let effScale = max(0.25, pixelScale / max(0.5, uiScale))
+        let img = UIImage(cgImage: cgImage, scale: effScale, orientation: .up)
+        let sz = img.size
+        let hSum = leftF + rightF
+        let vSum = topF + bottomF
+        let hScale = hSum > 0.96 ? (0.96 / hSum) : 1.0
+        let vScale = vSum > 0.96 ? (0.96 / vSum) : 1.0
+        let insets = EdgeInsets(
+            top: sz.height * topF * vScale,
+            leading: sz.width * leftF * hScale,
+            bottom: sz.height * bottomF * vScale,
+            trailing: sz.width * rightF * hScale
+        )
+        return (img, insets)
+    }
 }
 
 private struct AtlasFrameMeta {
@@ -477,12 +501,22 @@ final class CCBIAtlasStore: @unchecked Sendable {
             parsedFrames.reserveCapacity(rawFrames.count)
             for (fname, fdict) in rawFrames {
                 let frameStr = (fdict["frame"] as? String) ?? "{{0,0},{0,0}}"
-                let srcColorStr = (fdict["sourceColorRect"] as? String) ?? frameStr
                 let srcSizeStr = (fdict["sourceSize"] as? String) ?? "{0,0}"
                 let rotated = (fdict["rotated"] as? Bool) ?? false
                 let fRect = NSCoder.cgRect(for: frameStr)
-                let cRect = NSCoder.cgRect(for: srcColorStr)
                 let sSize = NSCoder.cgSize(for: srcSizeStr)
+                let cRect: CGRect = {
+                    if let rawCR = fdict["sourceColorRect"] as? String {
+                        return NSCoder.cgRect(for: rawCR)
+                    }
+                    let off = NSCoder.cgPoint(for: (fdict["offset"] as? String) ?? "{0,0}")
+                    return CGRect(
+                        x: (sSize.width - fRect.width) * 0.5 + off.x,
+                        y: (sSize.height - fRect.height) * 0.5 - off.y,
+                        width: fRect.width,
+                        height: fRect.height
+                    )
+                }()
                 if fRect.width > 0 && fRect.height > 0 && sSize.width > 0 && sSize.height > 0 {
                     parsedFrames[fname] = AtlasFrameMeta(frameRect: fRect, sourceColorRect: cRect, sourceSize: sSize, rotated: rotated)
                 }
@@ -557,7 +591,7 @@ final class CCBIAtlasStore: @unchecked Sendable {
                 if let renderedCG = rendered.cgImage {
                     let designSize = CGSize(width: outSize.width / atlas.pixelScale, height: outSize.height / atlas.pixelScale)
                     let finalUI = UIImage(cgImage: renderedCG, scale: atlas.pixelScale, orientation: .up)
-                    let entry = CCBISpriteEntry(image: finalUI, designSize: designSize)
+                    let entry = CCBISpriteEntry(image: finalUI, designSize: designSize, pixelScale: atlas.pixelScale)
                     lock.lock()
                     spriteCache[cacheKey] = entry
                     lock.unlock()
@@ -576,7 +610,7 @@ final class CCBIAtlasStore: @unchecked Sendable {
             let pxScale: CGFloat = (32.0 / 9.0)
             let designSize = CGSize(width: CGFloat(rawCG.width) / pxScale, height: CGFloat(rawCG.height) / pxScale)
             let finalUI = UIImage(cgImage: rawCG, scale: pxScale, orientation: .up)
-            let entry = CCBISpriteEntry(image: finalUI, designSize: designSize)
+            let entry = CCBISpriteEntry(image: finalUI, designSize: designSize, pixelScale: pxScale)
             lock.lock()
             spriteCache[cacheKey] = entry
             lock.unlock()
@@ -601,7 +635,8 @@ final class CCBIAtlasStore: @unchecked Sendable {
               let dict = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
               let sheet = dict["Sprite_Sheet"] as? String,
               let sourceFrame = dict["Source_Frame"] as? String,
-              let entry = sprite(for: sourceFrame, explicitSheet: sheet) else {
+              let entry = sprite(for: sourceFrame, explicitSheet: sheet),
+              let cg = entry.image.cgImage else {
             return nil
         }
 
@@ -622,7 +657,16 @@ final class CCBIAtlasStore: @unchecked Sendable {
             bottom: ptSize.height * bottomF * vScale,
             trailing: ptSize.width * rightF * hScale
         )
-        let res = CCBIMCFSEntry(image: entry.image, capInsets: insets)
+        let res = CCBIMCFSEntry(
+            image: entry.image,
+            capInsets: insets,
+            cgImage: cg,
+            pixelScale: entry.pixelScale,
+            leftF: leftF,
+            rightF: rightF,
+            topF: topF,
+            bottomF: bottomF
+        )
         lock.lock()
         mcfsCache[stem] = res
         lock.unlock()
@@ -675,6 +719,8 @@ private struct CCBINodeRenderer: View {
     let parentDesignSize: CGSize
     let scaleFactor: CGFloat
     let context: CCBIBindingContext
+    var positionOverride: (CGFloat, CGFloat)? = nil
+    var anchorOverride: CGPoint? = nil
 
     private var childContext: CCBIBindingContext {
         if node.varName.isEmpty { return context }
@@ -686,20 +732,20 @@ private struct CCBINodeRenderer: View {
     var body: some View {
         let isVisible = resolveVisible()
         if isVisible {
-            let resolvedSize = resolveContentSize(node: node, parentSize: parentDesignSize)
-            let anchor = resolveAnchorPoint(node: node)
-            let (posSX, posSY) = resolvePosition(node: node, parentSize: parentDesignSize)
+            let subFileRoot = loadSubCCBFileIfNeeded()
+            let resolvedSize = resolveContentSize(node: node, parentSize: parentDesignSize, subRoot: subFileRoot)
+            let anchor = effectiveAnchorPoint(node: node, subRoot: subFileRoot)
+            let (posSX, posSY) = positionOverride ?? resolvePosition(node: node, parentSize: parentDesignSize)
             let (scaleX, scaleY) = resolveScale(node: node)
             let rotationDeg = resolveFloat("rotation", default: 0)
             let opacity = resolveFloat("opacity", default: 1)
 
-            // In SwiftUI, top-left of node's frame places anchor point (anchor.x * w, (1 - anchor.y) * h) at (posSX, posSY)
             let swiftAnchorX = anchor.x
             let swiftAnchorY = 1.0 - anchor.y
 
-            let core = nodeContent(designSize: resolvedSize, isButtonRoot: isInteractiveItem)
-                .frame(width: max(0, resolvedSize.width * scaleFactor),
-                       height: max(0, resolvedSize.height * scaleFactor),
+            let core = nodeContent(designSize: resolvedSize, subFileRoot: subFileRoot)
+                .frame(width: resolvedSize.width > 0 ? resolvedSize.width * scaleFactor : nil,
+                       height: resolvedSize.height > 0 ? resolvedSize.height * scaleFactor : nil,
                        alignment: .topLeading)
                 .scaleEffect(x: scaleX, y: scaleY, anchor: UnitPoint(x: swiftAnchorX, y: swiftAnchorY))
                 .rotationEffect(.degrees(Double(rotationDeg)), anchor: UnitPoint(x: swiftAnchorX, y: swiftAnchorY))
@@ -723,8 +769,14 @@ private struct CCBINodeRenderer: View {
         }
     }
 
-    private var isInteractiveItem: Bool {
-        node.cls.contains("MenuItem") || node.base.contains("MenuItem") || node.cls == "LockablePlayButton"
+    private func loadSubCCBFileIfNeeded() -> CCBINode? {
+        guard (node.cls == "CCBFile" || node.base == "CCBFile"),
+              case let .str(ccb) = node.props["ccbFile"],
+              let subRoot = CCBIAtlasStore.shared.loadCCBI(named: ccb) else {
+            return nil
+        }
+        applyOverrides(from: node, to: subRoot)
+        return subRoot
     }
 
     private func resolveBlockSelector() -> String? {
@@ -748,22 +800,39 @@ private struct CCBINodeRenderer: View {
         return def
     }
 
+    private func effectiveAnchorPoint(node: CCBINode, subRoot: CCBINode?) -> CGPoint {
+        if let ao = anchorOverride { return ao }
+        if let subRoot, node.props["anchorPoint"] == nil, node.props["ignoreAnchorPointForPosition"] == nil {
+            return resolveAnchorPoint(node: subRoot)
+        }
+        return resolveAnchorPoint(node: node)
+    }
+
     private func resolveAnchorPoint(node: CCBINode) -> CGPoint {
-        if case let .bool(ign) = node.props["ignoreAnchorPointForPosition"], ign {
+        if case let .bool(ign) = node.props["ignoreAnchorPointForPosition"] {
+            if ign { return .zero }
+        } else if node.cls == "CCLayer" || node.base == "CCLayer" ||
+                  node.cls == "CCNodeColor" || node.base == "CCNodeColor" ||
+                  node.cls == "CCLayerColor" || node.base == "CCLayerColor" {
             return .zero
         }
         if case let .point(x, y) = node.props["anchorPoint"] {
             return CGPoint(x: x, y: y)
         }
-        switch node.cls {
-        case "CCSprite", "MCAutoScalableSprite", "MCFramedSprite", "MCLabelTTF", "CCLabelTTF":
+        let isMenuItem = node.cls.contains("MenuItem") || node.base.contains("MenuItem")
+        if !isMenuItem && (
+            node.cls == "CCSprite" || node.base == "CCSprite" ||
+            node.cls == "MCAutoScalableSprite" || node.base == "MCAutoScalableSprite" ||
+            node.cls == "MCFramedSprite" || node.base == "MCFramedSprite" ||
+            node.cls == "MCLabelTTF" || node.base == "MCLabelTTF" ||
+            node.cls == "CCLabelTTF" ||
+            node.cls == "CCHybridMenu" || node.base == "CCHybridMenu" ||
+            node.cls == "CCMenu" || node.base == "CCMenu" ||
+            node.cls == "MCAlignmentNode" || node.base == "MCAlignmentNode"
+        ) {
             return CGPoint(x: 0.5, y: 0.5)
-        default:
-            if node.base == "CCSprite" || node.base == "MCFramedSprite" || node.base == "MCLabelTTF" || node.base == "MCAutoScalableSprite" {
-                return CGPoint(x: 0.5, y: 0.5)
-            }
-            return .zero
         }
+        return .zero
     }
 
     private func resolveScale(node: CCBINode) -> (CGFloat, CGFloat) {
@@ -781,16 +850,11 @@ private struct CCBINodeRenderer: View {
         let py: CGFloat = (yUnit == 2) ? rawY * parentSize.height : rawY
         // Convert Cocos2d ReferenceCorner -> SwiftUI top-left coordinates (design points)
         switch refCorner {
-        case 0: // Bottom-Left
-            return (px, parentSize.height - py)
-        case 1: // Top-Left
-            return (px, py)
-        case 2: // Top-Right
-            return (parentSize.width - px, py)
-        case 3: // Bottom-Right
-            return (parentSize.width - px, parentSize.height - py)
-        default:
-            return (px, parentSize.height - py)
+        case 0: return (px, parentSize.height - py)
+        case 1: return (px, py)
+        case 2: return (parentSize.width - px, py)
+        case 3: return (parentSize.width - px, parentSize.height - py)
+        default: return (px, parentSize.height - py)
         }
     }
 
@@ -804,24 +868,31 @@ private struct CCBINodeRenderer: View {
         return nil
     }
 
-    private func resolveContentSize(node: CCBINode, parentSize: CGSize) -> CGSize {
-        if node.cls == "CCBFile" || node.base == "CCBFile",
-           case let .str(ccb) = node.props["ccbFile"],
-           let subRoot = CCBIAtlasStore.shared.loadCCBI(named: ccb) {
-            applyOverrides(from: node, to: subRoot)
-            let w: CGFloat
-            let h: CGFloat
+    private func resolveContentSize(node: CCBINode, parentSize: CGSize, subRoot: CCBINode? = nil) -> CGSize {
+        if let sub = subRoot {
             if case let .size(rw, rh, wu, hu, _) = node.props["contentSize"], (rw > 0 || rh > 0) {
-                w = evalDim(rw, unit: wu, parent: parentSize.width)
-                h = evalDim(rh, unit: hu, parent: parentSize.height)
-            } else {
-                let s = resolveContentSize(node: subRoot, parentSize: parentSize)
-                w = s.width; h = s.height
+                return CGSize(width: evalDim(rw, unit: wu, parent: parentSize.width),
+                              height: evalDim(rh, unit: hu, parent: parentSize.height))
             }
-            return CGSize(width: w, height: h)
+            return resolveContentSize(node: sub, parentSize: parentSize, subRoot: nil)
         }
-        if let entry = spriteEntryForNode(node),
-           node.props["contentSize"] == nil {
+        if (node.cls == "CCBFile" || node.base == "CCBFile"),
+           case let .str(ccb) = node.props["ccbFile"],
+           let sub = CCBIAtlasStore.shared.loadCCBI(named: ccb) {
+            applyOverrides(from: node, to: sub)
+            if case let .size(rw, rh, wu, hu, _) = node.props["contentSize"], (rw > 0 || rh > 0) {
+                return CGSize(width: evalDim(rw, unit: wu, parent: parentSize.width),
+                              height: evalDim(rh, unit: hu, parent: parentSize.height))
+            }
+            return resolveContentSize(node: sub, parentSize: parentSize, subRoot: nil)
+        }
+        if let entry = spriteEntryForNode(node), node.props["contentSize"] == nil {
+            if (node.cls == "MCAutoScalableSprite" || node.base == "MCAutoScalableSprite" || node.varName == "_defaultImage"),
+               parentSize.width > 0 && parentSize.height > 0,
+               (entry.designSize.width > parentSize.width || entry.designSize.height > parentSize.height) {
+                let k = min(parentSize.width / entry.designSize.width, parentSize.height / entry.designSize.height)
+                return CGSize(width: entry.designSize.width * k, height: entry.designSize.height * k)
+            }
             return entry.designSize
         }
         if case let .size(rw, rh, wu, hu, _) = node.props["contentSize"] {
@@ -831,9 +902,51 @@ private struct CCBINodeRenderer: View {
                 w = entry.designSize.width
                 h = entry.designSize.height
             }
-            return CGSize(width: w, height: h)
+            if w > 0 || h > 0 {
+                return CGSize(width: w, height: h)
+            }
+        }
+        if (node.cls.contains("MenuItem") || node.base.contains("MenuItem")),
+           case let .int(normTag) = node.props["normalNodeTag"] {
+            for c in node.children {
+                if case let .int(tag) = c.props["name"], tag == normTag {
+                    return resolveContentSize(node: c, parentSize: parentSize, subRoot: nil)
+                }
+            }
+        }
+        if node.cls == "MCAlignmentNode" || node.base == "MCAlignmentNode" {
+            let gap = alignmentSpacing(node)
+            let visibleChildren = node.children.filter { childIsVisible($0) }
+            if !visibleChildren.isEmpty {
+                var totalW: CGFloat = 0
+                var maxH: CGFloat = 0
+                for c in visibleChildren {
+                    let cs = resolveContentSize(node: c, parentSize: parentSize, subRoot: nil)
+                    totalW += cs.width
+                    maxH = max(maxH, cs.height)
+                }
+                totalW += gap * CGFloat(max(0, visibleChildren.count - 1))
+                return CGSize(width: totalW, height: maxH)
+            }
+        }
+        if node.cls == "MCLabelTTF" || node.base == "MCLabelTTF" || node.cls == "CCLabelTTF" {
+            return measureLabelDesignSize(parentDesignSize: parentSize)
         }
         return .zero
+    }
+
+    private func alignmentSpacing(_ n: CCBINode) -> CGFloat {
+        if case let .fltInt(sp, _) = n.props["spacing"] { return sp }
+        if case let .float(sp) = n.props["spacing"] { return sp }
+        return 0
+    }
+
+    private func childIsVisible(_ c: CCBINode) -> Bool {
+        if let ov = childContext.scopedLookup(childContext.visibilityOverrides, varName: c.varName) {
+            return ov
+        }
+        if case let .bool(v) = c.props["visible"] { return v }
+        return true
     }
 
     private func evalDim(_ v: CGFloat, unit: Int, parent: CGFloat) -> CGFloat {
@@ -848,16 +961,14 @@ private struct CCBINodeRenderer: View {
         for (k, v) in owner.props where k.hasPrefix("override:") {
             let comps = k.split(separator: ":", maxSplits: 2).map(String.init)
             if comps.count == 3 {
-                let varTarget = comps[1]
-                let propName = comps[2]
-                setPropRecursive(node: subRoot, varTarget: varTarget, propName: propName, val: v)
+                setPropRecursive(node: subRoot, varTarget: comps[1], propName: comps[2], val: v)
             }
         }
     }
 
     private func setPropRecursive(node: CCBINode, varTarget: String, propName: String, val: CCBIPropValue) {
         if node.varName == varTarget || varTarget == "Content Size" || varTarget == "Button Size" {
-            if propName == "contentSize" || propName == "visible" || propName == "descriptionName" || propName == "string" || propName == "color" || propName == "outlineColor" {
+            if propName == "contentSize" || propName == "visible" || propName == "descriptionName" || propName == "string" || propName == "color" || propName == "outlineColor" || propName == "fontColor" {
                 node.props[propName] = val
                 if varTarget != "Content Size" && varTarget != "Button Size" { return }
             }
@@ -867,17 +978,71 @@ private struct CCBINodeRenderer: View {
         }
     }
 
+    private func filteredNormalChildren(designSize: CGSize) -> [(node: CCBINode, posOverride: (CGFloat, CGFloat)?, anchorOverride: CGPoint?)] {
+        if node.cls == "MCAlignmentNode" || node.base == "MCAlignmentNode" {
+            let gap = alignmentSpacing(node)
+            var out: [(CCBINode, (CGFloat, CGFloat)?, CGPoint?)] = []
+            var curX: CGFloat = 0
+            for c in node.children where childIsVisible(c) {
+                let cs = resolveContentSize(node: c, parentSize: parentDesignSize, subRoot: nil)
+                out.append((c, (curX + cs.width * 0.5, designSize.height * 0.5), CGPoint(x: 0.5, y: 0.5)))
+                curX += cs.width + gap
+            }
+            return out
+        }
+
+        let normTag: Int? = {
+            if case let .int(t) = node.props["normalNodeTag"] { return t }
+            return nil
+        }()
+        let selTag: Int? = {
+            if (node.cls.contains("MenuItem") || node.base.contains("MenuItem")),
+               case let .int(t) = node.props["selectedNodeTag"], t != normTag {
+                return t
+            }
+            return nil
+        }()
+        let disTag: Int? = {
+            if (node.cls.contains("MenuItem") || node.base.contains("MenuItem")),
+               case let .int(t) = node.props["disabledNodeTag"], t != normTag {
+                return t
+            }
+            return nil
+        }()
+
+        return node.children.compactMap { c in
+            if case let .int(tag) = c.props["name"], tag == selTag || tag == disTag {
+                return nil
+            }
+            return (c, nil, nil)
+        }
+    }
+
     @ViewBuilder
-    private func nodeContent(designSize: CGSize, isButtonRoot: Bool) -> some View {
+    private func nodeContent(designSize: CGSize, subFileRoot: CCBINode?) -> some View {
         let wPx = max(0, designSize.width * scaleFactor)
         let hPx = max(0, designSize.height * scaleFactor)
+        let customSlot = context.scopedLookup(context.slotViews, varName: node.varName)
+        let suppressDefaultsForSlot = customSlot != nil && (
+            node.varName == "_playerAvatar" ||
+            node.varName == "_rewardSprite" ||
+            node.varName == "_buttonIcon" ||
+            node.varName == "_skinsButtonSprite" ||
+            node.varName == "_staticPlayButtonsContainer"
+        )
 
         ZStack(alignment: .topLeading) {
-            // 1. Sub-CCBI file inclusion
-            if (node.cls == "CCBFile" || node.base == "CCBFile"),
-               case let .str(ccb) = node.props["ccbFile"],
-               let subRoot = CCBIAtlasStore.shared.loadCCBI(named: ccb) {
-                let _ = applyOverrides(from: node, to: subRoot)
+            if suppressDefaultsForSlot, let customSlot {
+                customSlot.frame(width: wPx > 0 ? wPx : nil, height: hPx > 0 ? hPx : nil)
+            } else if let subRoot = subFileRoot {
+                let _ = {
+                    subRoot.props["position"] = .pos(x: 0, y: 0, refCorner: 1, xUnit: 0, yUnit: 0, c: 0)
+                    subRoot.props["anchorPoint"] = .point(0, 1)
+                    subRoot.props["ignoreAnchorPointForPosition"] = .bool(false)
+                    if designSize.width > 0 || designSize.height > 0 {
+                        subRoot.props["contentSize"] = .size(w: designSize.width, h: designSize.height, wUnit: 0, hUnit: 0, c: 0)
+                    }
+                }()
                 CCBINodeRenderer(
                     node: subRoot,
                     parentDesignSize: designSize,
@@ -885,19 +1050,23 @@ private struct CCBINodeRenderer: View {
                     context: childContext
                 )
             } else {
-                // 2. Background / Visual node body
-                if node.cls == "CCNodeColor" || node.base == "CCNodeColor",
-                   case let .rgba(r, g, b, a) = node.props["color"] {
-                    let nr = r > 1.0 ? r / 255.0 : r
-                    let ng = g > 1.0 ? g / 255.0 : g
-                    let nb = b > 1.0 ? b / 255.0 : b
-                    let na = a > 1.0 ? a / 255.0 : a
-                    Rectangle().fill(Color(red: nr, green: ng, blue: nb, opacity: na))
+                // Background / Visual node body
+                if node.cls == "CCNodeColor" || node.base == "CCNodeColor" {
+                    if case let .rgba(r, g, b, a) = node.props["color"] {
+                        let nr = r > 1.0 ? r / 255.0 : r
+                        let ng = g > 1.0 ? g / 255.0 : g
+                        let nb = b > 1.0 ? b / 255.0 : b
+                        let na = a > 1.0 ? a / 255.0 : a
+                        Rectangle().fill(Color(red: nr, green: ng, blue: nb, opacity: na))
+                    } else {
+                        Rectangle().fill(Color.white)
+                    }
                 } else if (node.cls == "MCFramedSprite" || node.base == "MCFramedSprite"),
                           case let .str(desc) = node.props["descriptionName"],
                           let mcfs = CCBIAtlasStore.shared.mcfs(for: desc) {
-                    Image(uiImage: mcfs.image)
-                        .resizable(capInsets: mcfs.capInsets, resizingMode: .stretch)
+                    let pair = mcfs.uiImageAndInsets(forUIScale: scaleFactor)
+                    Image(uiImage: pair.0)
+                        .resizable(capInsets: pair.1, resizingMode: .stretch)
                         .frame(width: wPx, height: hPx)
                 } else if let sp = spriteEntryForNode(node) {
                     let img = Image(uiImage: sp.image).resizable()
@@ -909,29 +1078,29 @@ private struct CCBINodeRenderer: View {
                         img.frame(width: wPx, height: hPx)
                     }
                 } else if node.cls == "MCLabelTTF" || node.base == "MCLabelTTF" || node.cls == "CCLabelTTF" {
-                    renderLabel(designSize: designSize)
+                    buildLabelView(designSize: designSize)
                 }
 
-                // 3. Child nodes
-                ForEach(node.children) { child in
+                // Child nodes
+                ForEach(Array(filteredNormalChildren(designSize: designSize).enumerated()), id: \.element.node.id) { _, entry in
                     CCBINodeRenderer(
-                        node: child,
+                        node: entry.node,
                         parentDesignSize: designSize,
                         scaleFactor: scaleFactor,
-                        context: childContext
+                        context: childContext,
+                        positionOverride: entry.posOverride,
+                        anchorOverride: entry.anchorOverride
                     )
                 }
             }
 
-            // 4. Slot view injection (live TextField, skin circle, or custom panels — works for CCBFile containers too)
-            if let custom = context.scopedLookup(context.slotViews, varName: node.varName) {
-                custom.frame(width: wPx > 0 ? wPx : nil, height: hPx > 0 ? hPx : nil)
+            if !suppressDefaultsForSlot, let customSlot {
+                customSlot.frame(width: wPx > 0 ? wPx : nil, height: hPx > 0 ? hPx : nil)
             }
         }
     }
 
-    @ViewBuilder
-    private func renderLabel(designSize: CGSize) -> some View {
+    private func resolveLabelTextAndFont() -> (text: String, fontName: String, fontSizeDesign: CGFloat) {
         let rawKey: String = {
             if let ov = context.scopedLookup(context.labelOverrides, varName: node.varName) {
                 return ov
@@ -954,32 +1123,68 @@ private struct CCBINodeRenderer: View {
             return "OpenSans-Bold"
         }()
 
-        let fontSizePt: CGFloat = {
-            if case let .fltInt(sz, _) = node.props["fontSize"] { return sz * scaleFactor }
-            if case let .float(sz) = node.props["fontSize"] { return sz * scaleFactor }
-            return 14 * scaleFactor
+        let fontSizeDesign: CGFloat = {
+            if case let .fltInt(sz, _) = node.props["fontSize"] { return sz }
+            if case let .float(sz) = node.props["fontSize"] { return sz }
+            return 14.0
         }()
 
-        let textColor: Color = {
-            if case let .rgba(r, g, b, a) = node.props["color"] {
-                let alpha = a > 1.0 ? a / 255.0 : a
-                return Color(red: r, green: g, blue: b, opacity: alpha)
-            }
-            if case let .rgba(r, g, b, a) = node.props["fontColor"] {
-                let alpha = a > 1.0 ? a / 255.0 : a
-                return Color(red: r, green: g, blue: b, opacity: alpha)
-            }
-            return .white
-        }()
+        return (rawKey, fontName, fontSizeDesign)
+    }
 
-        let outlineColor: Color? = {
-            if case let .bool(fx) = node.props["useFontEffects"], fx,
-               case let .rgba(r, g, b, a) = node.props["outlineColor"] {
-                let alpha = a > 1.0 ? a / 255.0 : a
-                return Color(red: r, green: g, blue: b, opacity: alpha)
-            }
-            return nil
-        }()
+    private func requestedLabelConstraint(parentDesignSize: CGSize) -> CGFloat {
+        if case let .size(rw, _, wu, _, _) = node.props["requestedDimensions"] {
+            let w = evalDim(rw, unit: wu, parent: parentDesignSize.width)
+            if w > 1.0 { return w }
+        }
+        return 0
+    }
+
+    private func measureLabelDesignSize(parentDesignSize: CGSize) -> CGSize {
+        let spec = resolveLabelTextAndFont()
+        guard !spec.text.isEmpty else { return .zero }
+        let uiFont = UIFont(name: spec.fontName, size: max(7, spec.fontSizeDesign))
+            ?? UIFont.systemFont(ofSize: max(7, spec.fontSizeDesign), weight: .bold)
+        let reqW = requestedLabelConstraint(parentDesignSize: parentDesignSize)
+        let boundW = reqW > 0 ? reqW : 10000
+        let rect = (spec.text as NSString).boundingRect(
+            with: CGSize(width: boundW, height: 10000),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: uiFont],
+            context: nil
+        )
+        let w = reqW > 0 ? min(reqW, ceil(rect.width) + 2) : (ceil(rect.width) + 2)
+        return CGSize(width: w, height: ceil(rect.height) + 2)
+    }
+
+    private func normalizedRGBA(_ prop: CCBIPropValue?) -> (r: Double, g: Double, b: Double, a: Double) {
+        guard case let .rgba(r, g, b, a) = prop else { return (1, 1, 1, 1) }
+        let nr = r > 1.0 ? r / 255.0 : r
+        let ng = g > 1.0 ? g / 255.0 : g
+        let nb = b > 1.0 ? b / 255.0 : b
+        let na = a > 1.0 ? a / 255.0 : a
+        return (nr, ng, nb, na)
+    }
+
+    private func buildLabelView(designSize: CGSize) -> CCBILabelView {
+        let spec = resolveLabelTextAndFont()
+        let fc = normalizedRGBA(node.props["fontColor"])
+        let cc = normalizedRGBA(node.props["color"])
+        let textColor = Color(red: fc.r * cc.r, green: fc.g * cc.g, blue: fc.b * cc.b, opacity: fc.a * cc.a)
+
+        var outlineColor: Color? = nil
+        var outlinePx: CGFloat = 0
+        if case let .bool(fx) = node.props["useFontEffects"], fx,
+           let ocProp = node.props["outlineColor"] {
+            let oc = normalizedRGBA(ocProp)
+            outlineColor = Color(red: oc.r, green: oc.g, blue: oc.b, opacity: oc.a)
+            let rawW: CGFloat = {
+                if case let .fltInt(w, _) = node.props["outlineWidth"] { return w }
+                if case let .float(w) = node.props["outlineWidth"] { return w }
+                return 1.2
+            }()
+            outlinePx = max(0.8, rawW * scaleFactor * 0.85)
+        }
 
         let align: TextAlignment = {
             if case let .int(h) = node.props["horizontalAlignment"] {
@@ -989,11 +1194,51 @@ private struct CCBINodeRenderer: View {
             return .center
         }()
 
-        Text(rawKey)
-            .font(.custom(fontName, size: max(7, fontSizePt)))
-            .foregroundColor(textColor)
-            .multilineTextAlignment(align)
-            .fixedSize(horizontal: designSize.width <= 0, vertical: true)
-            .shadow(color: outlineColor ?? .clear, radius: 0, x: 0, y: max(1, 0.9 * scaleFactor))
+        let reqW = requestedLabelConstraint(parentDesignSize: parentDesignSize)
+        return CCBILabelView(
+            text: spec.text,
+            fontName: spec.fontName,
+            fontSize: max(7, spec.fontSizeDesign * scaleFactor),
+            textColor: textColor,
+            outlineColor: outlineColor,
+            outlineWidth: outlinePx,
+            alignment: align,
+            constrainWidth: reqW > 0 || designSize.width > 0
+        )
+    }
+}
+
+private struct CCBILabelView: View {
+    let text: String
+    let fontName: String
+    let fontSize: CGFloat
+    let textColor: Color
+    let outlineColor: Color?
+    let outlineWidth: CGFloat
+    let alignment: TextAlignment
+    let constrainWidth: Bool
+
+    var body: some View {
+        let base = Text(text)
+            .font(.custom(fontName, size: fontSize))
+            .multilineTextAlignment(alignment)
+            .fixedSize(horizontal: !constrainWidth, vertical: true)
+
+        if let oc = outlineColor, outlineWidth > 0 {
+            let d = outlineWidth
+            ZStack {
+                base.foregroundColor(oc).offset(x: -d, y: 0)
+                base.foregroundColor(oc).offset(x: d, y: 0)
+                base.foregroundColor(oc).offset(x: 0, y: -d)
+                base.foregroundColor(oc).offset(x: 0, y: d)
+                base.foregroundColor(oc).offset(x: -d * 0.7, y: -d * 0.7)
+                base.foregroundColor(oc).offset(x: d * 0.7, y: -d * 0.7)
+                base.foregroundColor(oc).offset(x: -d * 0.7, y: d * 0.7)
+                base.foregroundColor(oc).offset(x: d * 0.7, y: d * 0.7)
+                base.foregroundColor(textColor)
+            }
+        } else {
+            base.foregroundColor(textColor)
+        }
     }
 }
