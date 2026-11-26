@@ -13205,7 +13205,8 @@ struct MainMenu: View {
                 }
                 Button(action: { SoundManager.shared.play(.menuClick); withAnimation { activeInfoTab = nil } }) {
                     Text("Close").font(.custom("UbuntuSans-Bold", size: 18)).foregroundColor(.white)
-                        .frame(maxWidth: .infinity, height: 46)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 46)
                         .background(
                             Image("ui-btn-blue")
                                 .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
@@ -13478,7 +13479,8 @@ struct MainMenu: View {
                         
                         Button(action: { SoundManager.shared.play(.menuClick); withAnimation { showSettings = false } }) {
                             Text("Done").font(.custom("UbuntuSans-Bold", size: 20)).foregroundColor(.white)
-                                .frame(maxWidth: .infinity, height: 48)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 48)
                                 .background(
                                     Image("ui-btn-blue")
                                         .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)

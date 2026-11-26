@@ -235,7 +235,8 @@ struct GiftsNewsModalView: View {
                             giftClaimed = true
                         }) {
                             Text("Claim Gift").font(.custom("UbuntuSans-Bold", size: 17)).foregroundColor(.white)
-                                .frame(maxWidth: .infinity, height: 46)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 46)
                                 .background(Image("ui-btn-green").resizable(capInsets: modalCapInsets, resizingMode: .stretch))
                         }
                     }
@@ -286,7 +287,8 @@ struct MatchResultsModalView: View {
                         Text("Menu")
                             .font(.custom("UbuntuSans-Bold", size: 18))
                             .foregroundColor(.white)
-                            .frame(maxWidth: .infinity, height: 48)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
                             .background(Image("ui-btn-orange").resizable(capInsets: modalCapInsets, resizingMode: .stretch))
                     }
                     Button(action: {
@@ -296,7 +298,8 @@ struct MatchResultsModalView: View {
                         Text("Play Again")
                             .font(.custom("UbuntuSans-Bold", size: 18))
                             .foregroundColor(.white)
-                            .frame(maxWidth: .infinity, height: 48)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
                             .background(Image("ui-btn-classic").resizable(capInsets: modalCapInsets, resizingMode: .stretch))
                     }
                 }
