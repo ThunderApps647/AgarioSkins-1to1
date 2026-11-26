@@ -29,8 +29,12 @@ enum OriginalGameplay {
     static let directionAngleVariation: Double = 0.2
     static let spawnFoodVelocityVariation: Double = 0.2
     static let minVelocityToMove: Double = 0.01
+    /// Split child offset from the parent centre (`mitosisPositionFactor` = 20).
+    static let mitosisPositionFactor: Double = 20
 
     static let scaleFactorForEating: Double = 0.866
+    /// Cell must be this much heavier than a virus to eat it (`1 / 0.866^2`).
+    static let eatMassRatio: Double = 1.0 / (scaleFactorForEating * scaleFactorForEating)
     static let scaleFactorForMergingBack: Double = 0.999
     static let overlapRatioForEating: Double = 0.5
     static let maxMagnitudeFactor: Double = 1.5

@@ -65,7 +65,7 @@ enum SrvRules {
     static let minEjectMass: Double = OriginalGameplay.minEjectMass
     static let ejectPelletMass: Double = OriginalGameplay.ejectPelletMass
     static let splitEjectionForce: Double = OriginalGameplay.splitImpulsePerSecond
-    static let eatMassRatio: Double = 1.0 / (OriginalGameplay.scaleFactorForEating * OriginalGameplay.scaleFactorForEating)
+    static let eatMassRatio: Double = OriginalGameplay.eatMassRatio
     static let virusBaseMass: Double = OriginalGameplay.virusBaseMass
     static let virusSplitThreshold: Double = OriginalGameplay.virusSplitMass
     static let virusPopMinMass: Double = OriginalGameplay.virusBaseMass * eatMassRatio
@@ -974,7 +974,7 @@ final class SrvWorld {
                               y: targetPoint.y - cells[index].position.y)
                 launchDirection = (abs(tv.x) >= 0.1 || abs(tv.y) >= 0.1) ? tv.normalized() : .zero
             }
-            let spawnOffset = visualRadius * 0.4
+            let spawnOffset = OriginalGameplay.mitosisPositionFactor
             var spawnPos = cells[index].position
             spawnPos.x += launchDirection.x * spawnOffset
             spawnPos.y += launchDirection.y * spawnOffset
@@ -1082,8 +1082,9 @@ final class SrvWorld {
         let baseAngle = atan2(baseDirection.y, baseDirection.x)
         let travelAngle = baseAngle + Double.random(in: -OriginalGameplay.directionAngleVariation...OriginalGameplay.directionAngleVariation)
         let travelDirection = SrvVec2(x: cos(travelAngle), y: sin(travelAngle)).normalized()
-        let startPosition = SrvVec2(x: cell.position.x + travelDirection.x * (cell.cachedRadius + 1),
-                                 y: cell.position.y + travelDirection.y * (cell.cachedRadius + 1))
+        let spawnDistance = cell.cachedRadius - 2 * OriginalGameplay.shotMassBaseRadius
+        let startPosition = SrvVec2(x: cell.position.x + travelDirection.x * spawnDistance,
+                                 y: cell.position.y + travelDirection.y * spawnDistance)
         let speedVariation = Double.random(in: (1.0 - OriginalGameplay.spawnFoodVelocityVariation)...(1.0 + OriginalGameplay.spawnFoodVelocityVariation))
         let initialSpeed = OriginalGameplay.ejectImpulsePerSecond * speedVariation * min(1.6, max(0.30, distanceScale))
 
@@ -1880,58 +1881,22 @@ final class SrvWorld {
         events.append(.tokensAdded(tokens: added))
     }
 
-    /// Client-parity virus split-mass distribution.
+    /// Exact Agar.io virus shatter distribution (`AgarCell::eatVirus`): recursive
+    /// binary splits, so the piece count is the largest power of two whose last
+    /// parent can still split (radius >= minRadiusToSplit) and whose owner stays
+    /// under the 16-cell cap. Every final piece has equal mass.
     func calculateVirusSplitMass(mass: Double, maxSplits: Int) -> [Double] {
-        let playerMinSize = 32.0
-        let minMass = playerMinSize * playerMinSize / 100
-        let throwSize = playerMinSize + 12
-        let throwMass = throwSize * throwSize / 100
-        var curMass = mass
-        var maxCount = maxSplits
-        while maxCount > 1 && (curMass / Double(maxCount - 1)) < throwMass { maxCount = maxCount / 2 }
-        if maxCount < 2 { return [mass] }
-        let splitMassBase = curMass / Double(maxCount)
-        if splitMassBase < minMass { return [mass] }
-        var masses: [Double] = []
-        if maxCount < 3 || maxCount < maxSplits || (curMass / throwMass) <= 30 {
-            for _ in 0..<maxCount { masses.append(splitMassBase) }
-            return masses
+        guard mass > 0, maxSplits >= 2 else { return [mass] }
+        var pieces = 1
+        var parentRadius = radiusForMass(mass)
+        let cap = min(maxSplits, 16)
+        while parentRadius >= OriginalGameplay.minRadiusToSplit,
+              pieces * 2 <= cap {
+            pieces *= 2
+            parentRadius /= 2.0.squareRoot()
         }
-        var restCount = maxCount
-        while restCount > 2 {
-            let sMass = curMass / 2
-            if sMass <= throwMass { break }
-            let maxSafety = curMass - throwMass * Double(restCount - 1)
-            if maxSafety <= throwMass || sMass >= maxSafety { break }
-            masses.append(sMass); curMass -= sMass; restCount -= 1
-        }
-        var sMass = curMass / 4
-        if sMass > throwMass {
-            while restCount > 2 {
-                let maxSafety = curMass - throwMass * Double(restCount - 1)
-                if maxSafety <= throwMass || sMass >= maxSafety { break }
-                masses.append(sMass); curMass -= sMass; restCount -= 1
-            }
-        }
-        sMass = curMass / 8
-        if sMass > throwMass {
-            while restCount > 2 {
-                let maxSafety = curMass - throwMass * Double(restCount - 1)
-                if maxSafety <= throwMass || sMass >= maxSafety { break }
-                masses.append(sMass); curMass -= sMass; restCount -= 1
-            }
-        }
-        if restCount > 1 {
-            sMass = curMass - throwMass * Double(restCount - 1)
-            if sMass > throwMass {
-                masses.append(sMass); curMass -= sMass; restCount -= 1
-            }
-        }
-        if restCount > 0 {
-            sMass = curMass / Double(restCount)
-            while restCount > 0 { masses.append(sMass); restCount -= 1 }
-        }
-        return masses
+        guard pieces > 1 else { return [mass] }
+        return Array(repeating: mass / Double(pieces), count: pieces)
     }
 
     private func handleVirusCollisions(index: SrvCellIndex) {
@@ -1953,7 +1918,7 @@ final class SrvWorld {
                 poppedCellIDs.insert(c.id)
                 guard c.index < cells.count else { return }
                 let ownerID = c.ownerID
-                let newTotalMass = cells[c.index].targetMass + 100
+                let newTotalMass = cells[c.index].targetMass + OriginalGameplay.virusBaseMass
                 var ownerCellCount = 0
                 for cc in cells where cc.ownerID == ownerID { ownerCellCount += 1 }
                 let maxSplits = settings.maxCellsPerOwner - ownerCellCount + 1
@@ -1988,27 +1953,39 @@ final class SrvWorld {
         for action in splitActions {
             guard let cellIdx = cells.firstIndex(where: { $0.id == action.cellID }) else { continue }
             let massList = action.massDistribution
-            let poppedHalvesFont = cells[cellIdx].targetMass + 100 >= 4000
-            cells[cellIdx].targetMass = massList[0]
-            guard massList.count > 1 else { continue }
-            var angle = Double.random(in: 0...(2 * .pi))
-            let step = (2 * Double.pi) / Double(massList.count - 1)
-            for k in 1..<massList.count {
-                let mass = massList[k]
-                let dynamicMergeTime = 30.0 + mass * 0.02
+            let pieceMass = massList[0]
+            if massList.count < 2 {
+                cells[cellIdx].targetMass = pieceMass
+                continue
+            }
+            let ws = SrvRules.worldSize
+            let spawnOffset = OriginalGameplay.mitosisPositionFactor
+            let pieceRadius = radiusForMass(pieceMass)
+            let poppedHalvesFont = cells[cellIdx].targetMass + OriginalGameplay.virusBaseMass >= 4000
+            let parentVelocity = cells[cellIdx].velocity
+            cells[cellIdx].targetMass = pieceMass
+            cells[cellIdx].mergeTimer = 30.0 + pieceMass * 0.02
+            cells[cellIdx].canMerge = false
+            for _ in 1..<massList.count {
+                let angle = Double.random(in: 0..<(2 * Double.pi))
                 let direction = SrvVec2(x: cos(angle), y: sin(angle))
-                let speed = 20.0
+                var spawn = cells[cellIdx].position
+                spawn.x += direction.x * spawnOffset
+                spawn.y += direction.y * spawnOffset
+                spawn.x = min(ws - pieceRadius, max(pieceRadius, spawn.x))
+                spawn.y = min(ws - pieceRadius, max(pieceRadius, spawn.y))
                 var newCell = SrvCell(id: newID(), ownerID: cells[cellIdx].ownerID,
-                                   position: cells[cellIdx].position,
-                                   mass: mass * 0.5, targetMass: mass,
-                                   velocity: SrvVec2(x: direction.x * speed, y: direction.y * speed),
-                                   mergeTimer: dynamicMergeTime, splitTimer: 1.0)
+                                   position: spawn,
+                                   mass: pieceMass, targetMass: pieceMass,
+                                   velocity: parentVelocity,
+                                   mergeTimer: 30.0 + pieceMass * 0.02, splitTimer: 1.0)
+                newCell.velocity.x += direction.x * SrvRules.splitEjectionForce
+                newCell.velocity.y += direction.y * SrvRules.splitEjectionForce
                 newCell.splitImmunityTimer = 0.2
                 newCell.immuneToCellID = cells[cellIdx].id
+                newCell.splitBornAt = time
                 newCell.massFontHalved = poppedHalvesFont
                 cells.append(newCell)
-                angle += step
-                if angle >= 2 * .pi { angle -= 2 * .pi }
             }
         }
     }

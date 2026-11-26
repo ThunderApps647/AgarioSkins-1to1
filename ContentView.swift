@@ -6189,7 +6189,7 @@ struct ContentView: View {
         let travelAngle = baseAngle + Double.random(in: -OriginalGameplay.directionAngleVariation...OriginalGameplay.directionAngleVariation)
         let travelDirection = CGSize(width: CGFloat(cos(travelAngle)),
                                      height: CGFloat(sin(travelAngle))).normalized()
-        let edgeDistance = cell.cachedSolidRadius + 1
+        let edgeDistance = cell.cachedSolidRadius - 2 * OriginalGameplay.shotMassBaseRadiusCGFloat
         let startPosition = CGPoint(
             x: cell.position.x + travelDirection.width * edgeDistance,
             y: cell.position.y + travelDirection.height * edgeDistance
@@ -10742,7 +10742,7 @@ struct ContentView: View {
                     }
                 }
                 
-                let spawnOffset = visualRadius * 0.4
+                let spawnOffset = CGFloat(OriginalGameplay.mitosisPositionFactor)
                 var spawnPos = cells[index].position
                 spawnPos.x += launchDirection.width * spawnOffset
                 spawnPos.y += launchDirection.height * spawnOffset
@@ -11054,8 +11054,7 @@ struct ContentView: View {
         
         for (virusIdx, virus) in viruses.enumerated() {
             var popped = false
-            let baseVirusMass = CGFloat(OriginalGameplay.mass(forRadius: OriginalGameplay.virusBaseRadius))
-            let popThreshold = 133 * (virus.targetMass / baseVirusMass)
+            let popThreshold = virus.targetMass * CGFloat(OriginalGameplay.eatMassRatio)
             index.forEach(near: virus.position, radius: 1) { c in
                 if popped { return }
                 if c.mass < popThreshold { return }
@@ -11071,7 +11070,7 @@ struct ContentView: View {
                 
                 if c.isPlayer {
                     guard c.index < playerCells.count else { return }
-                    let newTotalMass = playerCells[c.index].targetMass + 100
+                    let newTotalMass = playerCells[c.index].targetMass + CGFloat(OriginalGameplay.virusBaseMass)
                     let maxSplits = 16 - playerCells.count + 1
                     var masses = calculateVirusSplitMass(mass: newTotalMass, maxSplits: maxSplits)
                     if masses.count > 1 {
@@ -11083,7 +11082,7 @@ struct ContentView: View {
                     splitActions.append((isBot: false, cellIndex: c.index, massDistribution: masses))
                 } else {
                     guard c.index < botCells.count else { return }
-                    let newTotalMass = botCells[c.index].targetMass + 100
+                    let newTotalMass = botCells[c.index].targetMass + CGFloat(OriginalGameplay.virusBaseMass)
                     let ownerID = botCells[c.index].ownerID
                     var currentOwnerCellCount = 0
                     for b in botCells where b.ownerID == ownerID { currentOwnerCellCount += 1 }
@@ -11109,88 +11108,100 @@ struct ContentView: View {
         }
         
         for action in splitActions {
-            let cellIdx = action.cellIndex
             let massList = action.massDistribution
-            let isBot = action.isBot
-            
-            if isBot {
-                if cellIdx < botCells.count {
-                    // Same font lineage rule as executeSplit, using the pre-pop mass
-                    // (current targetMass + the virus's 100 bonus): only the NEW pieces
-                    // go half - the popped cell itself keeps its own ratio.
-                    let poppedHalvesFont = botCells[cellIdx].targetMass + 100 >= massFontHalfThreshold
-                    botCells[cellIdx].targetMass = massList[0]
-                    guard massList.count > 1 else { continue }
-                    var angle = Double.random(in: 0...(2 * Double.pi))
-                    let step = (2 * Double.pi) / Double(massList.count - 1)
-                    
-                    for k in 1..<massList.count {
-                        let mass = massList[k]
-                        let dynamicMergeTime = 30.0 + (Double(mass) * 0.02)
-                        let direction = CGSize(width: cos(angle), height: sin(angle))
-                        let speed: CGFloat = 20
-                        
-                        var newCell = PlayerCell(
-                            ownerID: botCells[cellIdx].ownerID,
-                            position: botCells[cellIdx].position,
-                            mass: mass * 0.5,
-                            targetMass: mass,
-                            velocity: CGSize(width: direction.width * speed, height: direction.height * speed),
-                            mergeTimer: dynamicMergeTime,
-                            canMerge: false,
-                            splitTimer: 1.0, 
-                            color: botCells[cellIdx].color,
-                            name: botCells[cellIdx].name,
-                            skinName: botCells[cellIdx].skinName,
-                            isBot: true,
-                            isFeedBot: botCells[cellIdx].isFeedBot,
-                            aiSkillTier: botCells[cellIdx].aiSkillTier
-                        )
-                        newCell.splitImmunityTimer = 0.2
-                        newCell.immuneToCellID = botCells[cellIdx].id
-                        newCell.massFontHalved = poppedHalvesFont
-                        newCell.massFontScale = poppedHalvesFont ? 0.5 : 1.0
-                        newCell.aiAggression = botCells[cellIdx].aiAggression
-                        newCell.aiCaution = botCells[cellIdx].aiCaution
-                        
-                        botCells.append(newCell)
-                        angle += step
-                        if angle >= 2 * Double.pi { angle -= 2 * Double.pi }
-                    }
+            let pieceMass = massList[0]
+            // At the 16-cell cap the cell cannot shatter, but it still swallows
+            // the virus mass (the original adds the virus before trying to split).
+            if massList.count < 2 {
+                if action.isBot {
+                    if action.cellIndex < botCells.count { botCells[action.cellIndex].targetMass = pieceMass }
+                } else if action.cellIndex < playerCells.count {
+                    playerCells[action.cellIndex].targetMass = pieceMass
+                }
+                continue
+            }
+            let worldSize = OriginalGameplay.arenaSideLengthCGFloat
+            let spawnOffset = CGFloat(OriginalGameplay.mitosisPositionFactor)
+            let impulse = CGFloat(OriginalGameplay.splitImpulsePerSecond)
+            let pieceRadius = OriginalGameplay.radius(forMass: pieceMass)
+
+            if action.isBot {
+                guard action.cellIndex < botCells.count else { continue }
+                let poppedHalvesFont = botCells[action.cellIndex].targetMass + CGFloat(OriginalGameplay.virusBaseMass) >= massFontHalfThreshold
+                let parentVelocity = botCells[action.cellIndex].velocity
+                botCells[action.cellIndex].targetMass = pieceMass
+                botCells[action.cellIndex].mergeTimer = 30.0 + Double(pieceMass) * 0.02
+                botCells[action.cellIndex].canMerge = false
+                for _ in 1..<massList.count {
+                    let angle = Double.random(in: 0..<(2 * Double.pi))
+                    let direction = CGSize(width: CGFloat(cos(angle)), height: CGFloat(sin(angle)))
+                    var spawn = botCells[action.cellIndex].position
+                    spawn.x += direction.width * spawnOffset
+                    spawn.y += direction.height * spawnOffset
+                    spawn.x = min(worldSize - pieceRadius, max(pieceRadius, spawn.x))
+                    spawn.y = min(worldSize - pieceRadius, max(pieceRadius, spawn.y))
+                    var newCell = PlayerCell(
+                        ownerID: botCells[action.cellIndex].ownerID,
+                        position: spawn,
+                        mass: pieceMass,
+                        targetMass: pieceMass,
+                        velocity: parentVelocity,
+                        mergeTimer: 30.0 + Double(pieceMass) * 0.02,
+                        canMerge: false,
+                        splitTimer: 1.0,
+                        color: botCells[action.cellIndex].color,
+                        name: botCells[action.cellIndex].name,
+                        skinName: botCells[action.cellIndex].skinName,
+                        isBot: true,
+                        isFeedBot: botCells[action.cellIndex].isFeedBot,
+                        aiSkillTier: botCells[action.cellIndex].aiSkillTier
+                    )
+                    newCell.splitImmunityTimer = 0.2
+                    newCell.immuneToCellID = botCells[action.cellIndex].id
+                    newCell.massFontHalved = poppedHalvesFont
+                    newCell.massFontScale = poppedHalvesFont ? 0.5 : 1.0
+                    newCell.aiAggression = botCells[action.cellIndex].aiAggression
+                    newCell.aiCaution = botCells[action.cellIndex].aiCaution
+                    newCell.velocity.width += direction.width * impulse
+                    newCell.velocity.height += direction.height * impulse
+                    botCells.append(newCell)
                 }
             } else {
-                if cellIdx < playerCells.count {
-                    SoundManager.shared.play(.virusPop, minInterval: 0.06)
-                    // Same font lineage rule as executeSplit, using the pre-pop mass:
-                    // only the NEW pieces go half - the popped cell keeps its own ratio.
-                    let poppedHalvesFont = playerCells[cellIdx].targetMass + 100 >= massFontHalfThreshold
-                    playerCells[cellIdx].targetMass = massList[0]
-                    guard massList.count > 1 else { continue }
-                    var angle = Double.random(in: 0...(2 * Double.pi))
-                    let step = (2 * Double.pi) / Double(massList.count - 1)
-                    
-                    for k in 1..<massList.count {
-                        let mass = massList[k]
-                        let dynamicMergeTime = 30.0 + (Double(mass) * 0.02)
-                        let direction = CGSize(width: cos(angle), height: sin(angle))
-                        let speed: CGFloat = 20
-                        
-                        var newCell = PlayerCell(
-                            ownerID: playerCells[cellIdx].ownerID,
-                            position: playerCells[cellIdx].position,
-                            mass: mass * 0.5, targetMass: mass,
-                            velocity: CGSize(width: direction.width * speed, height: direction.height * speed),
-                            mergeTimer: dynamicMergeTime, canMerge: false, splitTimer: 1.0,
-                            color: playerCells[cellIdx].color, name: playerCells[cellIdx].name, skinName: playerCells[cellIdx].skinName
-                        )
-                        newCell.splitImmunityTimer = 0.2
-                        newCell.immuneToCellID = playerCells[cellIdx].id
-                        newCell.massFontHalved = poppedHalvesFont
-                        newCell.massFontScale = poppedHalvesFont ? 0.5 : 1.0
-                        playerCells.append(newCell)
-                        angle += step
-                        if angle >= 2 * Double.pi { angle -= 2 * Double.pi }
-                    }
+                guard action.cellIndex < playerCells.count else { continue }
+                SoundManager.shared.play(.virusPop, minInterval: 0.06)
+                let poppedHalvesFont = playerCells[action.cellIndex].targetMass + CGFloat(OriginalGameplay.virusBaseMass) >= massFontHalfThreshold
+                let parentVelocity = playerCells[action.cellIndex].velocity
+                playerCells[action.cellIndex].targetMass = pieceMass
+                playerCells[action.cellIndex].mergeTimer = 30.0 + Double(pieceMass) * 0.02
+                playerCells[action.cellIndex].canMerge = false
+                for _ in 1..<massList.count {
+                    let angle = Double.random(in: 0..<(2 * Double.pi))
+                    let direction = CGSize(width: CGFloat(cos(angle)), height: CGFloat(sin(angle)))
+                    var spawn = playerCells[action.cellIndex].position
+                    spawn.x += direction.width * spawnOffset
+                    spawn.y += direction.height * spawnOffset
+                    spawn.x = min(worldSize - pieceRadius, max(pieceRadius, spawn.x))
+                    spawn.y = min(worldSize - pieceRadius, max(pieceRadius, spawn.y))
+                    var newCell = PlayerCell(
+                        ownerID: playerCells[action.cellIndex].ownerID,
+                        position: spawn,
+                        mass: pieceMass,
+                        targetMass: pieceMass,
+                        velocity: parentVelocity,
+                        mergeTimer: 30.0 + Double(pieceMass) * 0.02,
+                        canMerge: false,
+                        splitTimer: 1.0,
+                        color: playerCells[action.cellIndex].color,
+                        name: playerCells[action.cellIndex].name,
+                        skinName: playerCells[action.cellIndex].skinName
+                    )
+                    newCell.splitImmunityTimer = 0.2
+                    newCell.immuneToCellID = playerCells[action.cellIndex].id
+                    newCell.massFontHalved = poppedHalvesFont
+                    newCell.massFontScale = poppedHalvesFont ? 0.5 : 1.0
+                    newCell.velocity.width += direction.width * impulse
+                    newCell.velocity.height += direction.height * impulse
+                    playerCells.append(newCell)
                 }
             }
         }
@@ -11663,69 +11674,22 @@ struct ContentView: View {
     }
     private func spawnInitialTokens() { for _ in 0..<200 { tokens.append(spawnSingleToken(existing: tokens)) } }
     
+    /// Exact Agar.io virus shatter distribution (`AgarCell::eatVirus`): the cell
+    /// recursively binary-splits, so the piece count is the largest power of two
+    /// whose last parent can still split (radius >= minRadiusToSplit) and whose
+    /// owner stays under the 16-cell cap. Every final piece has equal mass.
     private func calculateVirusSplitMass(mass: CGFloat, maxSplits: Int) ->[CGFloat] {
-        let playerMinSize: CGFloat = 32
-        let minMass: CGFloat = (playerMinSize * playerMinSize) / 100
-        let throwSize: CGFloat = playerMinSize + 12
-        let throwMass: CGFloat = (throwSize * throwSize) / 100
-        var curMass = mass
-        var maxCount = maxSplits
-        
-        while maxCount > 1 && (curMass / CGFloat(maxCount - 1)) < throwMass { maxCount = maxCount / 2 }
-        if maxCount < 2 { return [mass] }
-        let splitMassBase = curMass / CGFloat(maxCount)
-        if splitMassBase < minMass { return [mass] }
-        var masses:[CGFloat] = []
-        if maxCount < 3 || maxCount < maxSplits || (curMass / throwMass) <= 30 {
-            for _ in 0..<maxCount { masses.append(splitMassBase) }
-            return masses
+        guard mass > 0, maxSplits >= 2 else { return [mass] }
+        var pieces = 1
+        var parentRadius = OriginalGameplay.radius(forMass: mass)
+        let cap = min(maxSplits, 16)
+        while parentRadius >= CGFloat(OriginalGameplay.minRadiusToSplit),
+              pieces * 2 <= cap {
+            pieces *= 2
+            parentRadius /= CGFloat(2.0.squareRoot())
         }
-        var restCount = maxCount
-        while restCount > 2 {
-            let sMass = curMass / 2
-            if sMass <= throwMass { break }
-            let maxSafety = curMass - (throwMass * CGFloat(restCount - 1))
-            if maxSafety <= throwMass || sMass >= maxSafety { break }
-            masses.append(sMass)
-            curMass -= sMass
-            restCount -= 1
-        }
-        var sMass = curMass / 4
-        if sMass > throwMass {
-            while restCount > 2 {
-                let maxSafety = curMass - (throwMass * CGFloat(restCount - 1))
-                if maxSafety <= throwMass || sMass >= maxSafety { break }
-                masses.append(sMass)
-                curMass -= sMass
-                restCount -= 1
-            }
-        }
-        sMass = curMass / 8
-        if sMass > throwMass {
-            while restCount > 2 {
-                let maxSafety = curMass - (throwMass * CGFloat(restCount - 1))
-                if maxSafety <= throwMass || sMass >= maxSafety { break }
-                masses.append(sMass)
-                curMass -= sMass
-                restCount -= 1
-            }
-        }
-        if restCount > 1 {
-            sMass = curMass - (throwMass * CGFloat(restCount - 1))
-            if sMass > throwMass {
-                masses.append(sMass)
-                curMass -= sMass
-                restCount -= 1
-            }
-        }
-        if restCount > 0 {
-            sMass = curMass / CGFloat(restCount)
-            while restCount > 0 {
-                masses.append(sMass)
-                restCount -= 1
-            }
-        }
-        return masses
+        guard pieces > 1 else { return [mass] }
+        return Array(repeating: mass / CGFloat(pieces), count: pieces)
     }
     
     private func pause() {
