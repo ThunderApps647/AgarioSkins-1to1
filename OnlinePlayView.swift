@@ -609,16 +609,7 @@ struct OnlineGameView: View {
                 let dx = value.location.x - basePos.x
                 let dy = value.location.y - basePos.y
                 let distance = sqrt(dx * dx + dy * dy)
-                let followLimit = maxDistance * 1.7
-                if distance > followLimit && distance > 0.001 {
-                    let ux = dx / distance
-                    let uy = dy / distance
-                    joystickBasePosition = CGPoint(
-                        x: value.location.x - ux * followLimit,
-                        y: value.location.y - uy * followLimit
-                    )
-                    joystickOffset = CGSize(width: ux * maxDistance, height: uy * maxDistance)
-                } else if distance > maxDistance && distance > 0.001 {
+                if distance > maxDistance && distance > 0.001 {
                     let ratio = maxDistance / distance
                     joystickOffset = CGSize(width: dx * ratio, height: dy * ratio)
                 } else {

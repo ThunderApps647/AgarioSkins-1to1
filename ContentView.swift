@@ -4954,22 +4954,13 @@ struct ContentView: View {
                                     joystickIsDragging = true
                                 }
                                 let maxDistance: CGFloat = 130 / 2
-                                // IPA ControlsWidget::followJoystickToPoint (0x1000ec4a8):
-                                // maxDPadDetectionRadiusFactor = 1.7 -> base follows finger past 1.7 * radius.
+                                // Classic Floating D-Pad: outer base stays locked at startLocation;
+                                // only the inner knob moves, clamped strictly to maxDistance (65pt).
                                 let basePos = joystickBasePosition ?? value.startLocation
                                 let dx = value.location.x - basePos.x
                                 let dy = value.location.y - basePos.y
                                 let distance = sqrt(dx * dx + dy * dy)
-                                let followLimit = maxDistance * 1.7
-                                if distance > followLimit && distance > 0.001 {
-                                    let ux = dx / distance
-                                    let uy = dy / distance
-                                    joystickBasePosition = CGPoint(
-                                        x: value.location.x - ux * followLimit,
-                                        y: value.location.y - uy * followLimit
-                                    )
-                                    joystickOffset = CGSize(width: ux * maxDistance, height: uy * maxDistance)
-                                } else if distance > maxDistance && distance > 0.001 {
+                                if distance > maxDistance && distance > 0.001 {
                                     let ratio = maxDistance / distance
                                     joystickOffset = CGSize(width: dx * ratio, height: dy * ratio)
                                 } else {
@@ -13120,6 +13111,7 @@ struct MainMenu: View {
                         Button(action: { SoundManager.shared.play(.menuClick); activeInfoTab = "Shop" }) {
                             HStack(spacing: 6) {
                                 Image("ui-dna-icon").resizable().scaledToFit().frame(width: 22, height: 22)
+                                Spacer(minLength: 2)
                                 Text("\(dnaCount)")
                                     .font(.custom("UbuntuSans-Bold", size: 15))
                                     .foregroundColor(Color(hex: 0x4A4A4A))
@@ -13127,8 +13119,8 @@ struct MainMenu: View {
                                     .animation(.easeOut(duration: 0.25), value: dnaCount)
                                 Image("ui-plus-box").resizable().scaledToFit().frame(width: 20, height: 20)
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
+                            .padding(.horizontal, 10)
+                            .frame(minWidth: 118, minHeight: 38)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(Color.white.opacity(0.95))
@@ -13139,6 +13131,7 @@ struct MainMenu: View {
                         Button(action: { SoundManager.shared.play(.menuClick); activeInfoTab = "Shop" }) {
                             HStack(spacing: 6) {
                                 Image("ui-coin-icon").resizable().scaledToFit().frame(width: 22, height: 22)
+                                Spacer(minLength: 2)
                                 Text("\(coinsCount)")
                                     .font(.custom("UbuntuSans-Bold", size: 15))
                                     .foregroundColor(Color(hex: 0x4A4A4A))
@@ -13146,8 +13139,8 @@ struct MainMenu: View {
                                     .animation(.easeOut(duration: 0.25), value: coinsCount)
                                 Image("ui-plus-box").resizable().scaledToFit().frame(width: 20, height: 20)
                             }
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 5)
+                            .padding(.horizontal, 10)
+                            .frame(minWidth: 118, minHeight: 38)
                             .background(
                                 RoundedRectangle(cornerRadius: 8)
                                     .fill(Color.white.opacity(0.95))
@@ -13438,7 +13431,7 @@ struct MainMenu: View {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { withAnimation(.spring(duration: 1)) { zoomLevel = 1.0 } }
                     }) {
                         VStack(spacing: 8) {
-                            Image("ui-play-icon").resizable().scaledToFit().frame(width: 34, height: 36)
+                            Image("ui-play-icon").resizable().scaledToFit().frame(width: 42.5, height: 47.5)
                             Text("Classic")
                                 .font(.custom("UbuntuSans-Bold", size: 20))
                                 .foregroundColor(.white)
