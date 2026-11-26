@@ -2872,6 +2872,7 @@ struct GameWorldView: View {
     /// Show Mass (settings): hides the numeric mass counter on cells when off.
     /// Stored like darkModeGrid so offline and online pick it up without plumbing.
     @AppStorage("macro.showMassText") private var showMassText: Bool = true
+    @AppStorage("macro.showMinimap") private var showMinimap: Bool = false
     
     /// Resolved-image cache, reset at the top of every draw. State-backed reference storage
     /// keeps SwiftUI from allocating a fresh cache every time the parent body is evaluated.
@@ -4894,14 +4895,27 @@ struct ContentView: View {
                                     joystickBasePosition = value.startLocation
                                     joystickIsDragging = true
                                 }
-                                let dragVector = value.translation
-                                let distance = sqrt(dragVector.width * dragVector.width + dragVector.height * dragVector.height)
                                 let maxDistance: CGFloat = 130 / 2
-                                if distance > maxDistance {
+                                // IPA ControlsWidget::followJoystickToPoint (0x1000ec4a8):
+                                // maxDPadDetectionRadiusFactor = 1.7 -> base follows finger past 1.7 * radius.
+                                let basePos = joystickBasePosition ?? value.startLocation
+                                let dx = value.location.x - basePos.x
+                                let dy = value.location.y - basePos.y
+                                let distance = sqrt(dx * dx + dy * dy)
+                                let followLimit = maxDistance * 1.7
+                                if distance > followLimit && distance > 0.001 {
+                                    let ux = dx / distance
+                                    let uy = dy / distance
+                                    joystickBasePosition = CGPoint(
+                                        x: value.location.x - ux * followLimit,
+                                        y: value.location.y - uy * followLimit
+                                    )
+                                    joystickOffset = CGSize(width: ux * maxDistance, height: uy * maxDistance)
+                                } else if distance > maxDistance && distance > 0.001 {
                                     let ratio = maxDistance / distance
-                                    joystickOffset = CGSize(width: dragVector.width * ratio, height: dragVector.height * ratio)
+                                    joystickOffset = CGSize(width: dx * ratio, height: dy * ratio)
                                 } else {
-                                    joystickOffset = dragVector
+                                    joystickOffset = CGSize(width: dx, height: dy)
                                 }
                                 lastJoystickDirection = joystickOffset
                                 trackRecruitmentCircle(offset: joystickOffset, now: CACurrentMediaTime())
@@ -4987,20 +5001,22 @@ struct ContentView: View {
                 }
                 
                 if isPlaying && !isLeavePopupPresented {
-                    MinimapHUD(
-                        playerPosition: playerCenter,
-                        teammatePositions: playerTeammateOwnerID.map { tid in
-                            let tCells = botCells.filter { $0.ownerID == tid }
-                            guard !tCells.isEmpty else { return [] }
-                            let total = tCells.reduce(CGFloat(0)) { $0 + $1.mass }
-                            guard total > 0 else { return [] }
-                            let x = tCells.reduce(CGFloat(0)) { $0 + $1.position.x * $1.mass } / total
-                            let y = tCells.reduce(CGFloat(0)) { $0 + $1.position.y * $1.mass } / total
-                            return [CGPoint(x: x, y: y)]
-                        } ?? [],
-                        worldSize: 11000
-                    )
-                    .zIndex(1)
+                    if showMinimap {
+                        MinimapHUD(
+                            playerPosition: playerCenter,
+                            teammatePositions: playerTeammateOwnerID.map { tid in
+                                let tCells = botCells.filter { $0.ownerID == tid }
+                                guard !tCells.isEmpty else { return [] }
+                                let total = tCells.reduce(CGFloat(0)) { $0 + $1.mass }
+                                guard total > 0 else { return [] }
+                                let x = tCells.reduce(CGFloat(0)) { $0 + $1.position.x * $1.mass } / total
+                                let y = tCells.reduce(CGFloat(0)) { $0 + $1.position.y * $1.mass } / total
+                                return [CGPoint(x: x, y: y)]
+                            } ?? [],
+                            worldSize: 11000
+                        )
+                        .zIndex(1)
+                    }
                     ActionButtonsHUD(canSplit: canSplit(),
                                      canFeed: canFeed(),
                                      isFeedingHeld: isFeedingHeld,
@@ -12844,6 +12860,7 @@ struct MainMenu: View {
     @AppStorage("macro.darkModeGrid") private var darkModeGrid: Bool = false
     /// Show Mass: shows/hides the mass counter on cells (shared with the renderer).
     @AppStorage("macro.showMassText") private var showMassText: Bool = true
+    @AppStorage("macro.showMinimap") private var showMinimap: Bool = false
     @AppStorage("macro.soundEnabled") private var soundEnabled: Bool = true
     @AppStorage("macro.coins") private var coinsCount: Int = 1000
     @AppStorage("macro.dna") private var dnaCount: Int = 50
@@ -13391,6 +13408,7 @@ struct MainMenu: View {
                                 lightSettingToggle("Show Level Badge", isOn: $showPlayerLevel)
                                 lightSettingToggle("Dark Mode Grid", isOn: $darkModeGrid)
                                 lightSettingToggle("Show Mass", isOn: $showMassText)
+                                lightSettingToggle("Show Minimap", isOn: $showMinimap)
 
                                 Text("Offline Match")
                                     .font(.custom("UbuntuSans-Bold", size: 18))
