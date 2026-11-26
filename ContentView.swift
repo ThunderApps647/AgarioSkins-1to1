@@ -1961,32 +1961,22 @@ func updateConsumedPickupAnimations(_ animations: inout [ConsumedPickupAnimation
     var i = animations.count - 1
     while i >= 0 {
         if let targetPos = allPositions[animations[i].eaterCellID] {
-            let targetRad = max(allRadii[animations[i].eaterCellID] ?? 20, 1)
             animations[i].age += dt
             let dx = targetPos.x - animations[i].position.x
             let dy = targetPos.y - animations[i].position.y
             let dist = sqrt(dx * dx + dy * dy)
             
-            // v5.9.1: the pellet is drawn UNDER the cells, so the eater's rim
-            // occludes it naturally — no artificial shrink. Despawn once it has
-            // slid fully under the border (penetration ≥ ~1.35 pellet radii, or
-            // ~55% into a tiny cell), or when the ~300 ms ingestion cap fires.
-            let pelletR: CGFloat = 25.3
-            let cutoff = min(0.55 * targetRad, 1.35 * pelletR)
-            let penetration = targetRad - dist
-            if penetration >= cutoff || dist < 10.0 || animations[i].age >= 0.30 {
+            let eatDuration: CGFloat = 0.12
+            let remaining = max(0.001, eatDuration - animations[i].age)
+            if animations[i].age >= eatDuration || dist < 4.0 {
                 animations.swapAt(i, animations.count - 1)
                 animations.removeLast()
             } else {
-                let step = min(dist * glideSpeedFactor, 950.0 * dt)
-                if dist > 0.001 {
-                    animations[i].position.x += dx / dist * step
-                    animations[i].position.y += dy / dist * step
-                }
-                let melt = min(max(penetration / cutoff, 0), 1)
-                let capFade = min(max((0.28 - animations[i].age) / 0.08, 0), 1)
-                animations[i].scale = max(0.2, 1.0 - melt * 0.8)
-                animations[i].alpha = min((1.0 - melt) / 0.4, 1.0) * capFade
+                let frac = min(1.0, dt / remaining)
+                animations[i].position.x += dx * frac
+                animations[i].position.y += dy * frac
+                animations[i].scale = 1.0
+                animations[i].alpha = 1.0
             }
         } else {
             animations.swapAt(i, animations.count - 1)
@@ -10056,20 +10046,21 @@ struct ContentView: View {
             }
             
             if let tPos = targetPos {
+                // Exact IPA AgarCellView::onBeingEaten (0x1002801b0): 0.12s move to eater center.
+                let eatDuration: CGFloat = 0.12
+                animatingEatenCells[i].splitImmunityTimer += dt
+                let elapsed = animatingEatenCells[i].splitImmunityTimer
                 let dx = tPos.x - animatingEatenCells[i].position.x
                 let dy = tPos.y - animatingEatenCells[i].position.y
                 let distanceSq = dx*dx + dy*dy
-                
-                // Immediately remove if it goes deep enough inside the eater's bounds so it doesn't linger outside
-                if distanceSq < (targetRad * targetRad * 0.64) || distanceSq < 100.0 || animatingEatenCells[i].mass < 1.0 {
+
+                if elapsed >= eatDuration || distanceSq < 16.0 {
                     animatingEatenCells.swapAt(i, animatingEatenCells.count - 1)
                     animatingEatenCells.removeLast()
                 } else {
-                    animatingEatenCells[i].position.x += dx * glideSpeedFactor
-                    animatingEatenCells[i].position.y += dy * glideSpeedFactor
-                    animatingEatenCells[i].mass *= (1.0 - glideSpeedFactor)
-                    animatingEatenCells[i].lagMass *= (1.0 - glideSpeedFactor)
-                    animatingEatenCells[i].refreshCachedRadii()
+                    let frac = min(1.0, dt / max(0.001, eatDuration - elapsed))
+                    animatingEatenCells[i].position.x += dx * frac
+                    animatingEatenCells[i].position.y += dy * frac
                 }
             } else {
                 animatingEatenCells.swapAt(i, animatingEatenCells.count - 1)

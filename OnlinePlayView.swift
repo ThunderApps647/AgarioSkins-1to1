@@ -1204,18 +1204,19 @@ struct OnlineGameView: View {
                 targetRad = allRadii[eID] ?? 20
             }
             if let tPos = targetPos {
+                let eatDuration: CGFloat = 0.12
+                animatingEatenCells[i].splitImmunityTimer += dt
+                let elapsed = animatingEatenCells[i].splitImmunityTimer
                 let dx = tPos.x - animatingEatenCells[i].position.x
                 let dy = tPos.y - animatingEatenCells[i].position.y
                 let distanceSq = dx * dx + dy * dy
-                if distanceSq < (targetRad * targetRad * 0.64) || distanceSq < 100.0 || animatingEatenCells[i].mass < 1.0 {
+                if elapsed >= eatDuration || distanceSq < 16.0 {
                     animatingEatenCells.swapAt(i, animatingEatenCells.count - 1)
                     animatingEatenCells.removeLast()
                 } else {
-                    animatingEatenCells[i].position.x += dx * glideSpeedFactor
-                    animatingEatenCells[i].position.y += dy * glideSpeedFactor
-                    animatingEatenCells[i].mass *= (1.0 - glideSpeedFactor)
-                    animatingEatenCells[i].lagMass *= (1.0 - glideSpeedFactor)
-                    animatingEatenCells[i].refreshCachedRadii()
+                    let frac = min(1.0, dt / max(0.001, eatDuration - elapsed))
+                    animatingEatenCells[i].position.x += dx * frac
+                    animatingEatenCells[i].position.y += dy * frac
                 }
             } else {
                 animatingEatenCells.swapAt(i, animatingEatenCells.count - 1)
