@@ -2828,8 +2828,7 @@ enum LeagueBadge {
 
 struct GameWorldView: View {
     let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
-    let cellSize: CGFloat = 31
-    let gridLineWidth: CGFloat = 1
+    let cellSize: CGFloat = 50
     let screenSize: CGSize
     
     @Binding var smoothedPlayerPosition: CGPoint
@@ -2917,7 +2916,8 @@ struct GameWorldView: View {
                 let gridIntensity = min(0.85, max(0.10, (50.0 * 50.0 * zoom * zoom) / 5000.0 + 0.10))
                 let gridGray = darkModeGrid ? gridIntensity : (1.0 - gridIntensity)
                 let gridColor = Color(red: gridGray, green: gridGray, blue: gridGray)
-                let lineWidth: CGFloat = darkModeGrid ? 2.0 : 1.0
+                let hairline = max(0.5, 1.0 / max(1.0, UIScreen.main.scale))
+                let lineWidth: CGFloat = darkModeGrid ? max(1.0, hairline * 2.0) : hairline
                 
                 let startX = floor(visibleRect.minX / cellSize) * cellSize
                 let endX = ceil(visibleRect.maxX / cellSize) * cellSize
@@ -3005,7 +3005,8 @@ struct GameWorldView: View {
             visibleMasses.sort { $0.zIndex < $1.zIndex }
             
             let massRadius = OriginalGameplay.shotMassBaseRadiusCGFloat * zoom
-            let massStroke = 8 * zoom
+            // SoftBodyCellView border on r = 40 (> 18): 10 world units (5 out + 5 in)
+            let massStroke = 10 * zoom
             for mass in visibleMasses {
                 guard let style = massManager.renderStyle(for: mass.styleID) else { continue }
                 // renderPosition = physical position + decaying spawn offset, so fresh
@@ -3051,7 +3052,7 @@ struct GameWorldView: View {
                         let path = Path(ellipseIn: rect)
                         context.fill(path, with: .color(style.color.opacity(animation.alpha)))
                         context.stroke(path, with: .color(style.borderColor.opacity(animation.alpha)),
-                                       lineWidth: 8 * animation.scale * zoom)
+                                       lineWidth: 10 * animation.scale * zoom)
                     }
                 case .token:
                     let r = 26 * animation.scale * zoom
@@ -4861,6 +4862,7 @@ struct ContentView: View {
     @State private var fps: Int = 60
     @State private var lastFpsCheckTime: TimeInterval = 0
     @State private var showFPS: Bool = false
+    @AppStorage("macro.stopOnRelease") private var stopOnRelease: Bool = false
     /// 0.4 (dumb) ... 1.6 (ruthless). Scales bot reaction speed, prediction and split appetite.
     @State private var botSkill: Double = 1.0
     
@@ -5065,12 +5067,12 @@ struct ContentView: View {
                                 finishForcedFeedCircleAttempt()
                                 joystickIsDragging = false
                                 joystickBasePosition = nil
-                                anchorPoint = playerCenter
                                 let isTap = value.translation.width.magnitude < 5 && value.translation.height.magnitude < 5
                                 if isTap {
                                     let playerScreenCenter = CGPoint(x: geometry.size.width / 2, y: (geometry.size.height + geometry.safeAreaInsets.top - geometry.safeAreaInsets.bottom) / 2)
                                     lastJoystickDirection = CGSize(width: value.startLocation.x - playerScreenCenter.x, height: value.startLocation.y - playerScreenCenter.y)
                                 }
+                                anchorPoint = stopOnRelease ? playerCenter : nil
                                 joystickOffset = .zero
                             }
                         )
@@ -6203,7 +6205,7 @@ struct ContentView: View {
                         color: cell.color,
                         ownerID: cell.ownerID,
                         sourceCellID: cell.id,
-                        borderColor: cell.ejectedMassBorderColor,
+                        borderColor: cell.color.darker(ratio: 0.9),
                         now: now)
         return true
     }
@@ -10677,6 +10679,9 @@ struct ContentView: View {
                     playerCells[i].position.x += normalizedDirection.width * travelDistance
                     playerCells[i].position.y += normalizedDirection.height * travelDistance
                 }
+            } else if globalDirectionNorm != .zero {
+                playerCells[i].position.x += globalDirectionNorm.width * distanceThisFrame
+                playerCells[i].position.y += globalDirectionNorm.height * distanceThisFrame
             }
             
             playerCells[i].position.x += playerCells[i].velocity.width * dt
@@ -12028,14 +12033,13 @@ private struct LeavePopupButtonStyle: ButtonStyle {
 private struct HudSquareIconButtonStyle: ButtonStyle {
     let icon: String
     let pressedIcon: String?
-    var size: CGFloat = 50
-    var iconSize: CGFloat = 28
+    var size: CGFloat = 48
+    var iconSize: CGFloat = 26
 
     func makeBody(configuration: Configuration) -> some View {
         let activeIcon = (configuration.isPressed ? pressedIcon : nil) ?? icon
         ZStack {
-            Image("mcfs-hud-button")
-                .resizable()
+            MCFSFrame(name: "mcfs-hud-button")
                 .frame(width: size, height: size)
                 .opacity(configuration.isPressed ? 0.78 : 1.0)
             Image(activeIcon)
@@ -12075,63 +12079,64 @@ struct TopBarHUD: View, Equatable {
     }
     
     var body: some View {
-        VStack {
-            HStack(alignment: .top, spacing: 10) {
-                // PauseButton.ccbi (5.11, 4.92) + EmojiWidget.ccbi (5.11, 49.39)
-                VStack(spacing: 6) {
-                    Button(action: onPause) {
-                        Color.clear
-                    }
-                    .buttonStyle(HudSquareIconButtonStyle(icon: "hud-pause", pressedIcon: "hud-pause-pressed", size: 50, iconSize: 28))
-                    
-                    if showEmojiWidget {
-                        Button(action: onEmotes) {
-                            Color.clear
+        GeometryReader { geometry in
+            let s = OriginalGameplay.uiScale(for: geometry.size)
+            let btnSide = 39.17 * s
+            let pad = 5.11 * s
+            VStack {
+                HStack(alignment: .top, spacing: 8 * s) {
+                    // PauseButton.ccbi (5.11, 5.11) + EmojiWidget.ccbi (5.11, 49.39)
+                    VStack(spacing: 5.11 * s) {
+                        Button(action: onPause) { Color.clear }
+                            .buttonStyle(HudSquareIconButtonStyle(icon: "hud-pause", pressedIcon: "hud-pause-pressed", size: btnSide, iconSize: 22 * s))
+                        
+                        if showEmojiWidget {
+                            Button(action: onEmotes) { Color.clear }
+                                .buttonStyle(HudSquareIconButtonStyle(icon: "hud-emoji-icon", pressedIcon: nil, size: btnSide, iconSize: 24 * s))
                         }
-                        .buttonStyle(HudSquareIconButtonStyle(icon: "hud-emoji-icon", pressedIcon: nil, size: 50, iconSize: 30))
                     }
-                }
-                
-                // Score.ccbi metrics aligned beside PauseButton
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Score: \(score)")
-                        .font(.custom("OpenSans-Bold", size: 20))
-                        .foregroundColor(Color(hex: 0x8E8E8E))
-                    HStack(spacing: 6) {
-                        Image("token").resizable().aspectRatio(contentMode: .fit).frame(width: 24, height: 24)
-                        Text("\(tokenCount)")
-                            .font(.custom("OpenSans-Bold", size: 20))
+                    
+                    // Score.ccbi metrics aligned beside PauseButton
+                    VStack(alignment: .leading, spacing: 2 * s) {
+                        Text("Score: \(score)")
+                            .font(.custom("OpenSans-Bold", size: 15 * s))
                             .foregroundColor(Color(hex: 0x8E8E8E))
+                        HStack(spacing: 4 * s) {
+                            Image("token").resizable().aspectRatio(contentMode: .fit).frame(width: 18 * s, height: 18 * s)
+                            Text("\(tokenCount)")
+                                .font(.custom("OpenSans-Bold", size: 15 * s))
+                                .foregroundColor(Color(hex: 0x8E8E8E))
+                        }
+                        if showFPS {
+                            Text("\(fps) FPS")
+                                .font(.custom("OpenSans-Bold", size: 12 * s))
+                                .foregroundColor(fps >= 100 ? Color(hex: 0x54C826) : (fps >= 55 ? Color(hex: 0x8E8E8E) : .orange))
+                        }
                     }
-                    if showFPS {
-                        Text("\(fps) FPS")
-                            .font(.custom("OpenSans-Bold", size: 15))
-                            .foregroundColor(fps >= 100 ? Color(hex: 0x54C826) : (fps >= 55 ? Color(hex: 0x8E8E8E) : .orange))
+                    .padding(.top, 3 * s)
+                    
+                    Spacer()
+                    
+                    if inParty {
+                        HStack(spacing: 5 * s) {
+                            Image("friends-count-icon")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 20 * s, height: 20 * s)
+                            Text("\(friendCount) friend\(friendCount == 1 ? "" : "s")")
+                                .font(.custom("OpenSans-Bold", size: 14 * s))
+                                .foregroundColor(Color(hex: 0x8E8E8E))
+                        }
+                        .frame(height: btnSide)
+                        .padding(.trailing, 4 * s)
                     }
+                    
+                    LeaderboardHUDButton(rows: leaderboardRows, uiScale: s)
                 }
-                .padding(.top, 4)
-                
+                .padding(.horizontal, pad)
+                .padding(.top, pad)
                 Spacer()
-                
-                if inParty {
-                    HStack(spacing: 6) {
-                        Image("friends-count-icon")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 26, height: 26)
-                        Text("\(friendCount) friend\(friendCount == 1 ? "" : "s")")
-                            .font(.custom("OpenSans-Bold", size: 17))
-                            .foregroundColor(Color(hex: 0x8E8E8E))
-                    }
-                    .frame(height: 50)
-                    .padding(.trailing, 4)
-                }
-                
-                LeaderboardHUDButton(rows: leaderboardRows)
             }
-            .padding(.horizontal, 8)
-            .padding(.top, 8)
-            Spacer()
         }
         .allowsHitTesting(true)
     }
@@ -12195,22 +12200,23 @@ private struct StrokedHUDText: View {
 /// dark part. Tapping again reverses: bottom retracts, then the left side slides in.
 struct LeaderboardHUDButton: View {
     let rows: [LeaderboardHUDRow]
+    var uiScale: CGFloat = 1.25
 
-    private let collapsedSide: CGFloat = 50
+    private var collapsedSide: CGFloat { 39.17 * uiScale }
     private let expansionFactor: CGFloat = 3.5
-    private var cornerRadius: CGFloat { 9 }
-    private var iconSize: CGFloat { 28 }
-    private var labelFontSize: CGFloat { 17 }
+    private var cornerRadius: CGFloat { 7.5 * uiScale }
+    private var iconSize: CGFloat { 22 * uiScale }
+    private var labelFontSize: CGFloat { 14 * uiScale }
     private var iconInset: CGFloat { (collapsedSide - iconSize) / 2 }
-    private var iconTextGap: CGFloat { 10 }
-    private var separatorHeight: CGFloat { 2 }
-    private var headerBottom: CGFloat { collapsedSide - 4 }
-    private let rowFontSize: CGFloat = 15
-    private let rowSlot: CGFloat = 23
-    private let rowsVerticalMargin: CGFloat = 8
-    private let pfpSide: CGFloat = 20
-    private let pfpNameGap: CGFloat = 6
-    private let pfpRingWidth: CGFloat = 1.75
+    private var iconTextGap: CGFloat { 8 * uiScale }
+    private var separatorHeight: CGFloat { max(1.5, 1.5 * uiScale) }
+    private var headerBottom: CGFloat { collapsedSide - 3 * uiScale }
+    private var rowFontSize: CGFloat { 13.5 * uiScale }
+    private var rowSlot: CGFloat { 20 * uiScale }
+    private var rowsVerticalMargin: CGFloat { 6 * uiScale }
+    private var pfpSide: CGFloat { 17 * uiScale }
+    private var pfpNameGap: CGFloat { 5 * uiScale }
+    private var pfpRingWidth: CGFloat { 1.5 * uiScale }
 
     private var partyPfp: some View {
         Image("friend-pfp")
@@ -12232,7 +12238,7 @@ struct LeaderboardHUDButton: View {
 
     private var expandedWidth: CGFloat {
         guard labelWidth > 0 else { return collapsedSide * expansionFactor }
-        return max(176, iconInset + iconSize + iconTextGap + labelWidth + iconInset)
+        return max(150 * uiScale, iconInset + iconSize + iconTextGap + labelWidth + iconInset)
     }
     private var expandedHeight: CGFloat {
         headerBottom + separatorHeight + rowsVerticalMargin * 2
@@ -12245,15 +12251,12 @@ struct LeaderboardHUDButton: View {
         ZStack(alignment: .top) {
             if expandedV {
                 VStack(spacing: 0) {
-                    Image("mcfs-leaderboard-expanded")
-                        .resizable()
+                    MCFSFrame(name: "mcfs-leaderboard-expanded")
                         .frame(height: headerBottom + separatorHeight)
-                    Image("mcfs-leaderboard-content-float")
-                        .resizable()
+                    MCFSFrame(name: "mcfs-leaderboard-content-float")
                 }
             } else {
-                Image(expandedH ? "mcfs-leaderboard-expanded" : "mcfs-leaderboard-collapsed")
-                    .resizable()
+                MCFSFrame(name: expandedH ? "mcfs-leaderboard-expanded" : "mcfs-leaderboard-collapsed")
             }
         }
         .overlay(
@@ -12456,29 +12459,31 @@ struct ActionButtonsHUD: View, Equatable {
     }
     
     var body: some View {
-        // Controls-Sides.ccbi: Split & Eject backed by hud-splitshot-bg + hud-split / hud-shot,
-        // preserving custom macro fast-eject button diagonally above Feed.
-        let buttonSide: CGFloat = 96
-        let macroSide: CGFloat = 82
-        return VStack(alignment: .trailing, spacing: 14) {
-            Spacer()
-            Button(action: onSplit) {
-                ZStack {
-                    Image("hud-splitshot-bg")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: buttonSide, height: buttonSide)
-                    Image("hud-split")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: buttonSide * 0.60, height: buttonSide * 0.60)
+        // Controls-Sides.ccbi: pos=(0.08, 0.125 BR) & (0.08, 0.355 BR), size=(65, 65) * uiScale
+        GeometryReader { geometry in
+            let s = OriginalGameplay.uiScale(for: geometry.size)
+            let buttonSide = 65.0 * s
+            let macroSide = 54.0 * s
+            let centerX = geometry.size.width * 0.92
+            let shootCenterY = geometry.size.height * 0.875
+            let splitCenterY = geometry.size.height * 0.645
+            ZStack {
+                Button(action: onSplit) {
+                    ZStack {
+                        Image("hud-splitshot-bg")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: buttonSide, height: buttonSide)
+                        Image("hud-split")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: buttonSide * 0.58, height: buttonSide * 0.58)
+                    }
+                    .opacity(canSplit ? 1.0 : 0.45)
                 }
-                .opacity(canSplit ? 1.0 : 0.45)
-            }
-            .disabled(!canSplit)
-            .padding(.trailing, 18)
-            
-            ZStack(alignment: .bottomTrailing) {
+                .disabled(!canSplit)
+                .position(x: centerX, y: splitCenterY)
+
                 Image("macro")
                     .resizable()
                     .aspectRatio(contentMode: .fit)
@@ -12491,11 +12496,10 @@ struct ActionButtonsHUD: View, Equatable {
                     )
                     .opacity(canFeed ? (macroPressed ? 0.55 : 1.0) : 0.45)
                     .allowsHitTesting(canFeed)
-                    .offset(x: -76, y: -66)
-                    .padding(.trailing, 54)
+                    .position(x: centerX - buttonSide * 1.05, y: shootCenterY)
                     .accessibilityLabel("Fast eject")
                     .accessibilityAddTraits(.isButton)
-                
+
                 ZStack {
                     Image("hud-splitshot-bg")
                         .resizable()
@@ -12504,8 +12508,8 @@ struct ActionButtonsHUD: View, Equatable {
                     Image("hud-shot")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: buttonSide * 0.58, height: buttonSide * 0.58)
-                    
+                        .frame(width: buttonSide * 0.56, height: buttonSide * 0.56)
+
                     Circle()
                         .fill(Color.black.opacity(0.22))
                         .frame(width: buttonSide, height: buttonSide)
@@ -12526,13 +12530,11 @@ struct ActionButtonsHUD: View, Equatable {
                 )
                 .opacity(canFeed ? (feedPressed ? 0.55 : 1.0) : 0.45)
                 .allowsHitTesting(canFeed)
-                .padding(.trailing, 54)
+                .position(x: centerX, y: shootCenterY)
                 .accessibilityLabel("Eject mass")
                 .accessibilityAddTraits(.isButton)
             }
         }
-        .padding(.bottom, 22)
-        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 }
 
@@ -12541,35 +12543,37 @@ struct MinimapHUD: View {
     let teammatePositions: [CGPoint]
     let worldSize: CGFloat
 
-    private let mapSide: CGFloat = 96
-
     var body: some View {
-        VStack {
-            Spacer()
-            HStack {
-                ZStack {
-                    Image("mcfs-gray")
-                        .resizable()
-                        .opacity(0.68)
-                    Canvas { context, size in
-                        let w = max(1, worldSize)
-                        for tp in teammatePositions {
-                            let tx = min(max(tp.x / w, 0), 1) * size.width
-                            let ty = min(max(tp.y / w, 0), 1) * size.height
-                            let rect = CGRect(x: tx - 3.5, y: ty - 3.5, width: 7, height: 7)
-                            context.fill(Path(ellipseIn: rect), with: .color(Color(hex: 0xFFC300)))
+        // MinimapWidget.ccbi: pos=(100, 135, TR), size=(90, 90) * uiScale -> top-right under leaderboard
+        GeometryReader { geometry in
+            let s = OriginalGameplay.uiScale(for: geometry.size)
+            let mapSide = 90.0 * s
+            VStack {
+                HStack {
+                    Spacer()
+                    ZStack {
+                        MCFSFrame(name: "mcfs-gray")
+                            .opacity(0.45)
+                        Canvas { context, size in
+                            let w = max(1, worldSize)
+                            for tp in teammatePositions {
+                                let tx = min(max(tp.x / w, 0), 1) * size.width
+                                let ty = min(max(tp.y / w, 0), 1) * size.height
+                                let rect = CGRect(x: tx - 3.5, y: ty - 3.5, width: 7, height: 7)
+                                context.fill(Path(ellipseIn: rect), with: .color(Color(hex: 0xFFC300)))
+                            }
+                            let px = min(max(playerPosition.x / w, 0), 1) * size.width
+                            let py = min(max(playerPosition.y / w, 0), 1) * size.height
+                            let dotRect = CGRect(x: px - 4.5, y: py - 4.5, width: 9, height: 9)
+                            context.fill(Path(ellipseIn: dotRect), with: .color(.white))
+                            context.stroke(Path(ellipseIn: dotRect), with: .color(Color.black.opacity(0.45)), lineWidth: 1)
                         }
-                        let px = min(max(playerPosition.x / w, 0), 1) * size.width
-                        let py = min(max(playerPosition.y / w, 0), 1) * size.height
-                        let dotRect = CGRect(x: px - 4.5, y: py - 4.5, width: 9, height: 9)
-                        context.fill(Path(ellipseIn: dotRect), with: .color(.white))
-                        context.stroke(Path(ellipseIn: dotRect), with: .color(Color.black.opacity(0.45)), lineWidth: 1)
                     }
+                    .frame(width: mapSide, height: mapSide)
+                    .clipShape(RoundedRectangle(cornerRadius: 6 * s))
+                    .padding(.trailing, 8 * s)
+                    .padding(.top, 50 * s)
                 }
-                .frame(width: mapSide, height: mapSide)
-                .clipShape(RoundedRectangle(cornerRadius: 6))
-                .padding(.leading, 12)
-                .padding(.bottom, 12)
                 Spacer()
             }
         }
@@ -12584,34 +12588,34 @@ struct EmotePickerBar: View {
     private let emotes = ["emoji-tongue", "emoji-scared"]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                VStack(spacing: 6) {
-                    ForEach(emotes, id: \.self) { asset in
-                        Button(action: { onSelect(asset) }) {
-                            Image(asset)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 42, height: 42)
-                                .clipShape(Circle())
-                                .padding(4)
-                                .frame(width: 50, height: 50)
-                                .background(
-                                    Image("mcfs-hud-button")
-                                        .resizable()
-                                )
-                                .opacity(isOnCooldown ? 0.45 : 1.0)
+        GeometryReader { geometry in
+            let s = OriginalGameplay.uiScale(for: geometry.size)
+            let btnSide = 39.17 * s
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    VStack(spacing: 5 * s) {
+                        ForEach(emotes, id: \.self) { asset in
+                            Button(action: { onSelect(asset) }) {
+                                Image(asset)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: btnSide * 0.82, height: btnSide * 0.82)
+                                    .clipShape(Circle())
+                                    .frame(width: btnSide, height: btnSide)
+                                    .background(MCFSFrame(name: "mcfs-hud-button"))
+                                    .opacity(isOnCooldown ? 0.45 : 1.0)
+                            }
+                            .disabled(isOnCooldown)
                         }
-                        .disabled(isOnCooldown)
                     }
+                    .padding(4 * s)
+                    .background(MCFSFrame(name: "mcfs-leaderboard-content-float"))
+                    .padding(.leading, 5.11 * s)
+                    .padding(.top, 94 * s)
+                    Spacer()
                 }
-                .padding(6)
-                .background(Image("mcfs-leaderboard-content-float").resizable())
-                .padding(.leading, 8)
-                .padding(.top, 118)
                 Spacer()
             }
-            Spacer()
         }
     }
 }
@@ -12924,93 +12928,175 @@ struct MainMenu: View {
     @AppStorage("macro.showSkins") private var showSkins: Bool = true
     @AppStorage("macro.showEmojiWidget") private var showEmojiWidget: Bool = true
     @AppStorage("macro.soundEnabled") private var soundEnabled: Bool = true
+    @AppStorage("macro.stopOnRelease") private var stopOnRelease: Bool = false
     @AppStorage("macro.coins") private var coinsCount: Int = 1000
     @AppStorage("macro.dna") private var dnaCount: Int = 50
     @AppStorage("macro.activeStartBoost") private var activeStartBoost: Int = 0
+    @ObservedObject private var potionStore = PotionStore.shared
     @State private var showSkinDrawer: Bool = false
     @State private var showSkinsModal: Bool = false
+    @State private var selectedSkinsTab: Int = 0
     @State private var activeInfoTab: String? = nil
     /// Injected by ContentView; opens the PLAY ONLINE server browser.
     var onPlayOnline: () -> Void = {}
     let availableSkins = (1...387).map { String($0) }
 
-    /// Party create/join/leave overlay. Split out of `body` so the main-menu
-    /// ZStack stays small enough for the Swift type-checker.
-    private var partyOverlay: some View {
-            ZStack {
-                Color.black.opacity(0.7).edgesIgnoringSafeArea(.all).onTapGesture { withAnimation { showPartyMenu = false } }
-                
-                VStack(spacing: 18) {
-                    Text("Party").font(.custom("UbuntuSans-Bold", size: 28)).foregroundColor(.white)
-                    
-                    if partyCode.isEmpty {
-                        Text("Team up with friends: create a party and share the code, or join one with theirs. Everyone in the party joins the same online server and plays as a team.")
-                            .font(.custom("UbuntuSans-Bold", size: 14))
-                            .foregroundColor(.white.opacity(0.75))
-                            .multilineTextAlignment(.center)
-                        
+    /// MenuPartyModeShareWithFriends.ccbi: crisp light 9-slice Party dialog.
+    private func partyOverlay(scale s: CGFloat, containerSize: CGSize) -> some View {
+        ZStack {
+            Color.black.opacity(0.62)
+                .edgesIgnoringSafeArea(.all)
+                .onTapGesture { withAnimation { showPartyMenu = false } }
+
+            VStack(spacing: 10 * s) {
+                HStack {
+                    Color.clear.frame(width: 28 * s, height: 28 * s)
+                    Spacer()
+                    Text("Party")
+                        .font(.custom("OpenSans-Bold", size: 18 * s))
+                        .foregroundColor(Color(hex: 0x5A5F66))
+                    Spacer()
+                    Button(action: {
+                        SoundManager.shared.play(.menuClick)
+                        withAnimation { showPartyMenu = false }
+                    }) {
+                        Image("menu-exit-btn")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 28 * s, height: 28 * s)
+                    }
+                }
+
+                Image("mcfs-divider")
+                    .resizable()
+                    .frame(height: max(1.5, 2 * s))
+
+                if partyCode.isEmpty {
+                    Image("party-bigicon")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 36 * s)
+
+                    Text("Create a party and share the code, or enter a friend's code to play together in Play Online.")
+                        .font(.custom("Lato-Regular", size: 11.5 * s))
+                        .foregroundColor(Color(hex: 0x6E767E))
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    HStack(spacing: 10 * s) {
                         Button(action: {
+                            SoundManager.shared.play(.menuClick)
                             let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
                             partyCode = String((0..<6).map { _ in alphabet.randomElement()! })
                         }) {
-                            Text("Create Party").font(.headline).foregroundColor(.white)
-                                .padding().frame(maxWidth: .infinity)
-                                .background(Color.orange).cornerRadius(10)
+                            HStack(spacing: 6 * s) {
+                                Image("party-create-btn")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 18 * s, height: 18 * s)
+                                menuStrokedText("Create", size: 14 * s)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 38 * s)
                         }
-                        
-                        Text("Or join with a code").font(.custom("UbuntuSans-Bold", size: 14)).foregroundColor(.white.opacity(0.8))
-                        HStack(spacing: 10) {
+                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
+
+                        HStack(spacing: 6 * s) {
                             TextField("ABC123", text: $partyJoinCode)
                                 .textInputAutocapitalization(.characters)
                                 .autocorrectionDisabled()
-                                .font(.custom("UbuntuSans-Bold", size: 20))
+                                .font(.custom("OpenSans-Bold", size: 14 * s))
+                                .foregroundColor(Color(hex: 0x3D4347))
                                 .multilineTextAlignment(.center)
-                                .padding(10)
-                                .frame(width: 150)
-                                .background(Color.white.opacity(0.85).cornerRadius(8))
+                                .frame(height: 38 * s)
+                                .padding(.horizontal, 6 * s)
+                                .background(MCFSFrame(name: "mcfs-white"))
+
                             Button(action: {
+                                SoundManager.shared.play(.menuClick)
                                 let cleaned = sanitizedPartyCode(partyJoinCode)
                                 if !cleaned.isEmpty { partyCode = cleaned; partyJoinCode = "" }
                             }) {
-                                Text("Join").font(.headline).foregroundColor(.white)
-                                    .padding(.horizontal, 24).padding(.vertical, 12)
-                                    .background(sanitizedPartyCode(partyJoinCode).isEmpty ? Color.gray : Color.blue)
-                                    .cornerRadius(10)
+                                HStack(spacing: 5 * s) {
+                                    Image("party-join-btn")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 16 * s, height: 16 * s)
+                                    menuStrokedText("Join", size: 14 * s)
+                                }
+                                .padding(.horizontal, 12 * s)
+                                .frame(height: 38 * s)
                             }
+                            .buttonStyle(MCFSBevelStyle(frameAsset: sanitizedPartyCode(partyJoinCode).isEmpty ? "mcfs-dark-grey" : "mcfs-light-blue"))
                             .disabled(sanitizedPartyCode(partyJoinCode).isEmpty)
                         }
-                    } else {
-                        Text("Share this code - friends enter it under Party → join:")
-                            .font(.custom("UbuntuSans-Bold", size: 14))
-                            .foregroundColor(.white.opacity(0.75))
-                            .multilineTextAlignment(.center)
-                        Text(partyCode.map { String($0) }.joined(separator: " "))
-                            .font(.custom("UbuntuSans-Bold", size: 40))
-                            .foregroundColor(.white)
-                            .padding(.vertical, 6)
-                        Text("Everyone in the party joins the same server in Play Online and plays together, just like teaming up in a normal match.")
-                            .font(.custom("UbuntuSans-Bold", size: 13))
-                            .foregroundColor(.white.opacity(0.6))
-                            .multilineTextAlignment(.center)
-                        Button(action: { partyCode = "" }) {
-                            Text("Leave Party").font(.headline).foregroundColor(.white)
-                                .padding().frame(maxWidth: .infinity)
-                                .background(Color.red.opacity(0.85)).cornerRadius(10)
-                        }
                     }
-                    
-                    Button(action: { withAnimation { showPartyMenu = false } }) {
-                        Text("Done").font(.headline).foregroundColor(.white).padding().frame(maxWidth: .infinity).background(Color.blue).cornerRadius(10)
+                } else {
+                    HStack(spacing: 8 * s) {
+                        Image("party-buddy-icon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 24 * s, height: 24 * s)
+                        Text("Active Party Code")
+                            .font(.custom("OpenSans-Bold", size: 13 * s))
+                            .foregroundColor(Color(hex: 0x5A5F66))
+                    }
+
+                    Text(partyCode.map { String($0) }.joined(separator: " "))
+                        .font(.custom("OpenSans-Bold", size: 28 * s))
+                        .foregroundColor(Color(hex: 0x3D4347))
+                        .padding(.vertical, 8 * s)
+                        .frame(maxWidth: .infinity)
+                        .background(MCFSFrame(name: "mcfs-light-grey"))
+
+                    Text("Share this code. Everyone in the party joins the same online room.")
+                        .font(.custom("Lato-Regular", size: 11 * s))
+                        .foregroundColor(Color(hex: 0x6E767E))
+                        .multilineTextAlignment(.center)
+
+                    HStack(spacing: 10 * s) {
+                        Button(action: {
+                            SoundManager.shared.play(.menuClick)
+                            partyCode = ""
+                        }) {
+                            HStack(spacing: 6 * s) {
+                                Image("party-leave-icon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 16 * s, height: 16 * s)
+                                menuStrokedText("Leave", size: 14 * s)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 38 * s)
+                        }
+                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-red"))
+
+                        Button(action: {
+                            SoundManager.shared.play(.menuClick)
+                            withAnimation { showPartyMenu = false }
+                            onPlayOnline()
+                        }) {
+                            HStack(spacing: 6 * s) {
+                                Image("menu-play-icon")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 16 * s, height: 16 * s)
+                                menuStrokedText("Play Online", size: 14 * s)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 38 * s)
+                        }
+                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
                     }
                 }
-                .padding(24)
-                .frame(width: 340)
-                .background(Color(white: 0.15))
-                .cornerRadius(20)
-                .shadow(radius: 20)
             }
+            .padding(14 * s)
+            .frame(width: min(containerSize.width * 0.88, 390 * s))
+            .background(MCFSFrame(name: "mcfs-white-gray"))
+            .shadow(color: Color.black.opacity(0.35), radius: 14, y: 6)
+        }
     }
-    
+
     private func menuStrokedText(_ text: String, size: CGFloat, color: Color = .white) -> some View {
         Text(text)
             .font(.custom("OpenSans-Bold", size: size))
@@ -13018,413 +13104,208 @@ struct MainMenu: View {
             .shadow(color: Color.black.opacity(0.45), radius: 0, x: 0, y: 1.5)
     }
 
-    private var topMenuBar: some View {
-        VStack(spacing: 8) {
+    private func topMenuBar(scale s: CGFloat) -> some View {
+        VStack(spacing: 0) {
             HStack(alignment: .top) {
-                // MenuMain.ccbi top-left square utility buttons + BoostXpButton/BoostMassButton
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 7) {
-                        topSquareButton(icon: "menu-freecoins-icon", label: "Free", frameAsset: "mcfs-green") {
+                // MenuMain.ccbi top-left utility strip (40x40 units) + BoostXpButton/BoostMassButton
+                VStack(alignment: .leading, spacing: 5 * s) {
+                    HStack(spacing: 5 * s) {
+                        topSquareButton(icon: "menu-freecoins-icon", label: "Free", frameAsset: "mcfs-green", scale: s) {
                             activeInfoTab = "Gifts"
                         }
-                        topSquareButton(icon: "menu-leagues-icon", label: "Leagues", frameAsset: "mcfs-light-blue") {
+                        topSquareButton(icon: "menu-leagues-icon", label: "Leagues", frameAsset: "mcfs-light-blue", scale: s) {
                             activeInfoTab = "Leagues"
                         }
-                        topSquareButton(icon: "menu-chest-small", label: "Quests", frameAsset: "mcfs-light-blue") {
+                        topSquareButton(icon: "menu-chest-small", label: "Quests", frameAsset: "mcfs-light-blue", scale: s) {
                             activeInfoTab = "Quests"
                         }
-                        topSquareButton(icon: "ui-mystery-potion", label: "Potions", frameAsset: "mcfs-light-blue") {
-                            activeInfoTab = "Potions"
+                        TimelineView(.periodic(from: .now, by: 2.0)) { context in
+                            let ready = potionStore.readyCount(now: context.date.timeIntervalSince1970)
+                            topSquareButton(icon: "ui-mystery-potion", label: "Potions", frameAsset: "mcfs-light-blue", badgeCount: ready, scale: s) {
+                                activeInfoTab = "Potions"
+                            }
                         }
-                        topSquareButton(icon: "menu-vip-icon", label: "VIP", frameAsset: "mcfs-vip-black") {
+                        topSquareButton(icon: "menu-vip-icon", label: "VIP", frameAsset: "mcfs-vip-black", scale: s) {
                             activeInfoTab = "Shop"
                         }
                     }
 
-                    HStack(spacing: 6) {
-                        Button(action: { SoundManager.shared.play(.menuClick); activeInfoTab = "Shop" }) {
-                            Image("menu-3x-xp").resizable().scaledToFit().frame(width: 48, height: 34)
+                    HStack(spacing: 5 * s) {
+                        boostPillButton(icon: "menu-xpboost", multiplier: "menu-3x-xp", scale: s) {
+                            activeInfoTab = "Shop"
                         }
-                        Button(action: { SoundManager.shared.play(.menuClick); activeInfoTab = "Shop" }) {
-                            Image("menu-3x-mass").resizable().scaledToFit().frame(width: 48, height: 34)
+                        boostPillButton(icon: "menu-massboost", multiplier: "menu-3x-mass", scale: s) {
+                            activeInfoTab = "Shop"
                         }
                     }
-                    .padding(.top, 2)
                 }
 
                 Spacer()
 
-                // CoinsBar.ccbi + DNABar.ccbi (mcfs-white-green 9-slice) + FreeRewardsButton banner
-                VStack(alignment: .trailing, spacing: 7) {
-                    HStack(spacing: 8) {
-                        Button(action: { SoundManager.shared.play(.menuClick); activeInfoTab = "Shop" }) {
-                            HStack(spacing: 6) {
-                                Image("menu-dna-icon").resizable().scaledToFit().frame(width: 20, height: 20)
-                                Spacer(minLength: 2)
-                                Text("\(dnaCount)")
-                                    .font(.custom("OpenSans-Bold", size: 14))
-                                    .foregroundColor(Color(hex: 0x3D4347))
-                                    .contentTransition(.numericText())
-                                    .animation(.easeOut(duration: 0.25), value: dnaCount)
-                                Image("menu-plus-box").resizable().scaledToFit().frame(width: 18, height: 18)
-                            }
-                            .padding(.horizontal, 8)
-                            .frame(minWidth: 112, minHeight: 32, maxHeight: 32)
-                            .background(Image("mcfs-white-green").resizable())
+                // CoinsBar.ccbi + DNABar.ccbi (100x24 units) + FreeRewardsButton banner
+                VStack(alignment: .trailing, spacing: 5 * s) {
+                    HStack(spacing: 6 * s) {
+                        currencyBarButton(icon: "menu-dna-icon", value: dnaCount, scale: s) {
+                            activeInfoTab = "Shop"
                         }
-
-                        Button(action: { SoundManager.shared.play(.menuClick); activeInfoTab = "Shop" }) {
-                            HStack(spacing: 6) {
-                                Image("menu-coin-icon").resizable().scaledToFit().frame(width: 20, height: 20)
-                                Spacer(minLength: 2)
-                                Text("\(coinsCount)")
-                                    .font(.custom("OpenSans-Bold", size: 14))
-                                    .foregroundColor(Color(hex: 0x3D4347))
-                                    .contentTransition(.numericText())
-                                    .animation(.easeOut(duration: 0.25), value: coinsCount)
-                                Image("menu-plus-box").resizable().scaledToFit().frame(width: 18, height: 18)
-                            }
-                            .padding(.horizontal, 8)
-                            .frame(minWidth: 112, minHeight: 32, maxHeight: 32)
-                            .background(Image("mcfs-white-green").resizable())
+                        currencyBarButton(icon: "menu-coin-icon", value: coinsCount, scale: s) {
+                            activeInfoTab = "Shop"
                         }
                     }
 
                     Button(action: { SoundManager.shared.play(.menuClick); activeInfoTab = "Gifts" }) {
-                        HStack(spacing: 6) {
-                            Image("menu-gift-icon").resizable().scaledToFit().frame(width: 20, height: 20)
-                            menuStrokedText("Collect Reward", size: 12)
+                        HStack(spacing: 5 * s) {
+                            Image("menu-gift-icon").resizable().scaledToFit().frame(width: 16 * s, height: 16 * s)
+                            menuStrokedText("Collect Reward", size: 10.5 * s)
                         }
-                        .padding(.horizontal, 12)
-                        .frame(height: 30)
+                        .padding(.horizontal, 10 * s)
+                        .frame(height: 24 * s)
                         .background(
                             ZStack {
-                                Image("mcfs-shadow").resizable().offset(y: 3)
-                                Image("mcfs-yellow-locket").resizable()
+                                MCFSFrame(name: "mcfs-shadow").offset(y: 2 * s)
+                                MCFSFrame(name: "mcfs-yellow-locket")
                             }
                         )
                     }
                 }
             }
-            .padding(.horizontal, 14)
-            .padding(.top, 12)
+            .padding(.horizontal, 10 * s)
+            .padding(.top, 8 * s)
             Spacer()
         }
     }
 
-    private func topSquareButton(icon: String, label: String, frameAsset: String, action: @escaping () -> Void) -> some View {
-        Button(action: {
-            SoundManager.shared.play(.menuClick)
-            withAnimation { action() }
-        }) {
-            VStack(spacing: 2) {
-                Image(icon).resizable().scaledToFit().frame(width: 24, height: 24)
-                menuStrokedText(label, size: 9)
-                    .lineLimit(1)
+    private func currencyBarButton(icon: String, value: Int, scale s: CGFloat, action: @escaping () -> Void) -> some View {
+        Button(action: { SoundManager.shared.play(.menuClick); action() }) {
+            HStack(spacing: 4 * s) {
+                Image(icon).resizable().scaledToFit().frame(width: 17 * s, height: 17 * s)
+                Spacer(minLength: 2)
+                Text("\(value)")
+                    .font(.custom("OpenSans-Bold", size: 11.5 * s))
+                    .foregroundColor(Color(hex: 0x3D4347))
+                    .contentTransition(.numericText())
+                    .animation(.easeOut(duration: 0.25), value: value)
+                Image("menu-plus-box").resizable().scaledToFit().frame(width: 14 * s, height: 14 * s)
             }
-            .frame(width: 50, height: 50)
+            .padding(.horizontal, 6 * s)
+            .frame(minWidth: 96 * s, minHeight: 24 * s, maxHeight: 24 * s)
             .background(
                 ZStack {
-                    Image("mcfs-shadow").resizable().offset(y: 3)
-                    Image(frameAsset).resizable()
+                    MCFSFrame(name: "mcfs-shadow").offset(y: 1.5 * s)
+                    MCFSFrame(name: "mcfs-white-green")
                 }
             )
         }
     }
 
-    private var bottomFeatureDock: some View {
-        VStack {
-            Spacer()
-            HStack(alignment: .center, spacing: 10) {
-                // Bottom-Left: Settings (mcfs-light-blue) + Party (mcfs-blue)
-                Button(action: {
-                    SoundManager.shared.play(.menuClick)
-                    withAnimation { showSettings = true }
-                }) {
-                    Image("menu-settings-icon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 26, height: 26)
-                        .frame(width: 50, height: 48)
-                        .background(
-                            ZStack {
-                                Image("mcfs-shadow").resizable().offset(y: 3)
-                                Image("mcfs-light-blue").resizable()
-                            }
-                        )
+    private func boostPillButton(icon: String, multiplier: String, scale s: CGFloat, action: @escaping () -> Void) -> some View {
+        Button(action: { SoundManager.shared.play(.menuClick); action() }) {
+            ZStack {
+                MCFSFrame(name: "mcfs-red-timer-frame")
+                HStack(spacing: 2 * s) {
+                    Image(icon).resizable().scaledToFit().frame(width: 17 * s, height: 17 * s)
+                    Image(multiplier).resizable().scaledToFit().frame(width: 18 * s, height: 14 * s)
                 }
-
-                Button(action: {
-                    SoundManager.shared.play(.menuClick)
-                    partyJoinCode = ""
-                    withAnimation { showPartyMenu = true }
-                }) {
-                    Image("menu-party-icon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 28, height: 24)
-                        .frame(width: 50, height: 48)
-                        .background(
-                            ZStack {
-                                Image("mcfs-shadow").resizable().offset(y: 3)
-                                Image("mcfs-blue").resizable()
-                            }
-                        )
-                }
-
-                Spacer()
-
-                // Bottom-Right: Shop (mcfs-green) + InitialisedPlayerAvatar (mcfs-blue-profile)
-                Button(action: {
-                    SoundManager.shared.play(.menuClick)
-                    withAnimation { activeInfoTab = "Shop" }
-                }) {
-                    HStack(spacing: 8) {
-                        menuStrokedText("Shop", size: 18)
-                        Image("menu-shop-icon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 24, height: 22)
-                    }
-                    .frame(width: 122, height: 48)
-                    .background(
-                        ZStack {
-                            Image("mcfs-shadow").resizable().offset(y: 3)
-                            Image("mcfs-green").resizable()
-                        }
-                    )
-                }
-
-                Button(action: {
-                    SoundManager.shared.play(.menuClick)
-                    withAnimation { activeInfoTab = "Leagues" }
-                }) {
-                    HStack(spacing: 8) {
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack(spacing: 4) {
-                                ZStack {
-                                    Image("ui-star-icon").resizable().scaledToFit().frame(width: 18, height: 18)
-                                    Text("\(LeagueBadge.clamp(playerLevel))")
-                                        .font(.custom("OpenSans-Bold", size: 9))
-                                        .foregroundColor(.white)
-                                }
-                                ZStack(alignment: .leading) {
-                                    Image("mcfs-hud-xp-box")
-                                        .resizable()
-                                        .frame(width: 78, height: 11)
-                                    Image("mcfs-hud-xp")
-                                        .resizable()
-                                        .frame(width: max(12, 74 * CGFloat((LeagueBadge.clamp(playerLevel) % 10) + 1) / 10.0), height: 9)
-                                        .padding(.leading, 2)
-                                }
-                            }
-                            Text(playerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Guest" : playerName)
-                                .font(.custom("OpenSans-Bold", size: 13))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                        }
-                        ZStack {
-                            Image("menu-profile-guest")
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 34, height: 34)
-                                .cornerRadius(6)
-                            if let skin = selectedSkinName {
-                                SkinSelectorPreview(skinName: skin)
-                                    .frame(width: 34, height: 34)
-                                    .cornerRadius(6)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 10)
-                    .frame(height: 48)
-                    .background(
-                        ZStack {
-                            Image("mcfs-shadow").resizable().offset(y: 3)
-                            Image("mcfs-blue-profile").resizable()
-                        }
-                    )
-                }
-            }
-            .padding(.horizontal, 14)
-            .padding(.bottom, 12)
-        }
-    }
-
-    private var skinsModalOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.68).edgesIgnoringSafeArea(.all).onTapGesture { withAnimation { showSkinsModal = false } }
-            VStack(spacing: 12) {
-                HStack {
-                    Button(action: { SoundManager.shared.play(.menuClick); withAnimation { showSkinsModal = false } }) {
-                        Image("menu-back-btn").resizable().scaledToFit().frame(width: 30, height: 30)
-                    }
-                    Spacer()
-                    Text("Skins").font(.custom("OpenSans-Bold", size: 22)).foregroundColor(Color(hex: 0x5A5F66))
-                    Spacer()
-                    Color.clear.frame(width: 30, height: 30)
-                }
-                Image("mcfs-divider").resizable().frame(height: 2)
-                ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 68), spacing: 12)], spacing: 12) {
-                        Button(action: { SoundManager.shared.play(.menuClick); selectedSkinName = nil; showSkinsModal = false }) {
-                            ZStack {
-                                Circle().fill(LinearGradient(gradient: Gradient(colors: [.red, .orange, .yellow, .green, .blue, .purple]), startPoint: .topLeading, endPoint: .bottomTrailing)).frame(width: 60, height: 60)
-                                Image(systemName: "xmark").font(.title3.bold()).foregroundColor(.white)
-                                if selectedSkinName == nil { Circle().stroke(Color(hex: 0x00C8F8), lineWidth: 4).frame(width: 66, height: 66) }
-                            }
-                        }
-                        Button(action: { SoundManager.shared.play(.menuClick); selectedSkinName = "Dragon"; showSkinsModal = false }) {
-                            ZStack {
-                                SkinSelectorPreview(skinName: "Dragon").frame(width: 60, height: 60)
-                                if selectedSkinName == "Dragon" { Circle().stroke(Color(hex: 0x00C8F8), lineWidth: 4).frame(width: 66, height: 66) }
-                            }
-                        }
-                        ForEach(availableSkins, id: \.self) { skin in
-                            Button(action: { SoundManager.shared.play(.menuClick); selectedSkinName = skin; showSkinsModal = false }) {
-                                ZStack {
-                                    SkinSelectorPreview(skinName: skin).frame(width: 60, height: 60)
-                                    if selectedSkinName == skin { Circle().stroke(Color(hex: 0x00C8F8), lineWidth: 4).frame(width: 66, height: 66) }
-                                }
-                            }
-                        }
-                    }
-                    .padding(8)
-                }
-                .frame(maxHeight: 360)
-            }
-            .padding(18)
-            .frame(width: 360)
-            .background(Image("mcfs-white").resizable())
-            .shadow(radius: 20)
-        }
-    }
-
-    private func infoModalOverlay(title: String) -> some View {
-        ZStack {
-            Color.black.opacity(0.68).edgesIgnoringSafeArea(.all).onTapGesture { withAnimation { activeInfoTab = nil } }
-            VStack(spacing: 14) {
-                HStack {
-                    Button(action: { SoundManager.shared.play(.menuClick); withAnimation { activeInfoTab = nil } }) {
-                        Image("menu-back-btn").resizable().scaledToFit().frame(width: 30, height: 30)
-                    }
-                    Spacer()
-                    Text(title).font(.custom("OpenSans-Bold", size: 22)).foregroundColor(Color(hex: 0x5A5F66))
-                    Spacer()
-                    Color.clear.frame(width: 30, height: 30)
-                }
-                Image("mcfs-divider").resizable().frame(height: 2)
-                HStack(spacing: 12) {
-                    Image(LeagueBadge.assetName(forLevel: playerLevel)).resizable().scaledToFit().frame(width: 60, height: 56)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Current Level: \(LeagueBadge.clamp(playerLevel))")
-                            .font(.custom("OpenSans-Bold", size: 17)).foregroundColor(Color(hex: 0x3D4347))
-                        Text("Adjust your level in the top-left profile bar (1-150).")
-                            .font(.custom("Lato-Regular", size: 13)).foregroundColor(Color(hex: 0x6E767E))
-                    }
-                }
-                Button(action: { SoundManager.shared.play(.menuClick); withAnimation { activeInfoTab = nil } }) {
-                    menuStrokedText("Close", size: 17)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 44)
-                        .background(
-                            ZStack {
-                                Image("mcfs-shadow").resizable().offset(y: 3)
-                                Image("mcfs-light-blue").resizable()
-                            }
-                        )
-                }
-            }
-            .padding(18)
-            .frame(width: 340)
-            .background(Image("mcfs-white").resizable())
-            .shadow(radius: 20)
-        }
-    }
-
-    var body: some View {
-        ZStack {
-            Image("background-ipadpro-hd").resizable().scaledToFill().scaleEffect(1).edgesIgnoringSafeArea(.all)
-            
-            topMenuBar.zIndex(1)
-            bottomFeatureDock.zIndex(1)
-            
-            VStack(spacing: 14) {
-                Spacer()
-                Image("title")
+                Image("menu-plus-btn")
                     .resizable()
                     .scaledToFit()
-                    .frame(maxWidth: 235)
-                    .padding(.bottom, 2)
-                
-                // Skin circle with menu-plus-box on LEFT + mcfs-white-gray Nickname box on RIGHT
-                HStack(spacing: 12) {
-                    Button(action: {
-                        SoundManager.shared.play(.menuClick)
-                        showSkinsModal = true
-                    }) {
-                        ZStack(alignment: .bottomLeading) {
-                            ZStack {
-                                Circle().fill(Color.white).frame(width: 52, height: 52)
-                                if let skin = selectedSkinName {
-                                    SkinSelectorPreview(skinName: skin)
-                                        .frame(width: 48, height: 48)
-                                        .clipShape(Circle())
-                                } else {
-                                    Image("menu-skins-btn").resizable().scaledToFit().frame(width: 48, height: 48)
-                                }
-                            }
-                            .overlay(Circle().stroke(Color(hex: 0xCCCCCC), lineWidth: 2))
-                            Image("menu-plus-box")
+                    .frame(width: 11 * s, height: 11 * s)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .padding(2 * s)
+            }
+            .frame(width: 42 * s, height: 34 * s)
+        }
+    }
+
+    private func topSquareButton(icon: String, label: String, frameAsset: String, badgeCount: Int = 0, scale s: CGFloat, action: @escaping () -> Void) -> some View {
+        Button(action: {
+            SoundManager.shared.play(.menuClick)
+            withAnimation { action() }
+        }) {
+            ZStack(alignment: .topTrailing) {
+                VStack(spacing: 1.5 * s) {
+                    Image(icon).resizable().scaledToFit().frame(width: 21 * s, height: 21 * s)
+                    menuStrokedText(label, size: 7.5 * s)
+                        .lineLimit(1)
+                }
+                .frame(width: 40 * s, height: 40 * s)
+                .background(
+                    ZStack {
+                        MCFSFrame(name: "mcfs-shadow").offset(y: 2 * s)
+                        MCFSFrame(name: frameAsset)
+                    }
+                )
+
+                if badgeCount > 0 {
+                    Text("\(badgeCount)")
+                        .font(.custom("OpenSans-Bold", size: 8.5 * s))
+                        .foregroundColor(.white)
+                        .frame(width: 15 * s, height: 15 * s)
+                        .background(Circle().fill(Color(hex: 0xE53935)))
+                        .overlay(Circle().stroke(Color.white, lineWidth: 1.2 * s))
+                        .offset(x: 4 * s, y: -4 * s)
+                }
+            }
+        }
+    }
+
+    private func bottomFeatureDock(scale s: CGFloat) -> some View {
+        VStack {
+            Spacer()
+            HStack(alignment: .bottom, spacing: 6 * s) {
+                // MenuMain.ccbi Bottom-Left: News stacked above Settings, beside Gifts & Party
+                HStack(alignment: .bottom, spacing: 6 * s) {
+                    VStack(spacing: 6 * s) {
+                        Button(action: {
+                            SoundManager.shared.play(.menuClick)
+                            withAnimation { activeInfoTab = "News" }
+                        }) {
+                            Image("menu-news-icon")
                                 .resizable()
                                 .scaledToFit()
-                                .frame(width: 20, height: 20)
-                                .offset(x: -4, y: 4)
+                                .frame(width: 21 * s, height: 21 * s)
+                                .frame(width: 40 * s, height: 38 * s)
+                                .background(
+                                    ZStack {
+                                        MCFSFrame(name: "mcfs-shadow").offset(y: 2 * s)
+                                        MCFSFrame(name: "mcfs-light-blue")
+                                    }
+                                )
                         }
-                    }
 
-                    ReliableNicknameField(text: $playerName, placeholder: "Nickname")
-                        .frame(width: 266, height: 44)
-                        .padding(.horizontal, 12)
-                        .background(Image("mcfs-white-gray").resizable())
-                        .multilineTextAlignment(.center)
-                }
-                
-                // Mode Play Row: ClassicButton.ccbi (120x80 ratio -> 136x90)
-                HStack(spacing: 12) {
-                    Button(action: {
-                        SoundManager.shared.play(.menuClick)
-                        withAnimation(.easeOut(duration: 0.4)) { zoomLevel = 0.8; isPlaying = true }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { withAnimation(.spring(duration: 1)) { zoomLevel = 1.0 } }
-                    }) {
-                        VStack(spacing: 6) {
-                            Image("menu-play-icon").resizable().scaledToFit().frame(width: 36, height: 38)
-                            menuStrokedText("Classic", size: 17)
+                        Button(action: {
+                            SoundManager.shared.play(.menuClick)
+                            withAnimation { showSettings = true }
+                        }) {
+                            Image("menu-settings-icon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 22 * s, height: 22 * s)
+                                .frame(width: 40 * s, height: 38 * s)
+                                .background(
+                                    ZStack {
+                                        MCFSFrame(name: "mcfs-shadow").offset(y: 2 * s)
+                                        MCFSFrame(name: "mcfs-light-blue")
+                                    }
+                                )
                         }
-                        .frame(width: 136, height: 92)
-                        .background(
-                            ZStack {
-                                Image("mcfs-shadow").resizable().offset(y: 4)
-                                Image("mcfs-mode-orange").resizable()
-                            }
-                        )
                     }
 
                     Button(action: {
                         SoundManager.shared.play(.menuClick)
-                        onPlayOnline()
+                        withAnimation { activeInfoTab = "Gifts" }
                     }) {
-                        VStack(spacing: 6) {
-                            Image("menu-party-icon").resizable().scaledToFit().frame(width: 38, height: 34)
-                            menuStrokedText("Play Online", size: 16)
-                        }
-                        .frame(width: 136, height: 92)
-                        .background(
-                            ZStack {
-                                Image("mcfs-shadow").resizable().offset(y: 4)
-                                Image("mcfs-green").resizable()
-                            }
-                        )
+                        Image("menu-gift-icon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 22 * s, height: 22 * s)
+                            .frame(width: 40 * s, height: 38 * s)
+                            .background(
+                                ZStack {
+                                    MCFSFrame(name: "mcfs-shadow").offset(y: 2 * s)
+                                    MCFSFrame(name: "mcfs-dark-blue")
+                                }
+                            )
                     }
 
                     Button(action: {
@@ -13432,131 +13313,472 @@ struct MainMenu: View {
                         partyJoinCode = ""
                         withAnimation { showPartyMenu = true }
                     }) {
-                        VStack(spacing: 6) {
-                            Image("ui-star-icon").resizable().scaledToFit().frame(width: 34, height: 34)
-                            menuStrokedText(partyCode.isEmpty ? "Party" : partyCode, size: 17)
+                        Image("menu-party-icon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 23 * s, height: 20 * s)
+                            .frame(width: 40 * s, height: 38 * s)
+                            .background(
+                                ZStack {
+                                    MCFSFrame(name: "mcfs-shadow").offset(y: 2 * s)
+                                    MCFSFrame(name: "mcfs-dark-blue")
+                                }
+                            )
+                    }
+                }
+
+                Spacer()
+
+                // MenuMain.ccbi Bottom-Right: Shop (100x40) + InitialisedPlayerAvatar (132x40)
+                HStack(alignment: .bottom, spacing: 7 * s) {
+                    Button(action: {
+                        SoundManager.shared.play(.menuClick)
+                        withAnimation { activeInfoTab = "Shop" }
+                    }) {
+                        HStack(spacing: 6 * s) {
+                            menuStrokedText("Shop", size: 15 * s)
+                            Image("menu-shop-icon")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20 * s, height: 18 * s)
                         }
-                        .frame(width: 136, height: 92)
+                        .frame(width: 98 * s, height: 40 * s)
                         .background(
                             ZStack {
-                                Image("mcfs-shadow").resizable().offset(y: 4)
-                                Image("mcfs-light-blue").resizable()
+                                MCFSFrame(name: "mcfs-shadow").offset(y: 2 * s)
+                                MCFSFrame(name: "mcfs-green")
+                            }
+                        )
+                    }
+
+                    Button(action: {
+                        SoundManager.shared.play(.menuClick)
+                        withAnimation { activeInfoTab = "Leagues" }
+                    }) {
+                        HStack(spacing: 7 * s) {
+                            VStack(alignment: .leading, spacing: 2 * s) {
+                                HStack(spacing: 4 * s) {
+                                    ZStack {
+                                        Image("ui-star-icon").resizable().scaledToFit().frame(width: 15 * s, height: 15 * s)
+                                        Text("\(LeagueBadge.clamp(playerLevel))")
+                                            .font(.custom("OpenSans-Bold", size: 8 * s))
+                                            .foregroundColor(.white)
+                                    }
+                                    ZStack(alignment: .leading) {
+                                        MCFSFrame(name: "mcfs-hud-xp-box")
+                                            .frame(width: 64 * s, height: 9 * s)
+                                        MCFSFrame(name: "mcfs-hud-xp")
+                                            .frame(width: max(10 * s, 60 * s * CGFloat((LeagueBadge.clamp(playerLevel) % 10) + 1) / 10.0), height: 7 * s)
+                                            .padding(.leading, 2 * s)
+                                    }
+                                }
+                                Text(playerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Guest" : playerName)
+                                    .font(.custom("OpenSans-Bold", size: 11 * s))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                            }
+                            ZStack {
+                                MCFSFrame(name: "mcfs-blue-profile")
+                                    .frame(width: 30 * s, height: 30 * s)
+                                Image("menu-profile-guest")
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 26 * s, height: 26 * s)
+                                    .cornerRadius(4 * s)
+                                if let skin = selectedSkinName {
+                                    SkinSelectorPreview(skinName: skin)
+                                        .frame(width: 26 * s, height: 26 * s)
+                                        .cornerRadius(4 * s)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 8 * s)
+                        .frame(height: 40 * s)
+                        .background(
+                            ZStack {
+                                MCFSFrame(name: "mcfs-shadow").offset(y: 2 * s)
+                                MCFSFrame(name: "mcfs-dark-blue")
                             }
                         )
                     }
                 }
-                .padding(.top, 4)
-                Spacer()
             }
-            
-            if showPartyMenu { partyOverlay.zIndex(2) }
-            if showSkinsModal { skinsModalOverlay.zIndex(2) }
-            if let tab = activeInfoTab {
-                switch tab {
-                case "Shop":
-                    ShopModalView(coins: $coinsCount, dna: $dnaCount, activeStartBoost: $activeStartBoost) {
-                        withAnimation { activeInfoTab = nil }
+            .padding(.horizontal, 10 * s)
+            .padding(.bottom, 8 * s)
+        }
+    }
+
+    /// MenuShopSkins.ccbi full-screen 1:1 Skin Picker (GenericHeader + tabs + mcfs-gray backing + MenuShopSkinsNode cards)
+    private func skinsModalOverlay(scale s: CGFloat, containerSize: CGSize) -> some View {
+        let filteredSkins: [String] = {
+            let full = ["Dragon"] + availableSkins
+            switch selectedSkinsTab {
+            case 2:
+                return full.filter { DualSkinCatalog.shared.isDual($0) }
+            default:
+                return full
+            }
+        }()
+        let tabNames = ["All Skins", "Owned", "Dual Skins"]
+        let minCard = max(78, 86 * s)
+
+        return ZStack {
+            Color.white.edgesIgnoringSafeArea(.all)
+            VStack(spacing: 0) {
+                VStack(spacing: 0) {
+                    HStack(spacing: 8 * s) {
+                        Button(action: { SoundManager.shared.play(.menuClick); withAnimation { showSkinsModal = false } }) {
+                            Image("menu-back-btn").resizable().scaledToFit().frame(width: 28 * s, height: 28 * s)
+                        }
+                        Text("Skins")
+                            .font(.custom("OpenSans-Bold", size: 19 * s))
+                            .foregroundColor(Color(hex: 0x5A5F66))
+                        Spacer()
+                        HStack(spacing: 6 * s) {
+                            currencyBarButton(icon: "menu-coin-icon", value: coinsCount, scale: s) {
+                                showSkinsModal = false; activeInfoTab = "Shop"
+                            }
+                            currencyBarButton(icon: "menu-dna-icon", value: dnaCount, scale: s) {
+                                showSkinsModal = false; activeInfoTab = "Shop"
+                            }
+                        }
                     }
-                    .zIndex(2)
-                case "Quests":
-                    QuestsModalView(coins: $coinsCount, dna: $dnaCount) {
-                        withAnimation { activeInfoTab = nil }
-                    }
-                    .zIndex(2)
-                case "Potions":
-                    PotionsModalView(coins: $coinsCount, dna: $dnaCount) {
-                        withAnimation { activeInfoTab = nil }
-                    }
-                    .zIndex(2)
-                case "Gifts", "News":
-                    GiftsNewsModalView(title: tab, coins: $coinsCount, dna: $dnaCount) {
-                        withAnimation { activeInfoTab = nil }
-                    }
-                    .zIndex(2)
-                default:
-                    infoModalOverlay(title: tab).zIndex(2)
+                    .padding(.horizontal, 14 * s)
+                    .padding(.vertical, 8 * s)
+                    Image("mcfs-divider").resizable().frame(height: max(1.5, 2 * s))
                 }
+                .background(Color.white)
+
+                HStack(spacing: 6 * s) {
+                    ForEach(0..<tabNames.count, id: \.self) { idx in
+                        let selected = selectedSkinsTab == idx
+                        Button(action: {
+                            SoundManager.shared.play(.menuClick)
+                            selectedSkinsTab = idx
+                        }) {
+                            Text(tabNames[idx])
+                                .font(.custom("OpenSans-Bold", size: 12 * s))
+                                .foregroundColor(selected ? .white : Color(hex: 0x5A5F66))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 30 * s)
+                        }
+                        .buttonStyle(MCFSBevelStyle(frameAsset: selected ? "mcfs-light-blue" : "mcfs-white-grey-tab", showShadow: selected))
+                    }
+
+                    Button(action: {
+                        SoundManager.shared.play(.menuClick)
+                        selectedSkinName = nil
+                        withAnimation { showSkinsModal = false }
+                    }) {
+                        Text("No Skin")
+                            .font(.custom("OpenSans-Bold", size: 11.5 * s))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12 * s)
+                            .frame(height: 30 * s)
+                    }
+                    .buttonStyle(MCFSBevelStyle(frameAsset: selectedSkinName == nil ? "mcfs-green" : "mcfs-orange"))
+                }
+                .padding(.horizontal, 14 * s)
+                .padding(.vertical, 8 * s)
+                .background(Color(hex: 0xF2F5F8))
+
+                ScrollView {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: minCard), spacing: 8 * s)], spacing: 8 * s) {
+                        ForEach(filteredSkins, id: \.self) { skin in
+                            let isSelected = selectedSkinName == skin
+                            let isDual = DualSkinCatalog.shared.isDual(skin)
+                            VStack(spacing: 5 * s) {
+                                Text(skin == "Dragon" ? "Dragon" : "Skin #\(skin)")
+                                    .font(.custom("OpenSans-Bold", size: 9.5 * s))
+                                    .foregroundColor(Color(hex: 0x5A5F66))
+                                    .lineLimit(1)
+
+                                ZStack(alignment: .topTrailing) {
+                                    SkinSelectorPreview(skinName: skin)
+                                        .frame(width: 52 * s, height: 52 * s)
+                                    if isDual {
+                                        Text("DUAL")
+                                            .font(.custom("OpenSans-Bold", size: 7 * s))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 4 * s)
+                                            .padding(.vertical, 1 * s)
+                                            .background(Capsule().fill(Color(hex: 0x9B4DFF)))
+                                            .offset(x: 4 * s, y: -2 * s)
+                                    }
+                                }
+
+                                Button(action: {
+                                    SoundManager.shared.play(.menuClick)
+                                    selectedSkinName = skin
+                                }) {
+                                    Text(isSelected ? "Using" : "Use")
+                                        .font(.custom("OpenSans-Bold", size: 10.5 * s))
+                                        .foregroundColor(.white)
+                                        .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 24 * s)
+                                }
+                                .buttonStyle(MCFSBevelStyle(frameAsset: isSelected ? "mcfs-green" : "mcfs-light-blue", showShadow: false))
+                            }
+                            .padding(7 * s)
+                            .background(MCFSFrame(name: isSelected ? "mcfs-skin-equipped" : "mcfs-white"))
+                        }
+                    }
+                    .padding(12 * s)
+                }
+                .background(MCFSFrame(name: "mcfs-gray"))
             }
-            
-            // GenericHeader.ccbi + MenuSettingsNode_26.2.0.ccbi Light Settings
-            if showSettings {
-                ZStack {
-                    Color(hex: 0xF2F5F8).edgesIgnoringSafeArea(.all)
-                    VStack(spacing: 0) {
+            .frame(width: containerSize.width, height: containerSize.height)
+        }
+    }
+
+    private func infoModalOverlay(title: String, scale s: CGFloat, containerSize: CGSize) -> some View {
+        ZStack {
+            Color.black.opacity(0.65).edgesIgnoringSafeArea(.all).onTapGesture { withAnimation { activeInfoTab = nil } }
+            VStack(spacing: 10 * s) {
+                HStack {
+                    Button(action: { SoundManager.shared.play(.menuClick); withAnimation { activeInfoTab = nil } }) {
+                        Image("menu-back-btn").resizable().scaledToFit().frame(width: 26 * s, height: 26 * s)
+                    }
+                    Spacer()
+                    Text(title).font(.custom("OpenSans-Bold", size: 18 * s)).foregroundColor(Color(hex: 0x5A5F66))
+                    Spacer()
+                    Color.clear.frame(width: 26 * s, height: 26 * s)
+                }
+                Image("mcfs-divider").resizable().frame(height: max(1.5, 2 * s))
+                HStack(spacing: 12 * s) {
+                    Image(LeagueBadge.assetName(forLevel: playerLevel)).resizable().scaledToFit().frame(width: 54 * s, height: 50 * s)
+                    VStack(alignment: .leading, spacing: 4 * s) {
+                        Text("Current Level: \(LeagueBadge.clamp(playerLevel))")
+                            .font(.custom("OpenSans-Bold", size: 15 * s)).foregroundColor(Color(hex: 0x3D4347))
+                        Text("Earn XP in matches to climb League tiers (1-150).")
+                            .font(.custom("Lato-Regular", size: 12 * s)).foregroundColor(Color(hex: 0x6E767E))
+                    }
+                }
+                Button(action: { SoundManager.shared.play(.menuClick); withAnimation { activeInfoTab = nil } }) {
+                    menuStrokedText("Close", size: 15 * s)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 38 * s)
+                }
+                .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-light-blue"))
+            }
+            .padding(16 * s)
+            .frame(width: min(containerSize.width * 0.85, 340 * s))
+            .background(MCFSFrame(name: "mcfs-white"))
+            .shadow(radius: 20)
+        }
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let s = max(1.0, min(OriginalGameplay.uiScale(for: geometry.size), geometry.size.width / 460.0))
+
+            ZStack {
+                Image("background-ipadpro-hd")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+                    .edgesIgnoringSafeArea(.all)
+
+                topMenuBar(scale: s).zIndex(1)
+                bottomFeatureDock(scale: s).zIndex(1)
+
+                VStack(spacing: 10 * s) {
+                    Spacer()
+                    Image("ui-logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 44 * s)
+                        .padding(.bottom, 2 * s)
+
+                    // Skin circle (45x45) + Nickname (mcfs-white-gray)
+                    HStack(spacing: 10 * s) {
+                        Button(action: {
+                            SoundManager.shared.play(.menuClick)
+                            showSkinsModal = true
+                        }) {
+                            ZStack(alignment: .bottomLeading) {
+                                ZStack {
+                                    Circle().fill(Color.white).frame(width: 45 * s, height: 45 * s)
+                                    if let skin = selectedSkinName {
+                                        SkinSelectorPreview(skinName: skin)
+                                            .frame(width: 41 * s, height: 41 * s)
+                                            .clipShape(Circle())
+                                    } else {
+                                        Image("menu-skins-btn").resizable().scaledToFit().frame(width: 41 * s, height: 41 * s)
+                                    }
+                                }
+                                .overlay(Circle().stroke(Color(hex: 0xCCCCCC), lineWidth: 1.8 * s))
+                                Image("menu-plus-box")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 17 * s, height: 17 * s)
+                                    .offset(x: -3 * s, y: 3 * s)
+                            }
+                        }
+
+                        ReliableNicknameField(text: $playerName, placeholder: "Nickname")
+                            .frame(width: 215 * s, height: 36 * s)
+                            .padding(.horizontal, 10 * s)
+                            .background(MCFSFrame(name: "mcfs-white-gray"))
+                            .multilineTextAlignment(.center)
+                    }
+
+                    // Mode Play Row: ClassicButton.ccbi 120x80 proportions scaled by s
+                    HStack(spacing: 10 * s) {
+                        Button(action: {
+                            SoundManager.shared.play(.menuClick)
+                            withAnimation(.easeOut(duration: 0.4)) { zoomLevel = 0.8; isPlaying = true }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { withAnimation(.spring(duration: 1)) { zoomLevel = 1.0 } }
+                        }) {
+                            VStack(spacing: 4 * s) {
+                                Image("menu-play-icon").resizable().scaledToFit().frame(width: 30 * s, height: 32 * s)
+                                menuStrokedText("Classic", size: 14 * s)
+                            }
+                            .frame(width: 118 * s, height: 78 * s)
+                        }
+                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-mode-darkorange"))
+
+                        Button(action: {
+                            SoundManager.shared.play(.menuClick)
+                            onPlayOnline()
+                        }) {
+                            VStack(spacing: 4 * s) {
+                                Image("menu-party-icon").resizable().scaledToFit().frame(width: 32 * s, height: 28 * s)
+                                menuStrokedText("Play Online", size: 13.5 * s)
+                            }
+                            .frame(width: 118 * s, height: 78 * s)
+                        }
+                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
+
+                        Button(action: {
+                            SoundManager.shared.play(.menuClick)
+                            partyJoinCode = ""
+                            withAnimation { showPartyMenu = true }
+                        }) {
+                            VStack(spacing: 4 * s) {
+                                Image(partyCode.isEmpty ? "party-bigicon" : "ui-star-icon").resizable().scaledToFit().frame(width: 30 * s, height: 30 * s)
+                                menuStrokedText(partyCode.isEmpty ? "Party" : partyCode, size: 14 * s)
+                            }
+                            .frame(width: 118 * s, height: 78 * s)
+                        }
+                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-light-blue"))
+                    }
+                    .padding(.top, 2 * s)
+                    Spacer()
+                }
+
+                if showPartyMenu { partyOverlay(scale: s, containerSize: geometry.size).zIndex(2) }
+                if showSkinsModal { skinsModalOverlay(scale: s, containerSize: geometry.size).zIndex(2) }
+                if let tab = activeInfoTab {
+                    switch tab {
+                    case "Shop":
+                        ShopModalView(coins: $coinsCount, dna: $dnaCount, activeStartBoost: $activeStartBoost) {
+                            withAnimation { activeInfoTab = nil }
+                        }
+                        .zIndex(2)
+                    case "Quests":
+                        QuestsModalView(coins: $coinsCount, dna: $dnaCount) {
+                            withAnimation { activeInfoTab = nil }
+                        }
+                        .zIndex(2)
+                    case "Potions":
+                        PotionsModalView(coins: $coinsCount, dna: $dnaCount) {
+                            withAnimation { activeInfoTab = nil }
+                        }
+                        .zIndex(2)
+                    case "Gifts", "News":
+                        GiftsNewsModalView(title: tab, coins: $coinsCount, dna: $dnaCount) {
+                            withAnimation { activeInfoTab = nil }
+                        }
+                        .zIndex(2)
+                    default:
+                        infoModalOverlay(title: tab, scale: s, containerSize: geometry.size).zIndex(2)
+                    }
+                }
+
+                // GenericHeader.ccbi + MenuSettingsNode_26.2.0.ccbi Light Settings
+                if showSettings {
+                    ZStack {
+                        Color(hex: 0xF2F5F8).edgesIgnoringSafeArea(.all)
                         VStack(spacing: 0) {
-                            HStack {
-                                Button(action: { SoundManager.shared.play(.menuClick); withAnimation { showSettings = false } }) {
-                                    Image("menu-back-btn").resizable().scaledToFit().frame(width: 34, height: 34)
+                            VStack(spacing: 0) {
+                                HStack {
+                                    Button(action: { SoundManager.shared.play(.menuClick); withAnimation { showSettings = false } }) {
+                                        Image("menu-back-btn").resizable().scaledToFit().frame(width: 28 * s, height: 28 * s)
+                                    }
+                                    Spacer()
+                                    Text("Settings")
+                                        .font(.custom("OpenSans-Bold", size: 19 * s))
+                                        .foregroundColor(Color(hex: 0x5A5F66))
+                                    Spacer()
+                                    Color.clear.frame(width: 28 * s, height: 28 * s)
                                 }
-                                Spacer()
-                                Text("Settings")
-                                    .font(.custom("OpenSans-Bold", size: 22))
-                                    .foregroundColor(Color(hex: 0x6E6E6E))
-                                Spacer()
-                                Color.clear.frame(width: 34, height: 34)
+                                .padding(.horizontal, 14 * s)
+                                .padding(.vertical, 8 * s)
+                                .background(Color.white)
+                                Image("mcfs-divider").resizable().frame(height: max(1.5, 2 * s))
                             }
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 10)
-                            .background(Color.white)
-                            Image("mcfs-divider").resizable().frame(height: 3)
-                        }
 
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Text("Game Options")
-                                    .font(.custom("OpenSans-Bold", size: 17))
-                                    .foregroundColor(Color(hex: 0x555555))
-                                    .padding(.top, 8)
+                            ScrollView {
+                                VStack(alignment: .leading, spacing: 7 * s) {
+                                    Text("Options")
+                                        .font(.custom("OpenSans-Bold", size: 14 * s))
+                                        .foregroundColor(Color(hex: 0x5A5F66))
+                                        .padding(.top, 8 * s)
 
-                                lightSettingToggle("Sound Effects", isOn: $soundEnabled)
-                                lightSettingToggle("Show Level Badge", isOn: $showPlayerLevel)
-                                lightSettingToggle("Dark Mode Grid", isOn: $darkModeGrid)
-                                lightSettingToggle("Show Mass", isOn: $showMassText)
-                                lightSettingToggle("Show Arrow", isOn: $showArrow)
-                                lightSettingToggle("Show Skins", isOn: $showSkins)
-                                lightSettingToggle("Show Emoji Widget", isOn: $showEmojiWidget)
-                                lightSettingToggle("Show Minimap", isOn: $showMinimap)
+                                    lightSettingToggle("Sound Effects", isOn: $soundEnabled, scale: s)
+                                    lightSettingToggle("Dark Mode", isOn: $darkModeGrid, scale: s)
+                                    lightSettingToggle("Show Mass", isOn: $showMassText, scale: s)
+                                    lightSettingToggle("Show Skins", isOn: $showSkins, scale: s)
+                                    lightSettingToggle("Show Level Badge", isOn: $showPlayerLevel, scale: s)
+                                    lightSettingToggle("Show Arrow", isOn: $showArrow, scale: s)
+                                    lightSettingToggle("Show Emoji Widget", isOn: $showEmojiWidget, scale: s)
+                                    lightSettingToggle("Show Minimap", isOn: $showMinimap, scale: s)
+                                    lightSettingToggle("Stop Movement on Release", isOn: $stopOnRelease, scale: s)
 
-                                Text("Offline Match")
-                                    .font(.custom("OpenSans-Bold", size: 17))
-                                    .foregroundColor(Color(hex: 0x555555))
-                                    .padding(.top, 8)
+                                    Text("Offline Match")
+                                        .font(.custom("OpenSans-Bold", size: 14 * s))
+                                        .foregroundColor(Color(hex: 0x5A5F66))
+                                        .padding(.top, 8 * s)
 
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Text("Player Start Mass: \(Int(playerStartMass))").font(.custom("Lato-Regular", size: 15)).foregroundColor(Color(hex: 0x555555))
-                                    Slider(value: $playerStartMass, in: 10...5000, step: 10).accentColor(Color(hex: 0x00C8F8))
+                                    VStack(alignment: .leading, spacing: 8 * s) {
+                                        Text("Player Start Mass: \(Int(playerStartMass))").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
+                                        Slider(value: $playerStartMass, in: 10...5000, step: 10).accentColor(Color(hex: 0x00C8F8))
 
-                                    Text("Bot Start Mass: \(Int(botStartMass))").font(.custom("Lato-Regular", size: 15)).foregroundColor(Color(hex: 0x555555))
-                                    Slider(value: $botStartMass, in: 10...5000, step: 10).accentColor(Color(hex: 0x54C826))
-                                        .opacity(randomizeBotStartMass ? 0.4 : 1.0)
-                                        .disabled(randomizeBotStartMass)
+                                        Text("Bot Start Mass: \(Int(botStartMass))").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
+                                        Slider(value: $botStartMass, in: 10...5000, step: 10).accentColor(Color(hex: 0x54C826))
+                                            .opacity(randomizeBotStartMass ? 0.4 : 1.0)
+                                            .disabled(randomizeBotStartMass)
 
-                                    lightSettingRowSwitch("Randomize Bot Start Mass", isOn: $randomizeBotStartMass)
+                                        lightSettingRowSwitch("Randomize Bot Start Mass", isOn: $randomizeBotStartMass, scale: s)
 
-                                    Text("Bot Count: \(targetBotCount)").font(.custom("Lato-Regular", size: 15)).foregroundColor(Color(hex: 0x555555))
-                                    Slider(value: Binding(get: { Double(targetBotCount) }, set: { targetBotCount = Int($0) }), in: 0...100, step: 1).accentColor(Color(hex: 0xF26522))
+                                        Text("Bot Count: \(targetBotCount)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
+                                        Slider(value: Binding(get: { Double(targetBotCount) }, set: { targetBotCount = Int($0) }), in: 0...100, step: 1).accentColor(Color(hex: 0xF26522))
 
-                                    Text("Feed Bot Count: \(feedBotCount)").font(.custom("Lato-Regular", size: 15)).foregroundColor(Color(hex: 0x555555))
-                                    Slider(value: Binding(get: { Double(feedBotCount) }, set: { feedBotCount = Int($0) }), in: 0...50, step: 1).accentColor(.pink)
+                                        Text("Feed Bot Count: \(feedBotCount)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
+                                        Slider(value: Binding(get: { Double(feedBotCount) }, set: { feedBotCount = Int($0) }), in: 0...50, step: 1).accentColor(.pink)
 
-                                    Text("Bot Skill: \(menuBotSkillLabel)").font(.custom("Lato-Regular", size: 15)).foregroundColor(Color(hex: 0x555555))
-                                    Slider(value: $botSkill, in: 0.4...1.6, step: 0.1).accentColor(.red)
+                                        Text("Bot Skill: \(menuBotSkillLabel)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
+                                        Slider(value: $botSkill, in: 0.4...1.6, step: 0.1).accentColor(.red)
+                                    }
+                                    .padding(12 * s)
+                                    .background(MCFSFrame(name: "mcfs-white"))
+
+                                    Text(buildStamp)
+                                        .font(.custom("Lato-Regular", size: 10 * s))
+                                        .foregroundColor(Color(hex: 0x9A9A9A))
+                                        .frame(maxWidth: .infinity, alignment: .center)
+                                        .padding(.top, 4 * s)
                                 }
-                                .padding(14)
-                                .background(Image("mcfs-white").resizable())
-
-                                Text(buildStamp)
-                                    .font(.custom("Lato-Regular", size: 11))
-                                    .foregroundColor(Color(hex: 0x9A9A9A))
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding(.top, 4)
+                                .padding(.horizontal, 16 * s)
+                                .padding(.bottom, 20 * s)
                             }
-                            .padding(.horizontal, 18)
-                            .padding(.bottom, 24)
                         }
                     }
+                    .zIndex(3)
                 }
-                .zIndex(3)
             }
         }
     }
@@ -13569,42 +13791,42 @@ struct MainMenu: View {
         return date.isEmpty ? "Build \(sha)" : "Build \(sha) · \(date)"
     }
 
-    private func lightSettingRowSwitch(_ title: String, isOn: Binding<Bool>) -> some View {
+    private func lightSettingRowSwitch(_ title: String, isOn: Binding<Bool>, scale s: CGFloat) -> some View {
         Button(action: {
             SoundManager.shared.play(.menuClick)
             withAnimation(.easeInOut(duration: 0.15)) { isOn.wrappedValue.toggle() }
         }) {
             HStack {
                 Text(title)
-                    .font(.custom("Lato-Regular", size: 15))
+                    .font(.custom("Lato-Regular", size: 13 * s))
                     .foregroundColor(Color(hex: 0x555555))
                 Spacer()
                 Image(isOn.wrappedValue ? "menu-slider-on" : "menu-slider-off")
                     .resizable()
                     .scaledToFit()
-                    .frame(height: 26)
+                    .frame(height: 22 * s)
             }
         }
     }
 
-    private func lightSettingToggle(_ title: String, isOn: Binding<Bool>) -> some View {
+    private func lightSettingToggle(_ title: String, isOn: Binding<Bool>, scale s: CGFloat) -> some View {
         Button(action: {
             SoundManager.shared.play(.menuClick)
             withAnimation(.easeInOut(duration: 0.15)) { isOn.wrappedValue.toggle() }
         }) {
             HStack {
                 Text(title)
-                    .font(.custom("Lato-Regular", size: 16))
+                    .font(.custom("Lato-Regular", size: 13.5 * s))
                     .foregroundColor(Color(hex: 0x5A5F66))
                 Spacer()
                 Image(isOn.wrappedValue ? "menu-slider-on" : "menu-slider-off")
                     .resizable()
                     .scaledToFit()
-                    .frame(height: 28)
+                    .frame(height: 23 * s)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 11)
-            .background(Image("mcfs-white").resizable())
+            .padding(.horizontal, 14 * s)
+            .padding(.vertical, 9 * s)
+            .background(MCFSFrame(name: "mcfs-white"))
         }
     }
 }

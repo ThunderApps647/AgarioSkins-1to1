@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import SwiftUI
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -107,5 +108,253 @@ enum OriginalGameplay {
 
     static func impulseDecay(dt: CGFloat) -> CGFloat {
         CGFloat(impulseDecay(dt: Double(dt)))
+    }
+
+    /// Cocos2d `.ccbi` design point scale (`480x320` base resolution).
+    static func uiScale(for size: CGSize) -> CGFloat {
+        let s = min(max(size.height, 1) / 320.0, max(size.width, 1) / 480.0)
+        return max(1.0, s)
+    }
+}
+
+/// Crisp 9-slice `MCFramedSprite` renderer. SwiftUI `.resizable()` ignores
+/// `Contents.json` `resizing` slices unless `capInsets:` is passed explicitly.
+struct MCFSFrame: View {
+    let name: String
+
+    static func capInsets(for name: String) -> EdgeInsets {
+        switch name {
+        case "mcfs-divider":
+            return EdgeInsets()
+        case "mcfs-hud-xp":
+            return EdgeInsets(top: 2.5, leading: 1.0, bottom: 2.5, trailing: 1.0)
+        case "mcfs-hud-xp-box":
+            return EdgeInsets(top: 3.5, leading: 3.5, bottom: 3.5, trailing: 3.5)
+        case "mcfs-leaderboard-collapsed":
+            return EdgeInsets(top: 3.0, leading: 3.0, bottom: 3.0, trailing: 3.0)
+        case "mcfs-leaderboard-expanded":
+            return EdgeInsets(top: 2.0, leading: 3.0, bottom: 2.0, trailing: 1.0)
+        case "mcfs-leaderboard-content-float":
+            return EdgeInsets(top: 1.5, leading: 6.5, bottom: 5.5, trailing: 6.5)
+        case "mcfs-red-timer-frame":
+            return EdgeInsets(top: 5.5, leading: 2.5, bottom: 5.5, trailing: 2.5)
+        case "mcfs-white-grey-tab":
+            return EdgeInsets(top: 4.5, leading: 6.0, bottom: 4.5, trailing: 6.0)
+        case "mcfs-shadow":
+            return EdgeInsets(top: 8.0, leading: 8.0, bottom: 8.0, trailing: 8.0)
+        case "mcfs-blue-profile", "mcfs-bar-darkcyan", "ui-bar-darkcyan":
+            return EdgeInsets(top: 4.5, leading: 4.5, bottom: 4.5, trailing: 4.5)
+        case "mcfs-leaderboard-party-outline":
+            return EdgeInsets(top: 5.0, leading: 5.0, bottom: 5.0, trailing: 5.0)
+        default:
+            return EdgeInsets(top: 6.5, leading: 6.5, bottom: 6.5, trailing: 6.5)
+        }
+    }
+
+    var body: some View {
+        Image(name)
+            .resizable(capInsets: Self.capInsets(for: name), resizingMode: .stretch)
+    }
+}
+
+enum PotionTier: String, Codable, CaseIterable {
+    case common = "Common"
+    case rare = "Rare"
+    case exotic = "Exotic"
+    case epic = "Epic"
+    case legendary = "Legendary"
+
+    var iconAsset: String {
+        switch self {
+        case .common: return "potion-common"
+        case .rare: return "potion-rare"
+        case .exotic: return "potion-exotic"
+        case .epic: return "potion-epic"
+        case .legendary: return "potion-legendary"
+        }
+    }
+
+    var badgeColor: Color {
+        switch self {
+        case .common: return Color(red: 0.33, green: 0.78, blue: 0.15)
+        case .rare: return Color(red: 0.0, green: 0.76, blue: 0.96)
+        case .exotic: return Color(red: 0.96, green: 0.45, blue: 0.12)
+        case .epic: return Color(red: 0.66, green: 0.30, blue: 0.92)
+        case .legendary: return Color(red: 0.98, green: 0.72, blue: 0.06)
+        }
+    }
+
+    var brewDurationSeconds: TimeInterval {
+        switch self {
+        case .common: return 90        // 1m 30s
+        case .rare: return 300         // 5m
+        case .exotic: return 600       // 10m
+        case .epic: return 1200        // 20m
+        case .legendary: return 1800   // 30m
+        }
+    }
+
+    var rewardCoinsRange: ClosedRange<Int> {
+        switch self {
+        case .common: return 150...280
+        case .rare: return 320...520
+        case .exotic: return 550...850
+        case .epic: return 900...1400
+        case .legendary: return 1600...2500
+        }
+    }
+
+    var rewardDNARange: ClosedRange<Int> {
+        switch self {
+        case .common: return 8...14
+        case .rare: return 16...28
+        case .exotic: return 28...44
+        case .epic: return 45...75
+        case .legendary: return 85...140
+        }
+    }
+
+    var skinPieceCount: Int {
+        switch self {
+        case .common: return 20
+        case .rare: return 50
+        case .exotic: return 120
+        case .epic: return 200
+        case .legendary: return 350
+        }
+    }
+}
+
+struct PotionSlotState: Identifiable, Codable, Equatable {
+    let id: Int
+    var tier: PotionTier?
+    var brewStartedAt: TimeInterval?
+    var brewDuration: TimeInterval
+
+    func isBrewing(now: TimeInterval) -> Bool {
+        guard tier != nil, let start = brewStartedAt else { return false }
+        return now < start + brewDuration
+    }
+
+    func isReady(now: TimeInterval) -> Bool {
+        guard tier != nil, let start = brewStartedAt else { return false }
+        return now >= start + brewDuration
+    }
+
+    func remainingSeconds(now: TimeInterval) -> TimeInterval {
+        guard let start = brewStartedAt else { return brewDuration }
+        return max(0, (start + brewDuration) - now)
+    }
+
+    func rushDNACost(now: TimeInterval) -> Int {
+        let rem = remainingSeconds(now: now)
+        return max(2, Int(ceil(rem / 45.0)))
+    }
+}
+
+struct PotionReward: Identifiable, Equatable {
+    let id = UUID()
+    let tier: PotionTier
+    let coins: Int
+    let dna: Int
+    let skinName: String
+    let skinPieces: Int
+}
+
+final class PotionStore: ObservableObject {
+    static let shared = PotionStore()
+    private let storageKey = "macro.potionSlots.v2"
+
+    @Published var slots: [PotionSlotState] = []
+    @Published var lastAwardedSlotTier: PotionTier? = nil
+
+    private init() {
+        if let raw = UserDefaults.standard.data(forKey: storageKey),
+           let decoded = try? JSONDecoder().decode([PotionSlotState].self, from: raw),
+           decoded.count == 4 {
+            slots = decoded
+        } else {
+            let now = Date().timeIntervalSince1970
+            slots = [
+                PotionSlotState(id: 0, tier: .exotic, brewStartedAt: now - 700, brewDuration: PotionTier.exotic.brewDurationSeconds),
+                PotionSlotState(id: 1, tier: .rare, brewStartedAt: nil, brewDuration: PotionTier.rare.brewDurationSeconds),
+                PotionSlotState(id: 2, tier: .common, brewStartedAt: nil, brewDuration: PotionTier.common.brewDurationSeconds),
+                PotionSlotState(id: 3, tier: nil, brewStartedAt: nil, brewDuration: 0)
+            ]
+            save()
+        }
+    }
+
+    private func save() {
+        if let encoded = try? JSONEncoder().encode(slots) {
+            UserDefaults.standard.set(encoded, forKey: storageKey)
+        }
+    }
+
+    func startBrew(slotIndex: Int, now: TimeInterval = Date().timeIntervalSince1970) {
+        guard slots.indices.contains(slotIndex), let tier = slots[slotIndex].tier else { return }
+        slots[slotIndex].brewStartedAt = now
+        slots[slotIndex].brewDuration = tier.brewDurationSeconds
+        save()
+    }
+
+    func rushWithDNA(slotIndex: Int, dna: inout Int, now: TimeInterval = Date().timeIntervalSince1970) -> Bool {
+        guard slots.indices.contains(slotIndex), slots[slotIndex].tier != nil else { return false }
+        let cost = slots[slotIndex].rushDNACost(now: now)
+        guard dna >= cost else { return false }
+        dna -= cost
+        slots[slotIndex].brewStartedAt = now - slots[slotIndex].brewDuration
+        save()
+        return true
+    }
+
+    func openPotion(slotIndex: Int, coins: inout Int, dna: inout Int, now: TimeInterval = Date().timeIntervalSince1970) -> PotionReward? {
+        guard slots.indices.contains(slotIndex),
+              let tier = slots[slotIndex].tier,
+              slots[slotIndex].isReady(now: now) else { return nil }
+        let c = Int.random(in: tier.rewardCoinsRange)
+        let d = Int.random(in: tier.rewardDNARange)
+        coins += c
+        dna += d
+        let featured = (1...387).randomElement().map { String($0) } ?? "1"
+        let reward = PotionReward(tier: tier, coins: c, dna: d, skinName: featured, skinPieces: tier.skinPieceCount)
+        slots[slotIndex] = PotionSlotState(id: slotIndex, tier: nil, brewStartedAt: nil, brewDuration: 0)
+        save()
+        return reward
+    }
+
+    @discardableResult
+    func awardPostMatchPotion(score: Int, survivalSeconds: Int) -> PotionTier? {
+        guard score >= 25 || survivalSeconds >= 10 else {
+            lastAwardedSlotTier = nil
+            return nil
+        }
+        guard let emptyIdx = slots.firstIndex(where: { $0.tier == nil }) else {
+            lastAwardedSlotTier = nil
+            return nil
+        }
+        let tier: PotionTier
+        if score >= 2500 { tier = .legendary }
+        else if score >= 1200 { tier = .epic }
+        else if score >= 500 { tier = .exotic }
+        else if score >= 180 { tier = .rare }
+        else { tier = .common }
+        slots[emptyIdx] = PotionSlotState(id: emptyIdx, tier: tier, brewStartedAt: nil, brewDuration: tier.brewDurationSeconds)
+        lastAwardedSlotTier = tier
+        save()
+        return tier
+    }
+
+    func collectSamplePotion() -> Bool {
+        guard let emptyIdx = slots.firstIndex(where: { $0.tier == nil }) else { return false }
+        let roll: [PotionTier] = [.common, .common, .rare, .exotic, .epic]
+        let tier = roll.randomElement() ?? .common
+        slots[emptyIdx] = PotionSlotState(id: emptyIdx, tier: tier, brewStartedAt: nil, brewDuration: tier.brewDurationSeconds)
+        save()
+        return true
+    }
+
+    func readyCount(now: TimeInterval = Date().timeIntervalSince1970) -> Int {
+        slots.filter { $0.isReady(now: now) }.count
     }
 }

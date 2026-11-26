@@ -3,40 +3,12 @@
     {
       "filename": "mcfs-hud-xp-box@2x.png",
       "idiom": "universal",
-      "scale": "2x",
-      "resizing": {
-        "mode": "9-part",
-        "center": {
-          "mode": "stretch",
-          "width": 2,
-          "height": 2
-        },
-        "cap-insets": {
-          "top": 4,
-          "bottom": 4,
-          "left": 4,
-          "right": 4
-        }
-      }
+      "scale": "2x"
     },
     {
       "filename": "mcfs-hud-xp-box@3x.png",
       "idiom": "universal",
-      "scale": "3x",
-      "resizing": {
-        "mode": "9-part",
-        "center": {
-          "mode": "stretch",
-          "width": 2,
-          "height": 2
-        },
-        "cap-insets": {
-          "top": 4,
-          "bottom": 4,
-          "left": 4,
-          "right": 4
-        }
-      }
+      "scale": "3x"
     }
   ],
   "info": {

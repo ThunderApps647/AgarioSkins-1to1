@@ -273,7 +273,7 @@ final class RemoteWorldModel {
                         initialSpeed: CGFloat(e.speed),
                         color: t.color,
                         ownerID: t.ownerID,
-                        borderColor: t.ejectedMassBorderColor,
+                        borderColor: t.color.darker(ratio: 0.9),
                         spawnOffset: spawnOffset,
                         now: CACurrentMediaTime())
         if let z = massManager.activeMasses.last?.zIndex {

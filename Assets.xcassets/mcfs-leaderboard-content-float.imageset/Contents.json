@@ -3,40 +3,12 @@
     {
       "filename": "mcfs-leaderboard-content-float@2x.png",
       "idiom": "universal",
-      "scale": "2x",
-      "resizing": {
-        "mode": "9-part",
-        "center": {
-          "mode": "stretch",
-          "width": 4,
-          "height": 1
-        },
-        "cap-insets": {
-          "top": 1,
-          "bottom": 7,
-          "left": 7,
-          "right": 7
-        }
-      }
+      "scale": "2x"
     },
     {
       "filename": "mcfs-leaderboard-content-float@3x.png",
       "idiom": "universal",
-      "scale": "3x",
-      "resizing": {
-        "mode": "9-part",
-        "center": {
-          "mode": "stretch",
-          "width": 4,
-          "height": 1
-        },
-        "cap-insets": {
-          "top": 1,
-          "bottom": 7,
-          "left": 7,
-          "right": 7
-        }
-      }
+      "scale": "3x"
     }
   ],
   "info": {
