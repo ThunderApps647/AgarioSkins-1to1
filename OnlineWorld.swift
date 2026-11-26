@@ -270,7 +270,7 @@ final class RemoteWorldModel {
         let t = render.template
         massManager.add(position: CGPoint(x: CGFloat(e.x), y: CGFloat(e.y)),
                         direction: CGSize(width: CGFloat(e.dirX), height: CGFloat(e.dirY)),
-                        travelDistance: CGFloat(e.speed) / 5.0,
+                        initialSpeed: CGFloat(e.speed),
                         color: t.color,
                         ownerID: t.ownerID,
                         borderColor: t.ejectedMassBorderColor,

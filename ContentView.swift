@@ -13105,7 +13105,7 @@ struct MainMenu: View {
                                 Image("menu-plus-box").resizable().scaledToFit().frame(width: 18, height: 18)
                             }
                             .padding(.horizontal, 8)
-                            .frame(minWidth: 112, height: 32)
+                            .frame(minWidth: 112, minHeight: 32, maxHeight: 32)
                             .background(Image("mcfs-white-green").resizable())
                         }
 
@@ -13121,7 +13121,7 @@ struct MainMenu: View {
                                 Image("menu-plus-box").resizable().scaledToFit().frame(width: 18, height: 18)
                             }
                             .padding(.horizontal, 8)
-                            .frame(minWidth: 112, height: 32)
+                            .frame(minWidth: 112, minHeight: 32, maxHeight: 32)
                             .background(Image("mcfs-white-green").resizable())
                         }
                     }

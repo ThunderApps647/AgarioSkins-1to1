@@ -343,7 +343,7 @@ struct SrvVirus {
     var velocity: SrvVec2 = .zero
     /// v4.2: owner who fed the 7th pellet on a launched virus (kill credit).
     var shooterID: UInt32? = nil
-    var radius: Double { SrvRules.radiusForMass(mass) }
+    var radius: Double { radiusForMass(mass) }
 }
 
 struct SrvToken {
@@ -752,7 +752,7 @@ final class SrvWorld {
     }
 
     func spawnVirus() -> SrvVirus {
-        let margin = SrvRules.radiusForMass(SrvRules.virusBaseMass)
+        let margin = radiusForMass(SrvRules.virusBaseMass)
         return SrvVirus(id: newID(), position: SrvVec2(x: .random(in: margin...(SrvRules.worldSize - margin)),
                                                  y: .random(in: margin...(SrvRules.worldSize - margin))))
     }
