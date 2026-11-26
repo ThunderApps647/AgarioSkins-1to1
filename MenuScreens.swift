@@ -74,9 +74,12 @@ struct AgarModalContainer<Content: View>: View {
 }
 
 enum ShopTab: String, CaseIterable {
-    case boosts = "Boosts"
     case coins = "Coins"
     case dna = "DNA"
+    case potions = "Potions"
+    case skins = "Skins"
+    case boosts = "Mass"
+    case xp = "XP"
 }
 
 struct MCFSBevelStyle: ButtonStyle {
@@ -100,14 +103,16 @@ struct MCFSBevelStyle: ButtonStyle {
     }
 }
 
-// MARK: - MenuShop.ccbi (Full-Screen 1:1)
+// MARK: - MenuShop.ccbi (6-Category Hub + Detail Grids, Full-Screen 1:1)
 struct ShopModalView: View {
     @Binding var coins: Int
     @Binding var dna: Int
     @Binding var activeStartBoost: Int
+    var onOpenPotions: (() -> Void)? = nil
+    var onOpenSkins: (() -> Void)? = nil
     let onClose: () -> Void
 
-    @State private var selectedTab: ShopTab = .boosts
+    @State private var selectedSection: ShopTab? = nil
     @State private var statusMessage: String = ""
 
     private let columns = [
@@ -124,96 +129,146 @@ struct ShopModalView: View {
                 Color.white.edgesIgnoringSafeArea(.all)
 
                 VStack(spacing: 0) {
-                    genericFullHeader(title: "Shop", coins: coins, dna: dna, scale: s, onClose: onClose)
-
-                    // MenuShop.ccbi 3-tab segmented bar
-                    HStack(spacing: 8 * s) {
-                        ForEach(ShopTab.allCases, id: \.self) { tab in
-                            let selected = selectedTab == tab
-                            Button(action: {
-                                SoundManager.shared.play(.menuClick)
-                                withAnimation(.easeOut(duration: 0.16)) { selectedTab = tab }
-                            }) {
-                                Text(tab.rawValue)
-                                    .font(.custom("OpenSans-Bold", size: 13 * s))
-                                    .foregroundColor(selected ? .white : Color(hex: 0x5A5F66))
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 30 * s)
+                    genericFullHeader(
+                        title: selectedSection == nil ? "Shop" : (selectedSection == .xp || selectedSection == .boosts ? "Boosts" : selectedSection!.rawValue),
+                        coins: coins,
+                        dna: dna,
+                        scale: s
+                    ) {
+                        if selectedSection != nil {
+                            withAnimation(.easeOut(duration: 0.15)) {
+                                selectedSection = nil
+                                statusMessage = ""
                             }
-                            .buttonStyle(MCFSBevelStyle(frameAsset: selected ? "mcfs-light-blue" : "mcfs-white-grey-tab", showShadow: selected))
+                        } else {
+                            onClose()
                         }
                     }
-                    .padding(.horizontal, 14 * s)
-                    .padding(.vertical, 8 * s)
-                    .background(Color(hex: 0xF2F5F8))
 
                     if !statusMessage.isEmpty {
                         Text(statusMessage)
                             .font(.custom("OpenSans-Bold", size: 12 * s))
                             .foregroundColor(Color(hex: 0x43A81D))
-                            .padding(.vertical, 4 * s)
+                            .padding(.vertical, 5 * s)
                             .frame(maxWidth: .infinity)
                             .background(Color(hex: 0xF2F5F8))
                     }
 
-                    ScrollView {
-                        LazyVGrid(columns: columns, spacing: 10 * s) {
-                            switch selectedTab {
-                            case .boosts:
-                                shopTile(icon: "ui-mass-20", title: "+20 Start Mass", subtitle: "Start match bigger", cost: 150, costIsDNA: false, scale: s) {
-                                    activeStartBoost = 20
-                                    statusMessage = "Equipped +20 Start Mass!"
-                                }
-                                shopTile(icon: "ui-mass-40", title: "+40 Start Mass", subtitle: "Start match huge", cost: 300, costIsDNA: false, scale: s) {
-                                    activeStartBoost = 40
-                                    statusMessage = "Equipped +40 Start Mass!"
-                                }
-                                shopTile(icon: "shop-mass-2x", title: "2x Mass Boost", subtitle: "Double mass gain", cost: 250, costIsDNA: false, scale: s) {
-                                    statusMessage = "2x Mass Boost activated!"
-                                }
-                                shopTile(icon: "shop-mass-3x", title: "3x Mass Boost", subtitle: "Triple mass gain", cost: 25, costIsDNA: true, scale: s) {
-                                    statusMessage = "3x Mass Boost activated!"
-                                }
-                                shopTile(icon: "shop-xp-2x", title: "2x XP Boost", subtitle: "Double XP gain", cost: 200, costIsDNA: false, scale: s) {
-                                    statusMessage = "2x XP Boost activated!"
-                                }
-                                shopTile(icon: "shop-xp-3x", title: "3x XP Boost", subtitle: "Triple XP gain", cost: 20, costIsDNA: true, scale: s) {
-                                    statusMessage = "3x XP Boost activated!"
-                                }
-                            case .coins:
-                                shopTile(icon: "shop-coins", title: "Coin Pouch", subtitle: "+500 Coins", cost: 10, costIsDNA: true, iconScale: 0.9, scale: s) {
-                                    coins += 500
-                                    statusMessage = "Added +500 Coins!"
-                                }
-                                shopTile(icon: "shop-coins", title: "Coin Stack", subtitle: "+1,500 Coins", cost: 25, costIsDNA: true, iconScale: 1.05, scale: s) {
-                                    coins += 1500
-                                    statusMessage = "Added +1,500 Coins!"
-                                }
-                                shopTile(icon: "shop-coins", title: "Coin Chest", subtitle: "+4,000 Coins", cost: 60, costIsDNA: true, iconScale: 1.15, scale: s) {
-                                    coins += 4000
-                                    statusMessage = "Added +4,000 Coins!"
-                                }
-                            case .dna:
-                                shopTile(icon: "shop-dna", title: "DNA Vial", subtitle: "+15 DNA", cost: 250, costIsDNA: false, iconScale: 0.9, scale: s) {
-                                    dna += 15
-                                    statusMessage = "Added +15 DNA!"
-                                }
-                                shopTile(icon: "shop-dna", title: "DNA Flask", subtitle: "+40 DNA", cost: 600, costIsDNA: false, iconScale: 1.05, scale: s) {
-                                    dna += 40
-                                    statusMessage = "Added +40 DNA!"
-                                }
-                                shopTile(icon: "shop-dna", title: "DNA Crate", subtitle: "+100 DNA", cost: 1400, costIsDNA: false, iconScale: 1.15, scale: s) {
-                                    dna += 100
-                                    statusMessage = "Added +100 DNA!"
+                    if let section = selectedSection {
+                        ScrollView {
+                            LazyVGrid(columns: columns, spacing: 10 * s) {
+                                switch section {
+                                case .boosts, .xp:
+                                    shopTile(icon: "ui-mass-20", title: "+20 Start Mass", subtitle: "Start match bigger", cost: 150, costIsDNA: false, scale: s) {
+                                        activeStartBoost = 20
+                                        statusMessage = "Equipped +20 Start Mass!"
+                                    }
+                                    shopTile(icon: "ui-mass-40", title: "+40 Start Mass", subtitle: "Start match huge", cost: 300, costIsDNA: false, scale: s) {
+                                        activeStartBoost = 40
+                                        statusMessage = "Equipped +40 Start Mass!"
+                                    }
+                                    shopTile(icon: "shop-mass-2x", title: "2x Mass Boost", subtitle: "Double mass gain", cost: 250, costIsDNA: false, scale: s) {
+                                        statusMessage = "2x Mass Boost activated!"
+                                    }
+                                    shopTile(icon: "shop-mass-3x", title: "3x Mass Boost", subtitle: "Triple mass gain", cost: 25, costIsDNA: true, scale: s) {
+                                        statusMessage = "3x Mass Boost activated!"
+                                    }
+                                    shopTile(icon: "shop-xp-2x", title: "2x XP Boost", subtitle: "Double XP gain", cost: 200, costIsDNA: false, scale: s) {
+                                        statusMessage = "2x XP Boost activated!"
+                                    }
+                                    shopTile(icon: "shop-xp-3x", title: "3x XP Boost", subtitle: "Triple XP gain", cost: 20, costIsDNA: true, scale: s) {
+                                        statusMessage = "3x XP Boost activated!"
+                                    }
+                                case .coins:
+                                    shopTile(icon: "shop-coins", title: "Coin Pouch", subtitle: "+500 Coins", cost: 10, costIsDNA: true, iconScale: 0.9, scale: s) {
+                                        coins += 500
+                                        statusMessage = "Added +500 Coins!"
+                                    }
+                                    shopTile(icon: "shop-coins", title: "Coin Stack", subtitle: "+1,500 Coins", cost: 25, costIsDNA: true, iconScale: 1.05, scale: s) {
+                                        coins += 1500
+                                        statusMessage = "Added +1,500 Coins!"
+                                    }
+                                    shopTile(icon: "shop-coins", title: "Coin Chest", subtitle: "+4,000 Coins", cost: 60, costIsDNA: true, iconScale: 1.15, scale: s) {
+                                        coins += 4000
+                                        statusMessage = "Added +4,000 Coins!"
+                                    }
+                                case .dna:
+                                    shopTile(icon: "shop-dna", title: "DNA Vial", subtitle: "+15 DNA", cost: 250, costIsDNA: false, iconScale: 0.9, scale: s) {
+                                        dna += 15
+                                        statusMessage = "Added +15 DNA!"
+                                    }
+                                    shopTile(icon: "shop-dna", title: "DNA Flask", subtitle: "+40 DNA", cost: 600, costIsDNA: false, iconScale: 1.05, scale: s) {
+                                        dna += 40
+                                        statusMessage = "Added +40 DNA!"
+                                    }
+                                    shopTile(icon: "shop-dna", title: "DNA Crate", subtitle: "+100 DNA", cost: 1400, costIsDNA: false, iconScale: 1.15, scale: s) {
+                                        dna += 100
+                                        statusMessage = "Added +100 DNA!"
+                                    }
+                                case .potions, .skins:
+                                    EmptyView()
                                 }
                             }
+                            .padding(14 * s)
                         }
-                        .padding(14 * s)
+                        .background(MCFSFrame(name: "mcfs-gray"))
+                    } else {
+                        // MenuShop.ccbi 3x2 Category Hub
+                        VStack(spacing: 10 * s) {
+                            Spacer(minLength: 4 * s)
+                            LazyVGrid(columns: columns, spacing: 10 * s) {
+                                shopCategoryCard(icon: "shop-coins", title: "Coins", accent: Color(hex: 0xE59B00), scale: s) {
+                                    withAnimation(.easeOut(duration: 0.15)) { selectedSection = .coins }
+                                }
+                                shopCategoryCard(icon: "shop-dna", title: "DNA", accent: Color(hex: 0x00A6D6), scale: s) {
+                                    withAnimation(.easeOut(duration: 0.15)) { selectedSection = .dna }
+                                }
+                                shopCategoryCard(icon: "shop-potions", title: "Potions", accent: Color(hex: 0x43A81D), scale: s) {
+                                    if let onOpenPotions = onOpenPotions { onOpenPotions() }
+                                    else { onClose() }
+                                }
+                                shopCategoryCard(icon: "shop-skins", title: "Skins", accent: Color(hex: 0x8E44AD), scale: s) {
+                                    if let onOpenSkins = onOpenSkins { onOpenSkins() }
+                                    else { onClose() }
+                                }
+                                shopCategoryCard(icon: "shop-mass", title: "Mass Boosts", accent: Color(hex: 0xE65C00), scale: s) {
+                                    withAnimation(.easeOut(duration: 0.15)) { selectedSection = .boosts }
+                                }
+                                shopCategoryCard(icon: "shop-xp", title: "XP Boosts", accent: Color(hex: 0x0078FE), scale: s) {
+                                    withAnimation(.easeOut(duration: 0.15)) { selectedSection = .xp }
+                                }
+                            }
+                            .padding(.horizontal, 16 * s)
+                            Spacer(minLength: 4 * s)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(MCFSFrame(name: "mcfs-gray"))
                     }
-                    .background(MCFSFrame(name: "mcfs-gray"))
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
             }
+        }
+    }
+
+    private func shopCategoryCard(icon: String, title: String, accent: Color, scale s: CGFloat, action: @escaping () -> Void) -> some View {
+        Button(action: {
+            SoundManager.shared.play(.menuClick)
+            action()
+        }) {
+            VStack(spacing: 6 * s) {
+                Image(icon)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 54 * s)
+                Text(title)
+                    .font(.custom("OpenSans-Bold", size: 14 * s))
+                    .foregroundColor(.white)
+                    .shadow(color: accent.opacity(0.9), radius: 0, x: 0, y: 1.5)
+                    .shadow(color: .black.opacity(0.35), radius: 0, x: 0, y: 1)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 92 * s)
+            .background(MCFSFrame(name: "mcfs-white"))
         }
     }
 

@@ -2482,14 +2482,13 @@ class EjectedMassManager: ObservableObject {
     // Renderer geometry is intentionally asymmetric (1.8r rect beginning at centre-r).
     // Include half of the 8pt stroke so no pixel can cross the world plate.
     private let renderedRadius: CGFloat = CGFloat(OriginalGameplay.shotMassBaseRadius)
-    private let renderedStrokeHalfWidth: CGFloat = 4.0
+    private let renderedStrokeHalfWidth: CGFloat = 5.0
     
     @inline(__always)
     private func borderSafePosition(_ point: CGPoint) -> CGPoint {
-        let minCentre = renderedRadius + renderedStrokeHalfWidth
-        let maxCentre = worldSize - (renderedRadius * 0.8 + renderedStrokeHalfWidth)
-        return CGPoint(x: min(maxCentre, max(minCentre, point.x)),
-                       y: min(maxCentre, max(minCentre, point.y)))
+        let margin = renderedRadius + renderedStrokeHalfWidth
+        return CGPoint(x: min(worldSize - margin, max(margin, point.x)),
+                       y: min(worldSize - margin, max(margin, point.y)))
     }
     
     @inline(__always)
@@ -2916,7 +2915,7 @@ struct GameWorldView: View {
                 let gridIntensity = min(0.85, max(0.10, (50.0 * 50.0 * zoom * zoom) / 5000.0 + 0.10))
                 let gridGray = darkModeGrid ? gridIntensity : (1.0 - gridIntensity)
                 let gridColor = Color(red: gridGray, green: gridGray, blue: gridGray)
-                let hairline = max(0.5, 1.0 / max(1.0, UIScreen.main.scale))
+                let hairline = 1.0 / max(1.0, UIScreen.main.scale)
                 let lineWidth: CGFloat = darkModeGrid ? max(1.0, hairline * 2.0) : hairline
                 
                 let startX = floor(visibleRect.minX / cellSize) * cellSize
@@ -3584,7 +3583,7 @@ struct GameWorldView: View {
                                    screenBounds: CGRect,
                                    zoom: CGFloat,
                                    darkMode: Bool) {
-        let bw = max(1.0, 5.0 * zoom)
+        let bw = max(0.5, 5.0 * zoom)
         let outerBorderRect = CGRect(x: boundaryRect.minX - bw,
                                      y: boundaryRect.minY - bw,
                                      width: boundaryRect.width + bw * 2,
@@ -3598,8 +3597,8 @@ struct GameWorldView: View {
         }
 
         // Exact ArenaBoundaryShaderEffect out-of-bounds fade:
-        // Light mode: #5A5A5A with alpha = mix(1.0, 0.35, 1 - pow(1 - t^2, 0.75))
-        // Dark mode: #B4B4B4 with alpha = 0.863 * alphaFactor
+        // Light mode: Multiply (#5A5A5A with alpha mix(1.0, 0.35, tEase)) -> shades over grid cleanly
+        // Dark mode: Alpha (#B4B4B4 with 0.863 * alphaFactor)
         let fadeDist = max(1.0, 2.0 * screenBounds.width)
         let r: Double = darkMode ? (180.0 / 255.0) : (90.0 / 255.0)
         let baseAlpha: Double = darkMode ? 0.863 : 1.0
@@ -3621,34 +3620,46 @@ struct GameWorldView: View {
         let clampedInnerX0 = max(screenBounds.minX, ox0)
         let clampedInnerX1 = min(screenBounds.maxX, ox1)
 
-        if clampedInnerY1 > clampedInnerY0 {
-            if ox0 > screenBounds.minX {
-                let rect = CGRect(x: screenBounds.minX, y: clampedInnerY0, width: ox0 - screenBounds.minX, height: clampedInnerY1 - clampedInnerY0)
-                context.fill(Path(rect), with: .linearGradient(fadeGradient, startPoint: CGPoint(x: ox0, y: 0), endPoint: CGPoint(x: ox0 - fadeDist, y: 0)))
+        let drawFade: (inout GraphicsContext) -> Void = { ctx in
+            if clampedInnerY1 > clampedInnerY0 {
+                if ox0 > screenBounds.minX {
+                    let rect = CGRect(x: screenBounds.minX, y: clampedInnerY0, width: ox0 - screenBounds.minX, height: clampedInnerY1 - clampedInnerY0)
+                    ctx.fill(Path(rect), with: .linearGradient(fadeGradient, startPoint: CGPoint(x: ox0, y: 0), endPoint: CGPoint(x: ox0 - fadeDist, y: 0)))
+                }
+                if ox1 < screenBounds.maxX {
+                    let rect = CGRect(x: ox1, y: clampedInnerY0, width: screenBounds.maxX - ox1, height: clampedInnerY1 - clampedInnerY0)
+                    ctx.fill(Path(rect), with: .linearGradient(fadeGradient, startPoint: CGPoint(x: ox1, y: 0), endPoint: CGPoint(x: ox1 + fadeDist, y: 0)))
+                }
             }
-            if ox1 < screenBounds.maxX {
-                let rect = CGRect(x: ox1, y: clampedInnerY0, width: screenBounds.maxX - ox1, height: clampedInnerY1 - clampedInnerY0)
-                context.fill(Path(rect), with: .linearGradient(fadeGradient, startPoint: CGPoint(x: ox1, y: 0), endPoint: CGPoint(x: ox1 + fadeDist, y: 0)))
+            if clampedInnerX1 > clampedInnerX0 {
+                if oy0 > screenBounds.minY {
+                    let rect = CGRect(x: clampedInnerX0, y: screenBounds.minY, width: clampedInnerX1 - clampedInnerX0, height: oy0 - screenBounds.minY)
+                    ctx.fill(Path(rect), with: .linearGradient(fadeGradient, startPoint: CGPoint(x: 0, y: oy0), endPoint: CGPoint(x: 0, y: oy0 - fadeDist)))
+                }
+                if oy1 < screenBounds.maxY {
+                    let rect = CGRect(x: clampedInnerX0, y: oy1, width: clampedInnerX1 - clampedInnerX0, height: screenBounds.maxY - oy1)
+                    ctx.fill(Path(rect), with: .linearGradient(fadeGradient, startPoint: CGPoint(x: 0, y: oy1), endPoint: CGPoint(x: 0, y: oy1 + fadeDist)))
+                }
+            }
+            let corners: [(CGRect, CGPoint)] = [
+                (CGRect(x: screenBounds.minX, y: screenBounds.minY, width: max(0, ox0 - screenBounds.minX), height: max(0, oy0 - screenBounds.minY)), CGPoint(x: ox0, y: oy0)),
+                (CGRect(x: ox1, y: screenBounds.minY, width: max(0, screenBounds.maxX - ox1), height: max(0, oy0 - screenBounds.minY)), CGPoint(x: ox1, y: oy0)),
+                (CGRect(x: screenBounds.minX, y: oy1, width: max(0, ox0 - screenBounds.minX), height: max(0, screenBounds.maxY - oy1)), CGPoint(x: ox0, y: oy1)),
+                (CGRect(x: ox1, y: oy1, width: max(0, screenBounds.maxX - ox1), height: max(0, screenBounds.maxY - oy1)), CGPoint(x: ox1, y: oy1))
+            ]
+            for (cornerRect, centerPt) in corners where cornerRect.width > 0.01 && cornerRect.height > 0.01 {
+                ctx.fill(Path(cornerRect), with: .radialGradient(fadeGradient, center: centerPt, startRadius: 0, endRadius: fadeDist))
             }
         }
-        if clampedInnerX1 > clampedInnerX0 {
-            if oy0 > screenBounds.minY {
-                let rect = CGRect(x: clampedInnerX0, y: screenBounds.minY, width: clampedInnerX1 - clampedInnerX0, height: oy0 - screenBounds.minY)
-                context.fill(Path(rect), with: .linearGradient(fadeGradient, startPoint: CGPoint(x: 0, y: oy0), endPoint: CGPoint(x: 0, y: oy0 - fadeDist)))
+
+        if darkMode {
+            var mutableContext = context
+            drawFade(&mutableContext)
+        } else {
+            context.drawLayer { layerContext in
+                layerContext.blendMode = .multiply
+                drawFade(&layerContext)
             }
-            if oy1 < screenBounds.maxY {
-                let rect = CGRect(x: clampedInnerX0, y: oy1, width: clampedInnerX1 - clampedInnerX0, height: screenBounds.maxY - oy1)
-                context.fill(Path(rect), with: .linearGradient(fadeGradient, startPoint: CGPoint(x: 0, y: oy1), endPoint: CGPoint(x: 0, y: oy1 + fadeDist)))
-            }
-        }
-        let corners: [(CGRect, CGPoint)] = [
-            (CGRect(x: screenBounds.minX, y: screenBounds.minY, width: max(0, ox0 - screenBounds.minX), height: max(0, oy0 - screenBounds.minY)), CGPoint(x: ox0, y: oy0)),
-            (CGRect(x: ox1, y: screenBounds.minY, width: max(0, screenBounds.maxX - ox1), height: max(0, oy0 - screenBounds.minY)), CGPoint(x: ox1, y: oy0)),
-            (CGRect(x: screenBounds.minX, y: oy1, width: max(0, ox0 - screenBounds.minX), height: max(0, screenBounds.maxY - oy1)), CGPoint(x: ox0, y: oy1)),
-            (CGRect(x: ox1, y: oy1, width: max(0, screenBounds.maxX - ox1), height: max(0, screenBounds.maxY - oy1)), CGPoint(x: ox1, y: oy1))
-        ]
-        for (cornerRect, centerPt) in corners where cornerRect.width > 0.01 && cornerRect.height > 0.01 {
-            context.fill(Path(cornerRect), with: .radialGradient(fadeGradient, center: centerPt, startRadius: 0, endRadius: fadeDist))
         }
     }
 
@@ -10239,7 +10250,6 @@ struct ContentView: View {
     ) {
         guard virusIndex >= 0, virusIndex < viruses.count else { return }
         
-        let launchRadius = viruses[virusIndex].radius
         viruses[virusIndex].targetMass += mass.mass
         viruses[virusIndex].mass += mass.mass * 0.35 // Tactile hit-pulse expansion before settling
         viruses[virusIndex].fedMass += mass.mass
@@ -10252,18 +10262,15 @@ struct ContentView: View {
         viruses[virusIndex].fedMass = 0
         
         let normalizedMassDirection = mass.direction.normalized()
-        let shootDirection: CGSize
-        if normalizedMassDirection == .zero {
-            shootDirection = CGSize(width: 0, height: 1)
-        } else {
-            shootDirection = normalizedMassDirection
-        }
-        let offsetDistance = launchRadius + 60
+        let baseAngle = normalizedMassDirection == .zero
+            ? Double.pi * 0.5
+            : atan2(Double(normalizedMassDirection.height), Double(normalizedMassDirection.width))
+        let launchAngle = baseAngle + Double.random(in: -OriginalGameplay.directionAngleVariation...OriginalGameplay.directionAngleVariation)
+        let shootDirection = CGSize(width: CGFloat(cos(launchAngle)), height: CGFloat(sin(launchAngle)))
+        let offsetDistance = CGFloat(OriginalGameplay.mitosisPositionFactor)
         let startPosition = CGPoint(
-            x: viruses[virusIndex].position.x
-            + shootDirection.width * offsetDistance,
-            y: viruses[virusIndex].position.y
-            + shootDirection.height * offsetDistance
+            x: viruses[virusIndex].position.x + shootDirection.width * offsetDistance,
+            y: viruses[virusIndex].position.y + shootDirection.height * offsetDistance
         )
         var newVirus = Virus(position: startPosition, mass: baseVirusMass)
         newVirus.targetMass = baseVirusMass
@@ -10679,9 +10686,10 @@ struct ContentView: View {
                     playerCells[i].position.x += normalizedDirection.width * travelDistance
                     playerCells[i].position.y += normalizedDirection.height * travelDistance
                 }
-            } else if globalDirectionNorm != .zero {
-                playerCells[i].position.x += globalDirectionNorm.width * distanceThisFrame
-                playerCells[i].position.y += globalDirectionNorm.height * distanceThisFrame
+            } else if lastJoystickDirection != .zero {
+                let glideDir = lastJoystickDirection.normalized()
+                playerCells[i].position.x += glideDir.width * distanceThisFrame
+                playerCells[i].position.y += glideDir.height * distanceThisFrame
             }
             
             playerCells[i].position.x += playerCells[i].velocity.width * dt
@@ -10813,7 +10821,7 @@ struct ContentView: View {
         
         var splitDirection: CGSize
         
-        if joystickIsDragging, lastJoystickDirection != .zero {
+        if !centerAimUntilCursorMoves && lastJoystickDirection != .zero {
             splitDirection = lastJoystickDirection.normalized()
         } else {
             let directionToCenter = CGSize(width: currentCenter.x - pCell.position.x, height: currentCenter.y - pCell.position.y)
@@ -10906,15 +10914,25 @@ struct ContentView: View {
                 }
                 
                 var nearbyMass:[EjectedMass] = []
+                var nearbySquishNeighbors: [(pos: CGPoint, radius: CGFloat)] = []
                 if complexIndentations {
                     let searchRadius = visualRadius + 100
                     let searchRect = CGRect(x: pos.x - searchRadius, y: pos.y - searchRadius, width: searchRadius * 2, height: searchRadius * 2)
                     nearbyMass = massManager.getLimitedVisibleMassesArray(in: searchRect, limit: 12)
+                    for j in cells.indices where j != i && cells[j].ownerID == cells[i].ownerID && !cells[j].isMerging {
+                        let jr = cells[j].cachedSolidRadius
+                        let sumR = visualRadius + jr + 6.0
+                        let ndx = pos.x - cells[j].position.x
+                        let ndy = pos.y - cells[j].position.y
+                        if ndx * ndx + ndy * ndy < sumR * sumR {
+                            nearbySquishNeighbors.append((cells[j].position, jr))
+                        }
+                    }
                 }
                 
                 for v in 0..<targetVertexCount {
                     var overlap: CGFloat = 0
-                    if !nearbyMass.isEmpty {
+                    if !nearbyMass.isEmpty || !nearbySquishNeighbors.isEmpty {
                         let uncompressedX = pos.x + trig[v].cos * visualRadius
                         let uncompressedY = pos.y + trig[v].sin * visualRadius
                         for mass in nearbyMass {
@@ -10926,12 +10944,20 @@ struct ContentView: View {
                                 overlap = max(overlap, massRad - sqrt(distSq))
                             }
                         }
+                        for neighbor in nearbySquishNeighbors {
+                            let dx = uncompressedX - neighbor.pos.x
+                            let dy = uncompressedY - neighbor.pos.y
+                            let distSq = dx * dx + dy * dy
+                            if distSq < neighbor.radius * neighbor.radius {
+                                overlap = max(overlap, (neighbor.radius - sqrt(distSq)) * 0.55)
+                            }
+                        }
                     }
                     objectBuf[v] = min(overlap, maxCompression)
                     smoothBuf[v] = objectBuf[v]
                 }
                 
-                if !nearbyMass.isEmpty {
+                if !nearbyMass.isEmpty || !nearbySquishNeighbors.isEmpty {
                     for _ in 0..<2 {
                         for v in 0..<targetVertexCount { tmpBuf[v] = smoothBuf[v] }
                         for v in 0..<targetVertexCount {
@@ -11064,11 +11090,12 @@ struct ContentView: View {
                 if popped { return }
                 if c.mass < popThreshold { return }
                 if poppedCellIDs.contains(c.id) { return }
+                let triggerRadius = max(c.radius * 0.4, c.radius - virus.radius * CGFloat(OriginalGameplay.overlapRatioForEating * 0.6))
                 let dx = c.x - virus.position.x
-                if dx < -c.radius || dx > c.radius { return }
+                if dx < -triggerRadius || dx > triggerRadius { return }
                 let dy = c.y - virus.position.y
-                if dy < -c.radius || dy > c.radius { return }
-                guard dx * dx + dy * dy < c.radius * c.radius else { return }
+                if dy < -triggerRadius || dy > triggerRadius { return }
+                guard dx * dx + dy * dy < triggerRadius * triggerRadius else { return }
                 
                 popped = true
                 poppedCellIDs.insert(c.id)
@@ -11137,21 +11164,26 @@ struct ContentView: View {
                 botCells[action.cellIndex].targetMass = pieceMass
                 botCells[action.cellIndex].mergeTimer = 30.0 + Double(pieceMass) * 0.02
                 botCells[action.cellIndex].canMerge = false
-                for _ in 1..<massList.count {
-                    let angle = Double.random(in: 0..<(2 * Double.pi))
+                let childCount = max(1, massList.count - 1)
+                let basePhase = Double.random(in: 0..<(2 * Double.pi))
+                for k in 1..<massList.count {
+                    let sectorAngle = basePhase + (2.0 * Double.pi * Double(k - 1)) / Double(childCount)
+                    let angle = sectorAngle + Double.random(in: -0.32...0.32)
                     let direction = CGSize(width: CGFloat(cos(angle)), height: CGFloat(sin(angle)))
+                    let childMass = massList[k]
+                    let childRadius = OriginalGameplay.radius(forMass: childMass)
                     var spawn = botCells[action.cellIndex].position
                     spawn.x += direction.width * spawnOffset
                     spawn.y += direction.height * spawnOffset
-                    spawn.x = min(worldSize - pieceRadius, max(pieceRadius, spawn.x))
-                    spawn.y = min(worldSize - pieceRadius, max(pieceRadius, spawn.y))
+                    spawn.x = min(worldSize - childRadius, max(childRadius, spawn.x))
+                    spawn.y = min(worldSize - childRadius, max(childRadius, spawn.y))
                     var newCell = PlayerCell(
                         ownerID: botCells[action.cellIndex].ownerID,
                         position: spawn,
-                        mass: pieceMass,
-                        targetMass: pieceMass,
+                        mass: childMass,
+                        targetMass: childMass,
                         velocity: parentVelocity,
-                        mergeTimer: 30.0 + Double(pieceMass) * 0.02,
+                        mergeTimer: 30.0 + Double(childMass) * 0.02,
                         canMerge: false,
                         splitTimer: 1.0,
                         color: botCells[action.cellIndex].color,
@@ -11167,8 +11199,9 @@ struct ContentView: View {
                     newCell.massFontScale = poppedHalvesFont ? 0.5 : 1.0
                     newCell.aiAggression = botCells[action.cellIndex].aiAggression
                     newCell.aiCaution = botCells[action.cellIndex].aiCaution
-                    newCell.velocity.width += direction.width * impulse
-                    newCell.velocity.height += direction.height * impulse
+                    let impulseScale = CGFloat.random(in: 0.85...1.15)
+                    newCell.velocity.width += direction.width * impulse * impulseScale
+                    newCell.velocity.height += direction.height * impulse * impulseScale
                     botCells.append(newCell)
                 }
             } else {
@@ -11179,21 +11212,26 @@ struct ContentView: View {
                 playerCells[action.cellIndex].targetMass = pieceMass
                 playerCells[action.cellIndex].mergeTimer = 30.0 + Double(pieceMass) * 0.02
                 playerCells[action.cellIndex].canMerge = false
-                for _ in 1..<massList.count {
-                    let angle = Double.random(in: 0..<(2 * Double.pi))
+                let childCount = max(1, massList.count - 1)
+                let basePhase = Double.random(in: 0..<(2 * Double.pi))
+                for k in 1..<massList.count {
+                    let sectorAngle = basePhase + (2.0 * Double.pi * Double(k - 1)) / Double(childCount)
+                    let angle = sectorAngle + Double.random(in: -0.32...0.32)
                     let direction = CGSize(width: CGFloat(cos(angle)), height: CGFloat(sin(angle)))
+                    let childMass = massList[k]
+                    let childRadius = OriginalGameplay.radius(forMass: childMass)
                     var spawn = playerCells[action.cellIndex].position
                     spawn.x += direction.width * spawnOffset
                     spawn.y += direction.height * spawnOffset
-                    spawn.x = min(worldSize - pieceRadius, max(pieceRadius, spawn.x))
-                    spawn.y = min(worldSize - pieceRadius, max(pieceRadius, spawn.y))
+                    spawn.x = min(worldSize - childRadius, max(childRadius, spawn.x))
+                    spawn.y = min(worldSize - childRadius, max(childRadius, spawn.y))
                     var newCell = PlayerCell(
                         ownerID: playerCells[action.cellIndex].ownerID,
                         position: spawn,
-                        mass: pieceMass,
-                        targetMass: pieceMass,
+                        mass: childMass,
+                        targetMass: childMass,
                         velocity: parentVelocity,
-                        mergeTimer: 30.0 + Double(pieceMass) * 0.02,
+                        mergeTimer: 30.0 + Double(childMass) * 0.02,
                         canMerge: false,
                         splitTimer: 1.0,
                         color: playerCells[action.cellIndex].color,
@@ -11204,8 +11242,9 @@ struct ContentView: View {
                     newCell.immuneToCellID = playerCells[action.cellIndex].id
                     newCell.massFontHalved = poppedHalvesFont
                     newCell.massFontScale = poppedHalvesFont ? 0.5 : 1.0
-                    newCell.velocity.width += direction.width * impulse
-                    newCell.velocity.height += direction.height * impulse
+                    let impulseScale = CGFloat.random(in: 0.85...1.15)
+                    newCell.velocity.width += direction.width * impulse * impulseScale
+                    newCell.velocity.height += direction.height * impulse * impulseScale
                     playerCells.append(newCell)
                 }
             }
@@ -11358,7 +11397,7 @@ struct ContentView: View {
                     
                     let bigRadius = cells[bigIdx].cachedSolidRadius
                     let smallRadius = cells[smallIdx].cachedSolidRadius
-                    let threshold = bigRadius - (smallRadius * 0.3)
+                    let threshold = bigRadius - (smallRadius * 0.15)
                     guard threshold > 0 else { continue }
                     
                     let dx = cells[smallIdx].position.x - cells[bigIdx].position.x
@@ -11683,18 +11722,20 @@ struct ContentView: View {
     /// recursively binary-splits, so the piece count is the largest power of two
     /// whose last parent can still split (radius >= minRadiusToSplit) and whose
     /// owner stays under the 16-cell cap. Every final piece has equal mass.
-    private func calculateVirusSplitMass(mass: CGFloat, maxSplits: Int) ->[CGFloat] {
+    private func calculateVirusSplitMass(mass: CGFloat, maxSplits: Int) -> [CGFloat] {
         guard mass > 0, maxSplits >= 2 else { return [mass] }
-        var pieces = 1
-        var parentRadius = OriginalGameplay.radius(forMass: mass)
         let cap = min(maxSplits, 16)
-        while parentRadius >= CGFloat(OriginalGameplay.minRadiusToSplit),
-              pieces * 2 <= cap {
-            pieces *= 2
-            parentRadius /= CGFloat(2.0.squareRoot())
+        let minSplitMass = CGFloat(OriginalGameplay.minSplitMass)
+        var pieces: [CGFloat] = [mass]
+        while pieces.count < cap {
+            guard let maxIdx = pieces.indices.max(by: { pieces[$0] < pieces[$1] }),
+                  pieces[maxIdx] >= minSplitMass else { break }
+            let half = pieces[maxIdx] * 0.5
+            pieces[maxIdx] = half
+            pieces.append(half)
         }
-        guard pieces > 1 else { return [mass] }
-        return Array(repeating: mass / CGFloat(pieces), count: pieces)
+        pieces.sort(by: >)
+        return pieces
     }
     
     private func pause() {
@@ -11739,7 +11780,7 @@ struct ContentView: View {
         joystickIsDragging = false
         joystickOffset = .zero
         joystickBasePosition = nil
-        anchorPoint = playerCenter
+        anchorPoint = stopOnRelease ? playerCenter : nil
         // Do not reuse the pre-popup gesture recognizers. A fresh session ensures feed's normal
         // timer and macro's immediate press begin from this touch-down, with no stale hold state.
         ejectControlSession &+= 1
@@ -11779,115 +11820,92 @@ struct ContentView: View {
 
 // MARK: - UI Helpers
 
-/// One flat 944x702 asset with two normalized transparent hit regions. Because the image and
-/// hit geometry share the same aspect-ratio-locked frame, rotation and iPad size changes cannot
-/// make the invisible buttons drift away from the painted red/green buttons.
+/// MenuPause.ccbi: crisp 9-slice Leave/Pause modal (`223x166 * uiScale`) with
+/// immediate touch handoff back to gameplay the instant No is pressed.
 struct LeavePopupModal: View {
-    /// Called the instant No commits: gameplay input must be live again immediately, long
-    /// before the exit animation ends.
     let onNo: () -> Void
-    /// Called when the No exit animation finishes so the owner can unmount this purely
-    /// visual layer.
     let onNoExitComplete: () -> Void
     let onYes: () -> Void
-    
+
     private enum Choice: Equatable {
         case no
         case yes
     }
-    
+
     private enum MotionPhase {
         case belowScreen
         case entranceOvershoot
         case resting
         case exitAnticipation
     }
-    
+
     @State private var motionPhase: MotionPhase = .belowScreen
     @State private var dimmerOpacity: Double = 0
     @State private var entranceComplete = false
     @State private var actionLocked = false
     @State private var dimBothButtons = false
-    
-    private let sourceAspect: CGFloat = 944.0 / 702.0
-    private let noRect = CGRect(
-        x: 0.1186, y: 0.5427,
-        width: 0.3210, height: 0.3106
-    )
-    private let yesRect = CGRect(
-        x: 0.5604, y: 0.5442,
-        width: 0.3199, height: 0.3091
-    )
-    
+
     var body: some View {
         GeometryReader { geometry in
-            let popupWidth = min(
-                470,
-                min(
-                    geometry.size.width * 0.42,
-                    geometry.size.height * 0.58 * sourceAspect
-                )
-            )
-            let popupHeight = popupWidth / sourceAspect
-            
+            let s = max(1.0, min(OriginalGameplay.uiScale(for: geometry.size), geometry.size.width / 460.0))
+            let popupWidth = min(geometry.size.width * 0.78, 223.0 * s)
+            let popupHeight = 166.0 * s
+
             ZStack {
                 Color.black
                     .opacity(dimmerOpacity)
                     .ignoresSafeArea()
-                
-                ZStack {
-                    Image("Leave-popup")
-                        .resizable()
-                        .scaledToFit()
-                    
-                    GeometryReader { imageGeometry in
+
+                VStack(spacing: 14 * s) {
+                    Spacer(minLength: 4 * s)
+                    Text("Are you sure you want to leave the game?")
+                        .font(.custom("OpenSans-Bold", size: 15 * s))
+                        .foregroundColor(Color(hex: 0x6E6E6E))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 14 * s)
+
+                    HStack(spacing: 12 * s) {
                         Button(action: { commit(.no) }) {
-                            Color.clear
-                                .contentShape(Rectangle())
+                            HStack(spacing: 5 * s) {
+                                Image("hud-no")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 14 * s, height: 14 * s)
+                                Text("No")
+                                    .font(.custom("OpenSans-Bold", size: 13 * s))
+                                    .foregroundColor(.white)
+                                    .shadow(color: Color(red: 0.72, green: 0.0, blue: 0.02), radius: 0, x: 0, y: 1)
+                            }
+                            .frame(width: 72.14 * s, height: 51.84 * s)
                         }
-                        .buttonStyle(
-                            LeavePopupButtonStyle(
-                                dimAll: dimBothButtons,
-                                cornerRadius: popupWidth * 0.022
-                            )
-                        )
-                        .frame(
-                            width: imageGeometry.size.width * noRect.width,
-                            height: imageGeometry.size.height * noRect.height
-                        )
-                        .contentShape(Rectangle())
-                        .position(
-                            x: imageGeometry.size.width * noRect.midX,
-                            y: imageGeometry.size.height * noRect.midY
-                        )
+                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-red", showShadow: false))
+                        .opacity(dimBothButtons ? 0.50 : 1.0)
                         .accessibilityLabel("No")
                         .accessibilityHint("Return to the current match")
-                        
+
                         Button(action: { commit(.yes) }) {
-                            Color.clear
-                                .contentShape(Rectangle())
+                            HStack(spacing: 5 * s) {
+                                Image("hud-yes")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 15 * s, height: 15 * s)
+                                Text("Yes")
+                                    .font(.custom("OpenSans-Bold", size: 13 * s))
+                                    .foregroundColor(.white)
+                                    .shadow(color: Color(red: 0.27, green: 0.67, blue: 0.0), radius: 0, x: 0, y: 1)
+                            }
+                            .frame(width: 72.14 * s, height: 51.84 * s)
                         }
-                        .buttonStyle(
-                            LeavePopupButtonStyle(
-                                dimAll: dimBothButtons,
-                                cornerRadius: popupWidth * 0.022
-                            )
-                        )
-                        .frame(
-                            width: imageGeometry.size.width * yesRect.width,
-                            height: imageGeometry.size.height * yesRect.height
-                        )
-                        .contentShape(Rectangle())
-                        .position(
-                            x: imageGeometry.size.width * yesRect.midX,
-                            y: imageGeometry.size.height * yesRect.midY
-                        )
+                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green", showShadow: false))
+                        .opacity(dimBothButtons ? 0.50 : 1.0)
                         .accessibilityLabel("Yes")
                         .accessibilityHint("Leave the current match")
                     }
-                    .allowsHitTesting(entranceComplete && !actionLocked)
+                    Spacer(minLength: 6 * s)
                 }
                 .frame(width: popupWidth, height: popupHeight)
+                .background(MCFSFrame(name: "mcfs-white-gray"))
+                .allowsHitTesting(entranceComplete && !actionLocked)
                 .offset(
                     y: verticalOffset(
                         containerHeight: geometry.size.height,
@@ -11896,11 +11914,6 @@ struct LeavePopupModal: View {
                 )
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // The entire overlay - dimmer included - stops intercepting touches the moment a
-            // choice commits. Previously it stayed hit-testable through the whole exit
-            // animation, so a finger that came down on feed/macro right after releasing No was
-            // captured by this dying layer and the hold never reached the game until a fresh
-            // touch (which is why moving "fixed" it).
             .allowsHitTesting(!actionLocked)
             .onAppear {
                 startEntrance()
@@ -12083,6 +12096,8 @@ struct TopBarHUD: View, Equatable {
             let s = OriginalGameplay.uiScale(for: geometry.size)
             let btnSide = 39.17 * s
             let pad = 5.11 * s
+            let leadPad = max(pad, geometry.safeAreaInsets.leading + 4)
+            let trailPad = max(pad, geometry.safeAreaInsets.trailing + 4)
             VStack {
                 HStack(alignment: .top, spacing: 8 * s) {
                     // PauseButton.ccbi (5.11, 5.11) + EmojiWidget.ccbi (5.11, 49.39)
@@ -12098,19 +12113,16 @@ struct TopBarHUD: View, Equatable {
                     
                     // Score.ccbi metrics aligned beside PauseButton
                     VStack(alignment: .leading, spacing: 2 * s) {
-                        Text("Score: \(score)")
-                            .font(.custom("OpenSans-Bold", size: 15 * s))
-                            .foregroundColor(Color(hex: 0x8E8E8E))
+                        StrokedHUDText(text: "Score: \(score)", fontSize: 15 * s, fill: .white)
                         HStack(spacing: 4 * s) {
-                            Image("token").resizable().aspectRatio(contentMode: .fit).frame(width: 18 * s, height: 18 * s)
-                            Text("\(tokenCount)")
-                                .font(.custom("OpenSans-Bold", size: 15 * s))
-                                .foregroundColor(Color(hex: 0x8E8E8E))
+                            Image("token").resizable().aspectRatio(contentMode: .fit).frame(width: 17 * s, height: 17 * s)
+                            StrokedHUDText(text: "\(tokenCount)", fontSize: 14 * s, fill: .white)
                         }
                         if showFPS {
                             Text("\(fps) FPS")
-                                .font(.custom("OpenSans-Bold", size: 12 * s))
-                                .foregroundColor(fps >= 100 ? Color(hex: 0x54C826) : (fps >= 55 ? Color(hex: 0x8E8E8E) : .orange))
+                                .font(.custom("OpenSans-Bold", size: 11 * s))
+                                .foregroundColor(fps >= 100 ? Color(hex: 0x54C826) : (fps >= 55 ? .white : .orange))
+                                .shadow(color: .black.opacity(0.6), radius: 1)
                         }
                     }
                     .padding(.top, 3 * s)
@@ -12123,9 +12135,7 @@ struct TopBarHUD: View, Equatable {
                                 .resizable()
                                 .aspectRatio(contentMode: .fit)
                                 .frame(width: 20 * s, height: 20 * s)
-                            Text("\(friendCount) friend\(friendCount == 1 ? "" : "s")")
-                                .font(.custom("OpenSans-Bold", size: 14 * s))
-                                .foregroundColor(Color(hex: 0x8E8E8E))
+                            StrokedHUDText(text: "\(friendCount) friend\(friendCount == 1 ? "" : "s")", fontSize: 13.5 * s, fill: .white)
                         }
                         .frame(height: btnSide)
                         .padding(.trailing, 4 * s)
@@ -12133,8 +12143,9 @@ struct TopBarHUD: View, Equatable {
                     
                     LeaderboardHUDButton(rows: leaderboardRows, uiScale: s)
                 }
-                .padding(.horizontal, pad)
-                .padding(.top, pad)
+                .padding(.leading, leadPad)
+                .padding(.trailing, trailPad)
+                .padding(.top, max(pad, geometry.safeAreaInsets.top + 2))
                 Spacer()
             }
         }
@@ -12464,7 +12475,8 @@ struct ActionButtonsHUD: View, Equatable {
             let s = OriginalGameplay.uiScale(for: geometry.size)
             let buttonSide = 65.0 * s
             let macroSide = 54.0 * s
-            let centerX = geometry.size.width * 0.92
+            let safeRight = max(geometry.size.width * 0.08, geometry.safeAreaInsets.trailing + buttonSide * 0.55)
+            let centerX = geometry.size.width - safeRight
             let shootCenterY = geometry.size.height * 0.875
             let splitCenterY = geometry.size.height * 0.645
             ZStack {
@@ -12548,13 +12560,26 @@ struct MinimapHUD: View {
         GeometryReader { geometry in
             let s = OriginalGameplay.uiScale(for: geometry.size)
             let mapSide = 90.0 * s
+            let trailPad = max(8 * s, geometry.safeAreaInsets.trailing + 4)
             VStack {
                 HStack {
                     Spacer()
                     ZStack {
                         MCFSFrame(name: "mcfs-gray")
-                            .opacity(0.45)
+                            .opacity(0.42)
                         Canvas { context, size in
+                            let sectorPath = Path { p in
+                                for k in 1..<4 {
+                                    let x = size.width * CGFloat(k) / 4.0
+                                    p.move(to: CGPoint(x: x, y: 0))
+                                    p.addLine(to: CGPoint(x: x, y: size.height))
+                                    let y = size.height * CGFloat(k) / 4.0
+                                    p.move(to: CGPoint(x: 0, y: y))
+                                    p.addLine(to: CGPoint(x: size.width, y: y))
+                                }
+                            }
+                            context.stroke(sectorPath, with: .color(Color.white.opacity(0.18)), lineWidth: 0.75)
+
                             let w = max(1, worldSize)
                             for tp in teammatePositions {
                                 let tx = min(max(tp.x / w, 0), 1) * size.width
@@ -12571,8 +12596,8 @@ struct MinimapHUD: View {
                     }
                     .frame(width: mapSide, height: mapSide)
                     .clipShape(RoundedRectangle(cornerRadius: 6 * s))
-                    .padding(.trailing, 8 * s)
-                    .padding(.top, 50 * s)
+                    .padding(.trailing, trailPad)
+                    .padding(.top, max(50 * s, geometry.safeAreaInsets.top + 46 * s))
                 }
                 Spacer()
             }
@@ -12610,8 +12635,8 @@ struct EmotePickerBar: View {
                     }
                     .padding(4 * s)
                     .background(MCFSFrame(name: "mcfs-leaderboard-content-float"))
-                    .padding(.leading, 5.11 * s)
-                    .padding(.top, 94 * s)
+                    .padding(.leading, max(5.11 * s, geometry.safeAreaInsets.leading + 4))
+                    .padding(.top, max(94 * s, geometry.safeAreaInsets.top + 90 * s))
                     Spacer()
                 }
                 Spacer()
@@ -13104,10 +13129,12 @@ struct MainMenu: View {
             .shadow(color: Color.black.opacity(0.45), radius: 0, x: 0, y: 1.5)
     }
 
-    private func topMenuBar(scale s: CGFloat) -> some View {
-        VStack(spacing: 0) {
+    private func topMenuBar(scale s: CGFloat, insets: EdgeInsets) -> some View {
+        let lead = max(10 * s, insets.leading + 4)
+        let trail = max(10 * s, insets.trailing + 4)
+        return VStack(spacing: 0) {
             HStack(alignment: .top) {
-                // MenuMain.ccbi top-left utility strip (40x40 units) + BoostXpButton/BoostMassButton
+                // MenuMain.ccbi top-left utility strip (40x40 units) + BoostXpButton/BoostMassButton stacked vertically
                 VStack(alignment: .leading, spacing: 5 * s) {
                     HStack(spacing: 5 * s) {
                         topSquareButton(icon: "menu-freecoins-icon", label: "Free", frameAsset: "mcfs-green", scale: s) {
@@ -13130,7 +13157,7 @@ struct MainMenu: View {
                         }
                     }
 
-                    HStack(spacing: 5 * s) {
+                    VStack(alignment: .leading, spacing: 4 * s) {
                         boostPillButton(icon: "menu-xpboost", multiplier: "menu-3x-xp", scale: s) {
                             activeInfoTab = "Shop"
                         }
@@ -13169,8 +13196,9 @@ struct MainMenu: View {
                     }
                 }
             }
-            .padding(.horizontal, 10 * s)
-            .padding(.top, 8 * s)
+            .padding(.leading, lead)
+            .padding(.trailing, trail)
+            .padding(.top, max(8 * s, insets.top + 2))
             Spacer()
         }
     }
@@ -13249,8 +13277,10 @@ struct MainMenu: View {
         }
     }
 
-    private func bottomFeatureDock(scale s: CGFloat) -> some View {
-        VStack {
+    private func bottomFeatureDock(scale s: CGFloat, insets: EdgeInsets) -> some View {
+        let lead = max(10 * s, insets.leading + 4)
+        let trail = max(10 * s, insets.trailing + 4)
+        return VStack {
             Spacer()
             HStack(alignment: .bottom, spacing: 6 * s) {
                 // MenuMain.ccbi Bottom-Left: News stacked above Settings, beside Gifts & Party
@@ -13403,8 +13433,9 @@ struct MainMenu: View {
                     }
                 }
             }
-            .padding(.horizontal, 10 * s)
-            .padding(.bottom, 8 * s)
+            .padding(.leading, lead)
+            .padding(.trailing, trail)
+            .padding(.bottom, max(8 * s, insets.bottom + 2))
         }
     }
 
@@ -13581,8 +13612,8 @@ struct MainMenu: View {
                     .clipped()
                     .edgesIgnoringSafeArea(.all)
 
-                topMenuBar(scale: s).zIndex(1)
-                bottomFeatureDock(scale: s).zIndex(1)
+                topMenuBar(scale: s, insets: geometry.safeAreaInsets).zIndex(1)
+                bottomFeatureDock(scale: s, insets: geometry.safeAreaInsets).zIndex(1)
 
                 VStack(spacing: 10 * s) {
                     Spacer()
@@ -13592,8 +13623,15 @@ struct MainMenu: View {
                         .frame(height: 44 * s)
                         .padding(.bottom, 2 * s)
 
-                    // Skin circle (45x45) + Nickname (mcfs-white-gray)
-                    HStack(spacing: 10 * s) {
+                    // Nickname dead-centered below ui-logo (MenuMain: 0.35*W), Skin circle overlaid to its left
+                    let nickWidth = min(250 * s, max(180, geometry.size.width * 0.35))
+                    ZStack {
+                        ReliableNicknameField(text: $playerName, placeholder: "Nickname")
+                            .frame(width: nickWidth, height: 34 * s)
+                            .padding(.horizontal, 10 * s)
+                            .background(MCFSFrame(name: "mcfs-white-gray"))
+                            .multilineTextAlignment(.center)
+
                         Button(action: {
                             SoundManager.shared.play(.menuClick)
                             showSkinsModal = true
@@ -13617,12 +13655,7 @@ struct MainMenu: View {
                                     .offset(x: -3 * s, y: 3 * s)
                             }
                         }
-
-                        ReliableNicknameField(text: $playerName, placeholder: "Nickname")
-                            .frame(width: 215 * s, height: 36 * s)
-                            .padding(.horizontal, 10 * s)
-                            .background(MCFSFrame(name: "mcfs-white-gray"))
-                            .multilineTextAlignment(.center)
+                        .offset(x: -(nickWidth * 0.5 + 34 * s))
                     }
 
                     // Mode Play Row: ClassicButton.ccbi 120x80 proportions scaled by s
@@ -13674,7 +13707,20 @@ struct MainMenu: View {
                 if let tab = activeInfoTab {
                     switch tab {
                     case "Shop":
-                        ShopModalView(coins: $coinsCount, dna: $dnaCount, activeStartBoost: $activeStartBoost) {
+                        ShopModalView(
+                            coins: $coinsCount,
+                            dna: $dnaCount,
+                            activeStartBoost: $activeStartBoost,
+                            onOpenPotions: {
+                                withAnimation { activeInfoTab = "Potions" }
+                            },
+                            onOpenSkins: {
+                                withAnimation {
+                                    activeInfoTab = nil
+                                    showSkinsModal = true
+                                }
+                            }
+                        ) {
                             withAnimation { activeInfoTab = nil }
                         }
                         .zIndex(2)
@@ -13701,7 +13747,7 @@ struct MainMenu: View {
                 // GenericHeader.ccbi + MenuSettingsNode_26.2.0.ccbi Light Settings
                 if showSettings {
                     ZStack {
-                        Color(hex: 0xF2F5F8).edgesIgnoringSafeArea(.all)
+                        Color.white.edgesIgnoringSafeArea(.all)
                         VStack(spacing: 0) {
                             VStack(spacing: 0) {
                                 HStack {
@@ -13764,7 +13810,7 @@ struct MainMenu: View {
                                         Slider(value: $botSkill, in: 0.4...1.6, step: 0.1).accentColor(.red)
                                     }
                                     .padding(12 * s)
-                                    .background(MCFSFrame(name: "mcfs-white"))
+                                    .background(MCFSFrame(name: "mcfs-light-grey"))
 
                                     Text(buildStamp)
                                         .font(.custom("Lato-Regular", size: 10 * s))
@@ -13826,7 +13872,7 @@ struct MainMenu: View {
             }
             .padding(.horizontal, 14 * s)
             .padding(.vertical, 9 * s)
-            .background(MCFSFrame(name: "mcfs-white"))
+            .background(MCFSFrame(name: "mcfs-light-grey"))
         }
     }
 }
