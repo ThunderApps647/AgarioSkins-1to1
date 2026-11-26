@@ -2908,9 +2908,12 @@ struct GameWorldView: View {
             // Dark mode swaps in the exact RGB inverse of the light palette.
             context.fill(Path(screenBounds), with: .color(Color(hex: darkModeGrid ? 0x000000 : 0xFFFFFF)))
             
-            // 2. Grid - IPA OptimizedArenaBackground::draw (0x10030e108):
-            // v = clamp((50 * zoom)^2 / 5000 + 0.10, 0.10, 0.85)
-            // Light mode gray = 1 - v; Dark mode gray = v; lineWidth = darkMode ? 2 : 1.
+            // 2. Classic FFA Grid (`OptimizedArenaBackground::draw` 0x10030e108):
+            // Bounded to [0, worldSize] with Retina 1px light / 2px dark hairlines and a matching subtle perimeter frame.
+            let boundaryRect = CGRect(x: cameraOffsetX,
+                                      y: cameraOffsetY,
+                                      width: worldSize * zoom,
+                                      height: worldSize * zoom)
             if showGrid {
                 let gridIntensity = min(0.85, max(0.10, (50.0 * 50.0 * zoom * zoom) / 5000.0 + 0.10))
                 let gridGray = darkModeGrid ? gridIntensity : (1.0 - gridIntensity)
@@ -2918,40 +2921,43 @@ struct GameWorldView: View {
                 let hairline = 1.0 / max(1.0, UIScreen.main.scale)
                 let lineWidth: CGFloat = darkModeGrid ? max(1.0, hairline * 2.0) : hairline
                 
-                let startX = floor(visibleRect.minX / cellSize) * cellSize
-                let endX = ceil(visibleRect.maxX / cellSize) * cellSize
-                let gridPathX = Path { p in
-                    for x in stride(from: startX, through: endX, by: cellSize) {
-                        let screenX = x * zoom + cameraOffsetX
-                        p.move(to: CGPoint(x: screenX, y: 0))
-                        p.addLine(to: CGPoint(x: screenX, y: size.height))
-                    }
-                }
-                context.stroke(gridPathX, with: .color(gridColor), lineWidth: lineWidth)
+                let minScreenX = max(0, boundaryRect.minX)
+                let maxScreenX = min(size.width, boundaryRect.maxX)
+                let minScreenY = max(0, boundaryRect.minY)
+                let maxScreenY = min(size.height, boundaryRect.maxY)
                 
-                let startY = floor(visibleRect.minY / cellSize) * cellSize
-                let endY = ceil(visibleRect.maxY / cellSize) * cellSize
-                let gridPathY = Path { p in
-                    for y in stride(from: startY, through: endY, by: cellSize) {
-                        let screenY = y * zoom + cameraOffsetY
-                        p.move(to: CGPoint(x: 0, y: screenY))
-                        p.addLine(to: CGPoint(x: size.width, y: screenY))
+                if maxScreenX > minScreenX && maxScreenY > minScreenY {
+                    let startX = max(0, floor(visibleRect.minX / cellSize) * cellSize)
+                    let endX = min(worldSize, ceil(visibleRect.maxX / cellSize) * cellSize)
+                    let gridPathX = Path { p in
+                        for x in stride(from: startX, through: endX, by: cellSize) {
+                            let screenX = x * zoom + cameraOffsetX
+                            if screenX >= minScreenX - 1 && screenX <= maxScreenX + 1 {
+                                p.move(to: CGPoint(x: screenX, y: minScreenY))
+                                p.addLine(to: CGPoint(x: screenX, y: maxScreenY))
+                            }
+                        }
                     }
+                    context.stroke(gridPathX, with: .color(gridColor), lineWidth: lineWidth)
+                    
+                    let startY = max(0, floor(visibleRect.minY / cellSize) * cellSize)
+                    let endY = min(worldSize, ceil(visibleRect.maxY / cellSize) * cellSize)
+                    let gridPathY = Path { p in
+                        for y in stride(from: startY, through: endY, by: cellSize) {
+                            let screenY = y * zoom + cameraOffsetY
+                            if screenY >= minScreenY - 1 && screenY <= maxScreenY + 1 {
+                                p.move(to: CGPoint(x: minScreenX, y: screenY))
+                                p.addLine(to: CGPoint(x: maxScreenX, y: screenY))
+                            }
+                        }
+                    }
+                    context.stroke(gridPathY, with: .color(gridColor), lineWidth: lineWidth)
                 }
-                context.stroke(gridPathY, with: .color(gridColor), lineWidth: lineWidth)
-            }
 
-            // 2b. Arena Boundary (ArenaBoundaryShaderEffect: 0x102304083 / 0x1001593cc):
-            // 5-world-unit #D0283C outer border strip + eased alpha-ramp shading outward.
-            let boundaryRect = CGRect(x: cameraOffsetX,
-                                      y: cameraOffsetY,
-                                      width: worldSize * zoom,
-                                      height: worldSize * zoom)
-            drawArenaBoundary(context: context,
-                              boundaryRect: boundaryRect,
-                              screenBounds: screenBounds,
-                              zoom: zoom,
-                              darkMode: darkModeGrid)
+                if boundaryRect.intersects(screenBounds) {
+                    context.stroke(Path(boundaryRect), with: .color(gridColor), lineWidth: max(1.0, lineWidth * 1.5))
+                }
+            }
             
             // 3. Food - same pellets, same 0.5px cutoff as before. The win is that the
             // pellets are grouped by palette index instead of hashing a Color per pellet
@@ -5055,15 +5061,26 @@ struct ContentView: View {
                                     joystickBasePosition = value.startLocation
                                     joystickIsDragging = true
                                 }
-                                let maxDistance: CGFloat = 130 / 2
-                                // Classic Floating D-Pad: outer base stays locked at startLocation;
-                                // only the inner knob moves, clamped strictly to maxDistance (65pt).
-                                let basePos = joystickBasePosition ?? value.startLocation
-                                let dx = value.location.x - basePos.x
-                                let dy = value.location.y - basePos.y
+                                let maxDistance: CGFloat = 65.0
+                                // Dynamic Floating D-Pad (`maxDPadDetectionRadiusFactor` = 1.7):
+                                // base follows once finger exceeds 1.35 * maxDistance so direction reversals
+                                // respond immediately without losing small/medium circle gestures.
+                                var basePos = joystickBasePosition ?? value.startLocation
+                                var dx = value.location.x - basePos.x
+                                var dy = value.location.y - basePos.y
                                 let distance = sqrt(dx * dx + dy * dy)
-                                if distance > maxDistance && distance > 0.001 {
-                                    let ratio = maxDistance / distance
+                                let followLimit = maxDistance * 1.35
+                                if distance > followLimit && distance > 0.001 {
+                                    let excess = distance - followLimit
+                                    basePos.x += (dx / distance) * excess
+                                    basePos.y += (dy / distance) * excess
+                                    joystickBasePosition = basePos
+                                    dx = value.location.x - basePos.x
+                                    dy = value.location.y - basePos.y
+                                }
+                                let clampedDist = sqrt(dx * dx + dy * dy)
+                                if clampedDist > maxDistance && clampedDist > 0.001 {
+                                    let ratio = maxDistance / clampedDist
                                     joystickOffset = CGSize(width: dx * ratio, height: dy * ratio)
                                 } else {
                                     joystickOffset = CGSize(width: dx, height: dy)
@@ -10559,7 +10576,7 @@ struct ContentView: View {
                             let timer2 = cells[idx2].splitTimer
                             let maxTimer = max(timer1, timer2)
                             let normalizedTimer = min(max(maxTimer, 0.0), 1.0)
-                            let resolutionForce: CGFloat = 1.0 - (normalizedTimer * 0.95)
+                            let resolutionForce: CGFloat = 0.65 - (normalizedTimer * 0.60)
                             
                             let actualPush = overlap * resolutionForce
                             // v5.8: a piece fully ENGULFED by a bigger cell used
@@ -10640,11 +10657,24 @@ struct ContentView: View {
             let joyY = joystickOffset.height
             let joyMagnitude = sqrt(joyX * joyX + joyY * joyY)
             let maxJoy: CGFloat = 65.0
-            inputScale = min(max(joyMagnitude / maxJoy, 0.0), 1.0)
-            if joyMagnitude > 0 {
+            // minDPadRadiusFactor = 0.6 -> full speed at ~65% stick throw, smooth ramp below.
+            inputScale = joyMagnitude < 4.0 ? 0.0 : min(1.0, max(0.20, joyMagnitude / (maxJoy * 0.65)))
+            if joyMagnitude > 0.001 {
                 globalDirectionNorm = CGSize(width: joyX / joyMagnitude, height: joyY / joyMagnitude)
             }
+        } else if lastJoystickDirection != .zero {
+            globalDirectionNorm = lastJoystickDirection.normalized()
         }
+
+        // Virtual world cursor ahead of cluster so multi-cell packs converge organically like desktop/mobile Agar.io.
+        let flockCenter = playerCenter
+        let focalWorldCursor: CGPoint? = {
+            guard globalDirectionNorm != .zero else { return nil }
+            let screenFocusScale: CGFloat = joystickIsDragging ? max(0.25, inputScale) : 1.0
+            let focalDistance = max(140.0 / max(zoomLevel, 0.05), 420.0 * screenFocusScale / max(zoomLevel, 0.05))
+            return CGPoint(x: flockCenter.x + globalDirectionNorm.width * focalDistance,
+                           y: flockCenter.y + globalDirectionNorm.height * focalDistance)
+        }()
         
         var idToIndex = [UUID: Int]()
         if playerCells.contains(where: { $0.splitImmunityTimer <= 0 && $0.immuneToCellID != nil }) {
@@ -10672,10 +10702,16 @@ struct ContentView: View {
             let distanceThisFrame = playerCells[i].cachedMovementSpeed * dt
             
             if joystickIsDragging {
-                if inputScale > 0.001, globalDirectionNorm != .zero {
-                    let step = distanceThisFrame * inputScale
-                    playerCells[i].position.x += globalDirectionNorm.width * step
-                    playerCells[i].position.y += globalDirectionNorm.height * step
+                if inputScale > 0.001, let target = focalWorldCursor {
+                    let vx = target.x - playerCells[i].position.x
+                    let vy = target.y - playerCells[i].position.y
+                    let dist = sqrt(vx * vx + vy * vy)
+                    if dist > 1.0 {
+                        let k = min(1.0, dist / max(playerCells[i].cachedVisualRadius, CGFloat(OriginalGameplay.baseRadius)))
+                        let step = distanceThisFrame * inputScale * k
+                        playerCells[i].position.x += (vx / dist) * step
+                        playerCells[i].position.y += (vy / dist) * step
+                    }
                 }
             } else if let anchor = anchorPoint {
                 let directionToAnchor = CGSize(width: anchor.x - playerCells[i].position.x, height: anchor.y - playerCells[i].position.y)
@@ -10686,10 +10722,16 @@ struct ContentView: View {
                     playerCells[i].position.x += normalizedDirection.width * travelDistance
                     playerCells[i].position.y += normalizedDirection.height * travelDistance
                 }
-            } else if lastJoystickDirection != .zero {
-                let glideDir = lastJoystickDirection.normalized()
-                playerCells[i].position.x += glideDir.width * distanceThisFrame
-                playerCells[i].position.y += glideDir.height * distanceThisFrame
+            } else if let target = focalWorldCursor {
+                let vx = target.x - playerCells[i].position.x
+                let vy = target.y - playerCells[i].position.y
+                let dist = sqrt(vx * vx + vy * vy)
+                if dist > 1.0 {
+                    let k = min(1.0, dist / max(playerCells[i].cachedVisualRadius, CGFloat(OriginalGameplay.baseRadius)))
+                    let step = distanceThisFrame * k
+                    playerCells[i].position.x += (vx / dist) * step
+                    playerCells[i].position.y += (vy / dist) * step
+                }
             }
             
             playerCells[i].position.x += playerCells[i].velocity.width * dt
@@ -11130,7 +11172,7 @@ struct ContentView: View {
             for i in virusIndicesToRemove.sorted(by: >) where i < viruses.count {
                 viruses.remove(at: i)
             }
-            let missingViruses = 80 - viruses.count
+            let missingViruses = 35 - viruses.count
             if missingViruses > 0 {
                 for _ in 0..<missingViruses {
                     viruses.append(spawnSingleVirusSafely())
@@ -11714,7 +11756,7 @@ struct ContentView: View {
     }
     
     private func spawnInitialViruses() {
-        for _ in 0..<80 { viruses.append(spawnSingleVirusSafely()) }
+        for _ in 0..<35 { viruses.append(spawnSingleVirusSafely()) }
     }
     private func spawnInitialTokens() { for _ in 0..<200 { tokens.append(spawnSingleToken(existing: tokens)) } }
     
@@ -12508,7 +12550,7 @@ struct ActionButtonsHUD: View, Equatable {
                     )
                     .opacity(canFeed ? (macroPressed ? 0.55 : 1.0) : 0.45)
                     .allowsHitTesting(canFeed)
-                    .position(x: centerX - buttonSide * 1.05, y: shootCenterY)
+                    .position(x: centerX - buttonSide * 1.15, y: shootCenterY)
                     .accessibilityLabel("Fast eject")
                     .accessibilityAddTraits(.isButton)
 
@@ -12800,8 +12842,8 @@ private struct ReliableNicknameField: UIViewRepresentable {
             attributes: [.foregroundColor: UIColor(white: 0.62, alpha: 1.0)]
         )
         field.textAlignment = .center
-        field.font = UIFont(name: "UbuntuSans-Bold", size: 22)
-        ?? UIFont.systemFont(ofSize: 22, weight: .bold)
+        field.font = UIFont(name: "Lato-Regular", size: 16)
+            ?? UIFont.systemFont(ofSize: 16, weight: .semibold)
         field.textColor = .black
         field.tintColor = .systemBlue
         field.borderStyle = .none
@@ -13180,20 +13222,10 @@ struct MainMenu: View {
                         }
                     }
 
-                    Button(action: { SoundManager.shared.play(.menuClick); activeInfoTab = "Gifts" }) {
-                        HStack(spacing: 5 * s) {
-                            Image("menu-gift-icon").resizable().scaledToFit().frame(width: 16 * s, height: 16 * s)
-                            menuStrokedText("Collect Reward", size: 10.5 * s)
-                        }
-                        .padding(.horizontal, 10 * s)
-                        .frame(height: 24 * s)
-                        .background(
-                            ZStack {
-                                MCFSFrame(name: "mcfs-shadow").offset(y: 2 * s)
-                                MCFSFrame(name: "mcfs-yellow-locket")
-                            }
-                        )
+                    Button(action: { SoundManager.shared.play(.menuClick); activeInfoTab = "Shop" }) {
+                        EmptyView()
                     }
+                    .hidden()
                 }
             }
             .padding(.leading, lead)
@@ -13229,19 +13261,24 @@ struct MainMenu: View {
     private func boostPillButton(icon: String, multiplier: String, scale s: CGFloat, action: @escaping () -> Void) -> some View {
         Button(action: { SoundManager.shared.play(.menuClick); action() }) {
             ZStack {
-                MCFSFrame(name: "mcfs-red-timer-frame")
-                HStack(spacing: 2 * s) {
-                    Image(icon).resizable().scaledToFit().frame(width: 17 * s, height: 17 * s)
-                    Image(multiplier).resizable().scaledToFit().frame(width: 18 * s, height: 14 * s)
-                }
+                Image(icon)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 34 * s, height: 34 * s)
+                Image(multiplier)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 20 * s, height: 14 * s)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .offset(x: 2 * s, y: -2 * s)
                 Image("menu-plus-btn")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 11 * s, height: 11 * s)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                    .padding(2 * s)
+                    .frame(width: 13 * s, height: 13 * s)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    .offset(x: -1 * s, y: 1 * s)
             }
-            .frame(width: 42 * s, height: 34 * s)
+            .frame(width: 38 * s, height: 36 * s)
         }
     }
 
@@ -13615,16 +13652,15 @@ struct MainMenu: View {
                 topMenuBar(scale: s, insets: geometry.safeAreaInsets).zIndex(1)
                 bottomFeatureDock(scale: s, insets: geometry.safeAreaInsets).zIndex(1)
 
-                VStack(spacing: 10 * s) {
-                    Spacer()
+                // MenuMain.ccbi exact vertical fractions: logo ~0.21*H, input ~0.38*H, play row ~0.62*H
+                let nickWidth = min(250 * s, max(175, geometry.size.width * 0.35))
+                ZStack {
                     Image("ui-logo")
                         .resizable()
                         .scaledToFit()
-                        .frame(height: 44 * s)
-                        .padding(.bottom, 2 * s)
+                        .frame(height: 46 * s)
+                        .position(x: geometry.size.width * 0.5, y: geometry.size.height * 0.215)
 
-                    // Nickname dead-centered below ui-logo (MenuMain: 0.35*W), Skin circle overlaid to its left
-                    let nickWidth = min(250 * s, max(180, geometry.size.width * 0.35))
                     ZStack {
                         ReliableNicknameField(text: $playerName, placeholder: "Nickname")
                             .frame(width: nickWidth, height: 34 * s)
@@ -13657,8 +13693,9 @@ struct MainMenu: View {
                         }
                         .offset(x: -(nickWidth * 0.5 + 34 * s))
                     }
+                    .position(x: geometry.size.width * 0.5, y: geometry.size.height * 0.385)
 
-                    // Mode Play Row: ClassicButton.ccbi 120x80 proportions scaled by s
+                    // Mode Play Row: ClassicButton.ccbi (120x80 * s) centered at 0.615*H
                     HStack(spacing: 10 * s) {
                         Button(action: {
                             SoundManager.shared.play(.menuClick)
@@ -13666,8 +13703,8 @@ struct MainMenu: View {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { withAnimation(.spring(duration: 1)) { zoomLevel = 1.0 } }
                         }) {
                             VStack(spacing: 4 * s) {
-                                Image("menu-play-icon").resizable().scaledToFit().frame(width: 30 * s, height: 32 * s)
-                                menuStrokedText("Classic", size: 14 * s)
+                                Image("menu-play-icon").resizable().scaledToFit().frame(width: 28 * s, height: 30 * s)
+                                menuStrokedText("Classic", size: 13.5 * s)
                             }
                             .frame(width: 118 * s, height: 78 * s)
                         }
@@ -13678,8 +13715,8 @@ struct MainMenu: View {
                             onPlayOnline()
                         }) {
                             VStack(spacing: 4 * s) {
-                                Image("menu-party-icon").resizable().scaledToFit().frame(width: 32 * s, height: 28 * s)
-                                menuStrokedText("Play Online", size: 13.5 * s)
+                                Image("menu-party-icon").resizable().scaledToFit().frame(width: 30 * s, height: 26 * s)
+                                menuStrokedText("Play Online", size: 13 * s)
                             }
                             .frame(width: 118 * s, height: 78 * s)
                         }
@@ -13691,15 +13728,14 @@ struct MainMenu: View {
                             withAnimation { showPartyMenu = true }
                         }) {
                             VStack(spacing: 4 * s) {
-                                Image(partyCode.isEmpty ? "party-bigicon" : "ui-star-icon").resizable().scaledToFit().frame(width: 30 * s, height: 30 * s)
-                                menuStrokedText(partyCode.isEmpty ? "Party" : partyCode, size: 14 * s)
+                                Image(partyCode.isEmpty ? "party-bigicon" : "ui-star-icon").resizable().scaledToFit().frame(width: 28 * s, height: 28 * s)
+                                menuStrokedText(partyCode.isEmpty ? "Party" : partyCode, size: 13.5 * s)
                             }
                             .frame(width: 118 * s, height: 78 * s)
                         }
                         .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-light-blue"))
                     }
-                    .padding(.top, 2 * s)
-                    Spacer()
+                    .position(x: geometry.size.width * 0.5, y: geometry.size.height * 0.615)
                 }
 
                 if showPartyMenu { partyOverlay(scale: s, containerSize: geometry.size).zIndex(2) }

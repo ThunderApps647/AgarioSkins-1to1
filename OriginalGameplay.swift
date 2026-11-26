@@ -118,37 +118,46 @@ enum OriginalGameplay {
 }
 
 /// Crisp 9-slice `MCFramedSprite` renderer. SwiftUI `.resizable()` ignores
-/// `Contents.json` `resizing` slices unless `capInsets:` is passed explicitly.
+/// `Contents.json` `resizing` slices unless `capInsets:` is passed explicitly,
+/// so we compute point insets directly from each loaded UIImage's dimensions
+/// and `MCFS_*.plist` normalized margins (works cleanly on @2x and -ipadhd @3x).
 struct MCFSFrame: View {
     let name: String
 
-    static func capInsets(for name: String) -> EdgeInsets {
+    static func marginFractions(for name: String) -> (top: CGFloat, leading: CGFloat, bottom: CGFloat, trailing: CGFloat) {
         switch name {
-        case "mcfs-divider":
-            return EdgeInsets()
-        case "mcfs-hud-xp":
-            return EdgeInsets(top: 2.5, leading: 1.0, bottom: 2.5, trailing: 1.0)
-        case "mcfs-hud-xp-box":
-            return EdgeInsets(top: 3.5, leading: 3.5, bottom: 3.5, trailing: 3.5)
-        case "mcfs-leaderboard-collapsed":
-            return EdgeInsets(top: 3.0, leading: 3.0, bottom: 3.0, trailing: 3.0)
-        case "mcfs-leaderboard-expanded":
-            return EdgeInsets(top: 2.0, leading: 3.0, bottom: 2.0, trailing: 1.0)
+        case "mcfs-divider", "mcfs-leaderboard-party-outline":
+            return (0, 0, 0, 0)
+        case "mcfs-hud-xp", "ui-xp-fill":
+            return (0.14, 0.25, 0.14, 0.25)
+        case "mcfs-hud-xp-box", "ui-xp-frame":
+            return (0.35, 0.35, 0.35, 0.35)
         case "mcfs-leaderboard-content-float":
-            return EdgeInsets(top: 1.5, leading: 6.5, bottom: 5.5, trailing: 6.5)
-        case "mcfs-red-timer-frame":
-            return EdgeInsets(top: 5.5, leading: 2.5, bottom: 5.5, trailing: 2.5)
-        case "mcfs-white-grey-tab":
-            return EdgeInsets(top: 4.5, leading: 6.0, bottom: 4.5, trailing: 6.0)
-        case "mcfs-shadow":
-            return EdgeInsets(top: 8.0, leading: 8.0, bottom: 8.0, trailing: 8.0)
+            return (0.10, 0.40, 0.80, 0.40)
         case "mcfs-blue-profile", "mcfs-bar-darkcyan", "ui-bar-darkcyan":
-            return EdgeInsets(top: 4.5, leading: 4.5, bottom: 4.5, trailing: 4.5)
-        case "mcfs-leaderboard-party-outline":
-            return EdgeInsets(top: 5.0, leading: 5.0, bottom: 5.0, trailing: 5.0)
+            return (0.0, 0.40, 0.0, 0.40)
         default:
-            return EdgeInsets(top: 6.5, leading: 6.5, bottom: 6.5, trailing: 6.5)
+            return (0.40, 0.40, 0.40, 0.40)
         }
+    }
+
+    static func capInsets(for name: String) -> EdgeInsets {
+        let f = marginFractions(for: name)
+        guard f.top > 0 || f.leading > 0 || f.bottom > 0 || f.trailing > 0 else {
+            return EdgeInsets()
+        }
+        #if canImport(UIKit)
+        if let img = UIImage(named: name) {
+            let w = img.size.width
+            let h = img.size.height
+            let top = min(h * 0.48, h * f.top)
+            let bottom = min(h * 0.48, h * f.bottom)
+            let leading = min(w * 0.48, w * f.leading)
+            let trailing = min(w * 0.48, w * f.trailing)
+            return EdgeInsets(top: top, leading: leading, bottom: bottom, trailing: trailing)
+        }
+        #endif
+        return EdgeInsets(top: 7, leading: 7, bottom: 7, trailing: 7)
     }
 
     var body: some View {

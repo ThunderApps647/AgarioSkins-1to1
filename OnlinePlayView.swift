@@ -599,13 +599,23 @@ struct OnlineGameView: View {
                     joystickBasePosition = value.startLocation
                     joystickIsDragging = true
                 }
-                let maxDistance: CGFloat = 130 / 2
-                let basePos = joystickBasePosition ?? value.startLocation
-                let dx = value.location.x - basePos.x
-                let dy = value.location.y - basePos.y
+                let maxDistance: CGFloat = 65.0
+                var basePos = joystickBasePosition ?? value.startLocation
+                var dx = value.location.x - basePos.x
+                var dy = value.location.y - basePos.y
                 let distance = sqrt(dx * dx + dy * dy)
-                if distance > maxDistance && distance > 0.001 {
-                    let ratio = maxDistance / distance
+                let followLimit = maxDistance * 1.35
+                if distance > followLimit && distance > 0.001 {
+                    let excess = distance - followLimit
+                    basePos.x += (dx / distance) * excess
+                    basePos.y += (dy / distance) * excess
+                    joystickBasePosition = basePos
+                    dx = value.location.x - basePos.x
+                    dy = value.location.y - basePos.y
+                }
+                let clampedDist = sqrt(dx * dx + dy * dy)
+                if clampedDist > maxDistance && clampedDist > 0.001 {
+                    let ratio = maxDistance / clampedDist
                     joystickOffset = CGSize(width: dx * ratio, height: dy * ratio)
                 } else {
                     joystickOffset = CGSize(width: dx, height: dy)

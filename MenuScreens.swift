@@ -90,10 +90,11 @@ struct MCFSBevelStyle: ButtonStyle {
         configuration.label
             .offset(y: configuration.isPressed ? 1.5 : 0)
             .background(
-                ZStack {
+                ZStack(alignment: .bottom) {
                     if showShadow {
                         MCFSFrame(name: "mcfs-shadow")
-                            .offset(y: configuration.isPressed ? 1.0 : 2.5)
+                            .frame(height: 24)
+                            .offset(y: configuration.isPressed ? 1.0 : 3.0)
                     }
                     MCFSFrame(name: frameAsset)
                 }
@@ -259,16 +260,24 @@ struct ShopModalView: View {
                 Image(icon)
                     .resizable()
                     .scaledToFit()
-                    .frame(height: 54 * s)
+                    .frame(height: 52 * s)
                 Text(title)
-                    .font(.custom("OpenSans-Bold", size: 14 * s))
-                    .foregroundColor(.white)
-                    .shadow(color: accent.opacity(0.9), radius: 0, x: 0, y: 1.5)
-                    .shadow(color: .black.opacity(0.35), radius: 0, x: 0, y: 1)
+                    .font(.custom("OpenSans-Bold", size: 13.5 * s))
+                    .foregroundColor(Color(hex: 0x3D4347))
+                    .padding(.horizontal, 10 * s)
+                    .padding(.vertical, 2.5 * s)
+                    .background(Capsule().fill(accent.opacity(0.14)))
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 92 * s)
-            .background(MCFSFrame(name: "mcfs-white"))
+            .frame(height: 94 * s)
+            .background(
+                ZStack(alignment: .bottom) {
+                    MCFSFrame(name: "mcfs-shadow")
+                        .frame(height: 22 * s)
+                        .offset(y: 3 * s)
+                    MCFSFrame(name: "mcfs-white")
+                }
+            )
         }
     }
 
@@ -527,19 +536,19 @@ struct PotionsModalView: View {
             let s = max(1.0, min(OriginalGameplay.uiScale(for: geometry.size), geometry.size.width / 460.0))
 
             ZStack {
-                Color(hex: 0xF7F9FB).edgesIgnoringSafeArea(.all)
+                Color.white.edgesIgnoringSafeArea(.all)
 
                 VStack(spacing: 0) {
                     genericFullHeader(title: "Mystery Potions", coins: coins, dna: dna, scale: s, onClose: onClose)
 
-                    VStack(spacing: 10 * s) {
+                    VStack(spacing: 8 * s) {
                         Text(statusBanner)
                             .font(.custom("Lato-Regular", size: 12 * s))
-                            .foregroundColor(Color(hex: 0x5A5F66))
+                            .foregroundColor(Color(hex: 0x535353))
                             .multilineTextAlignment(.center)
-                            .padding(.top, 6 * s)
+                            .padding(.top, 8 * s)
 
-                        // PotionSlot.ccbi: 4 vertical slot pedestals
+                        // PotionSlot.ccbi: 4 vertical slot cards with wide flaskslot_top_* ribbon header
                         HStack(spacing: 8 * s) {
                             ForEach(potionStore.slots) { slot in
                                 potionPedestalCard(slot: slot, scale: s)
@@ -549,7 +558,7 @@ struct PotionsModalView: View {
                         .padding(.bottom, 12 * s)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(MCFSFrame(name: "mcfs-gray"))
+                    .background(Color.white)
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
 
@@ -570,33 +579,36 @@ struct PotionsModalView: View {
         let tier = slot.tier
         let isReady = slot.isReady(now: nowTimestamp)
         let isBrewing = slot.isBrewing(now: nowTimestamp)
-        let slotSprite = isReady ? "potion-slot-orange" : (tier != nil ? "potion-slot-blue" : "potion-slot-grey")
+        let headerRibbon = isReady ? "potion-slot-orange" : (tier != nil ? "potion-slot-blue" : "potion-slot-grey")
+        let statusTitle: String = isReady ? "Ready!" : (isBrewing ? "Brewing" : (tier != nil ? "Stored" : "Empty"))
 
         return VStack(spacing: 6 * s) {
-            if let tier = tier {
-                Text(tier.rawValue)
-                    .font(.custom("OpenSans-Bold", size: 10.5 * s))
+            ZStack {
+                Image(headerRibbon)
+                    .resizable()
+                    .frame(height: 28 * s)
+                Text(statusTitle)
+                    .font(.custom("OpenSans-Bold", size: 11.5 * s))
                     .foregroundColor(.white)
-                    .padding(.horizontal, 8 * s)
-                    .padding(.vertical, 2 * s)
-                    .background(Capsule().fill(tier.badgeColor))
+                    .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 6 * s))
 
-                ZStack {
-                    Image(slotSprite)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 82 * s)
-                    Image(tier.iconAsset)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 50 * s, height: 66 * s)
-                        .offset(y: -6 * s)
-                }
-                .frame(height: 86 * s)
+            if let tier = tier {
+                Spacer(minLength: 2 * s)
+
+                Image(tier.iconAsset)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 58 * s, height: 74 * s)
+
+                Text(tier.rawValue)
+                    .font(.custom("OpenSans-Bold", size: 12 * s))
+                    .foregroundColor(tier.badgeColor)
 
                 if isReady {
-                    Text("Ready to Open!")
-                        .font(.custom("OpenSans-Bold", size: 10.5 * s))
+                    Text("Tap Open!")
+                        .font(.custom("OpenSans-Bold", size: 10 * s))
                         .foregroundColor(Color(hex: 0x43A81D))
                 } else if isBrewing {
                     let rem = Int(ceil(slot.remainingSeconds(now: nowTimestamp)))
@@ -645,7 +657,7 @@ struct PotionsModalView: View {
                             .foregroundColor(.white)
                             .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 29 * s)
+                            .frame(height: 30 * s)
                     }
                     .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
                 } else if isBrewing {
@@ -670,7 +682,7 @@ struct PotionsModalView: View {
                                 .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
                         }
                         .frame(maxWidth: .infinity)
-                        .frame(height: 29 * s)
+                        .frame(height: 30 * s)
                     }
                     .buttonStyle(MCFSBevelStyle(frameAsset: dna >= rushCost ? "mcfs-green" : "mcfs-orange"))
                 } else {
@@ -684,29 +696,24 @@ struct PotionsModalView: View {
                             .foregroundColor(.white)
                             .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
                             .frame(maxWidth: .infinity)
-                            .frame(height: 29 * s)
+                            .frame(height: 30 * s)
                     }
                     .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-light-blue"))
                 }
             } else {
-                Text("Empty Slot")
-                    .font(.custom("OpenSans-Bold", size: 10 * s))
-                    .foregroundColor(Color(hex: 0x7A828C))
-                    .padding(.horizontal, 6 * s)
-                    .padding(.vertical, 2 * s)
-                    .background(Capsule().fill(Color(hex: 0xE2E7EE)))
+                Spacer(minLength: 4 * s)
 
-                Image("potion-slot-grey")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 82 * s)
+                Image(systemName: "flask")
+                    .font(.system(size: 32 * s, weight: .medium))
+                    .foregroundColor(Color(hex: 0xCBD3DD))
 
                 Text("Play matches or claim below")
                     .font(.custom("Lato-Regular", size: 9.5 * s))
                     .foregroundColor(Color(hex: 0x8A939E))
                     .multilineTextAlignment(.center)
+                    .padding(.horizontal, 4 * s)
 
-                Spacer(minLength: 2 * s)
+                Spacer(minLength: 4 * s)
 
                 Button(action: {
                     SoundManager.shared.play(.menuClick)
@@ -719,14 +726,14 @@ struct PotionsModalView: View {
                         .foregroundColor(.white)
                         .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 29 * s)
+                        .frame(height: 30 * s)
                 }
                 .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
             }
         }
-        .padding(8 * s)
+        .padding(7 * s)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(MCFSFrame(name: "mcfs-white"))
+        .background(MCFSFrame(name: "mcfs-light-grey"))
     }
 }
 
