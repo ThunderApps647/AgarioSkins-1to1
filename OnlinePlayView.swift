@@ -490,8 +490,15 @@ struct OnlineGameView: View {
                         .zIndex(2)
                     }
                     if let emote = activeEmoteAsset, CACurrentMediaTime() < activeEmoteExpiresAt, !isLeavePopupPresented {
-                        ActiveEmoteBubble(assetName: emote)
-                            .zIndex(1)
+                        ActiveEmoteBubble(
+                            assetName: emote,
+                            cellPosition: playerCells.max(by: { $0.mass < $1.mass })?.position ?? playerCenter,
+                            cellRadius: playerCells.max(by: { $0.mass < $1.mass })?.cachedSolidRadius ?? 30,
+                            smoothedCamera: smoothedPlayerPosition,
+                            zoomLevel: zoomLevel,
+                            screenSize: geometry.size
+                        )
+                        .zIndex(1)
                     }
                 }
                 if connectionPhase == .playing && !isLeavePopupPresented {
