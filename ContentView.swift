@@ -4637,6 +4637,7 @@ struct ContentView: View {
     @AppStorage("macro.showSkins") private var showSkins: Bool = true
     @AppStorage("macro.showArrow") private var showArrow: Bool = true
     @AppStorage("macro.showEmojiWidget") private var showEmojiWidget: Bool = true
+    @AppStorage("macro.showMinimap") private var showMinimap: Bool = false
     @AppStorage("macro.offlineQuestStage") private var offlineQuestStage: Int = 0
     @AppStorage("macro.offlineQuestProgress") private var offlineQuestProgress: Int = 0
     @State private var allowPlayerTeaming: Bool = true
