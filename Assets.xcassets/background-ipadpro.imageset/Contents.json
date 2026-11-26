@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "background-ipadpro.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

@@ -1,0 +1,55 @@
+NEARBY MULTIPLAYER (v7.0) — ONE-TIME SETUP
+==========================================
+
+The app needs the "Local Network" capability with two Bonjour services
+declared, or iOS silently blocks nearby discovery.
+
+OPTION A — in Swift Playgrounds on the iPad:
+  1. Open the project, tap the project name in the sidebar (App Settings).
+  2. Tap "Capabilities", then "+".
+  3. If "Local Network" is in the list, add it and fill in:
+       Purpose string:
+         Finds and hosts nearby multiplayer games with other iPads.
+       Bonjour services (add BOTH, exactly):
+         _macro-io._tcp
+         _macro-io._udp
+
+OPTION B — if Local Network is NOT in the capabilities list:
+  Your project lives in iCloud Drive, and on Windows a .swiftpm project shows
+  up as a normal FOLDER. On your PC, open iCloud Drive -> Playgrounds ->
+  <your project>.swiftpm -> Package.swift in Notepad. Inside the
+  iOSApplication( ... ) product there is (or you add) a `capabilities: [...]`
+  list. Make it include:
+
+    capabilities: [
+        .localNetwork(
+            purposeString: "Finds and hosts nearby multiplayer games with other iPads.",
+            bonjourServiceTypes: ["_macro-io._tcp", "_macro-io._udp"]
+        )
+    ],
+
+  Save, let iCloud sync, then reopen the project on the iPad.
+
+HOW TO PLAY
+===========
+Host iPad:  PLAY ONLINE -> "Nearby iPads" card -> HOST -> pick name/bots -> START HOSTING.
+Other iPad: PLAY ONLINE -> the game appears under "Nearby iPads" -> JOIN.
+First time each iPad asks "allow local network" -> tap Allow.
+
+No Wi-Fi NETWORK or router is needed: iPads link directly over peer-to-peer
+Wi-Fi. Just keep the Wi-Fi and Bluetooth SWITCHES on (Settings or Control
+Center) on both iPads. Range is roughly same-room / same-house.
+
+Up to 8 players (host + 7 guests). Skins, party codes, feed bots, the mod
+menu, leaderboard and level-3 skins all work exactly like PC-hosted online
+games — the host iPad runs the same authoritative server sim as the PC.
+
+FILES IN THIS ZIP
+=================
+NEW      NearbySim.swift       (the PC server's sim, compiled into the app)
+NEW      NearbyHostCore.swift  (the host: 60Hz tick, joins, snapshots)
+NEW      NearbyPlay.swift      (peer-to-peer link + nearby UI)
+CHANGED  OnlineNetClient.swift (pluggable transport under NetClient)
+CHANGED  OnlinePlayView.swift  (nearby card + host flow in the browser)
+SAME     ContentView.swift, OnlineWorld.swift, MacroProtocol.swift, MyApp.swift
+         (included so your project matches this exact state)

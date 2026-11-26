@@ -1,0 +1,12 @@
+{
+  "images": [
+    {
+      "filename": "ui-xp-frame.png",
+      "idiom": "universal"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}
