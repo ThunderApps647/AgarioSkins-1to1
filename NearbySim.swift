@@ -61,11 +61,11 @@ enum SrvRules {
     static let maxPlayerMass: Double = 22500
     static let maxCellsPerOwner = 16
     static let radiusFactor: Double = 6.3245          // sqrt(mass) * this
-    static let minSplitMass: Double = 40
+    static let minSplitMass: Double = 36
     static let minEjectMass: Double = 32
     static let ejectPelletMass: Double = 16
     static let splitEjectionForce: Double = 26
-    static let eatMassRatio: Double = 1.25
+    static let eatMassRatio: Double = 4.0 / 3.0
     static let virusBaseMass: Double = 220
     static let virusSplitThreshold: Double = 220 + 7 * 14
     static let virusPopMinMass: Double = 133
@@ -1754,7 +1754,7 @@ final class SrvWorld {
                 if let immune = cells[eater.index].immuneToCellID, immune == victim.id,
                    cells[eater.index].splitImmunityTimer > 0 { return }
 
-                let overlapFactor: Double = (eater.isBot && victim.isBot) ? 0.5 : 0.3
+                let overlapFactor: Double = 0.5
                 let threshold = eater.solidRadius - victim.solidRadius * overlapFactor
                 if threshold <= 0 { return }
                 let dx = eater.x - victim.x
@@ -2472,7 +2472,12 @@ final class SrvWorld {
         let decayFactor = 1.0 - srvLerpFactor(base: 0.1, dt: dt)
         for i in cells.indices {
             if cells[i].targetMass > 10 {
-                cells[i].targetMass *= (1.0 - SrvRules.decayRate * dt)
+                // Exact IPA adapted decay from agar.io (0x10004b8a4 + 0x10004bfc8):
+                // t = clamp((sqrt(mass) - 20) / (150 - 20), 0, 1), rate = 0.99998 + (0.99922 - 0.99998) * t
+                let massSqrt = cells[i].targetMass.squareRoot()
+                let t = min(1.0, max(0.0, (massSqrt - 20.0) / 130.0))
+                let rate = 0.99998 + (0.99922 - 0.99998) * t
+                cells[i].targetMass *= pow(rate, 100.0 * dt)
             }
             if cells[i].mergeTimer > 0 {
                 cells[i].mergeTimer -= dt

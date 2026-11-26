@@ -1,11 +1,25 @@
 //
-//  MenuScreens.swift — IPA-matched Shop, Quests, Potions, Boosts, Gifts/News,
-//  and Match Results screens using extracted agarskins.ipa sprites.
+//  MenuScreens.swift — Clean Agar.io mobile modals (Shop, Quests, Potions,
+//  Gifts/News, Match Results) using extracted IPA icons and crisp 3D bevels.
 //
 
 import SwiftUI
 
-private let modalCapInsets = EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23)
+struct AgarBevelButtonStyle: View {
+    let fill: Color
+    let bevel: Color
+    var cornerRadius: CGFloat = 12
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(bevel)
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(fill)
+                .padding(.bottom, 4)
+        }
+    }
+}
 
 struct ShopModalView: View {
     @Binding var coins: Int
@@ -17,7 +31,7 @@ struct ShopModalView: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.72).edgesIgnoringSafeArea(.all).onTapGesture(perform: onClose)
+            Color.black.opacity(0.65).edgesIgnoringSafeArea(.all).onTapGesture(perform: onClose)
             VStack(spacing: 14) {
                 modalHeader(title: "Shop", onClose: onClose)
 
@@ -29,7 +43,7 @@ struct ShopModalView: View {
                 if !statusMessage.isEmpty {
                     Text(statusMessage)
                         .font(.custom("UbuntuSans-Bold", size: 13))
-                        .foregroundColor(.green)
+                        .foregroundColor(Color(hex: 0x54D62C))
                 }
 
                 ScrollView {
@@ -61,7 +75,11 @@ struct ShopModalView: View {
             }
             .padding(20)
             .frame(width: 360)
-            .background(Image("ui-btn-darkblue").resizable(capInsets: modalCapInsets, resizingMode: .stretch))
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Color(hex: 0x1A2E4C))
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.18), lineWidth: 2))
+            )
             .shadow(radius: 20)
         }
     }
@@ -69,7 +87,7 @@ struct ShopModalView: View {
     private func shopRow(icon: String, title: String, subtitle: String, cost: Int, isDNA: Bool, onBuy: @escaping () -> Void) -> some View {
         let canAfford = isDNA ? dna >= cost : coins >= cost
         return HStack(spacing: 12) {
-            Image(icon).resizable().scaledToFit().frame(width: 50, height: 42)
+            Image(icon).resizable().scaledToFit().frame(width: 48, height: 40)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.custom("UbuntuSans-Bold", size: 15)).foregroundColor(.white)
                 Text(subtitle).font(.custom("UbuntuSans-Bold", size: 11)).foregroundColor(.white.opacity(0.7))
@@ -88,13 +106,16 @@ struct ShopModalView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(
-                    Image(canAfford ? "ui-btn-green" : "ui-btn-orange")
-                        .resizable(capInsets: modalCapInsets, resizingMode: .stretch)
+                    AgarBevelButtonStyle(
+                        fill: canAfford ? Color(hex: 0x54C826) : Color(hex: 0xF57C00),
+                        bevel: canAfford ? Color(hex: 0x398E17) : Color(hex: 0xB55500),
+                        cornerRadius: 10
+                    )
                 )
             }
         }
         .padding(10)
-        .background(Color.black.opacity(0.28).cornerRadius(10))
+        .background(Color.black.opacity(0.25).cornerRadius(10))
     }
 }
 
@@ -109,10 +130,10 @@ struct QuestsModalView: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.72).edgesIgnoringSafeArea(.all).onTapGesture(perform: onClose)
+            Color.black.opacity(0.65).edgesIgnoringSafeArea(.all).onTapGesture(perform: onClose)
             VStack(spacing: 14) {
                 modalHeader(title: "Daily Quests", onClose: onClose)
-                Image("ui-quest-chest").resizable().scaledToFit().frame(height: 68)
+                Image("ui-quest-chest").resizable().scaledToFit().frame(height: 64)
 
                 VStack(spacing: 10) {
                     questRow(title: "Play a Classic Match", reward: "+250 Coins", claimed: q1Claimed) {
@@ -128,7 +149,11 @@ struct QuestsModalView: View {
             }
             .padding(20)
             .frame(width: 350)
-            .background(Image("ui-btn-darkblue").resizable(capInsets: modalCapInsets, resizingMode: .stretch))
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Color(hex: 0x1A2E4C))
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.18), lineWidth: 2))
+            )
             .shadow(radius: 20)
         }
     }
@@ -149,12 +174,12 @@ struct QuestsModalView: View {
                 }) {
                     Text("Claim").font(.custom("UbuntuSans-Bold", size: 13)).foregroundColor(.white)
                         .padding(.horizontal, 14).padding(.vertical, 7)
-                        .background(Image("ui-btn-green").resizable(capInsets: modalCapInsets, resizingMode: .stretch))
+                        .background(AgarBevelButtonStyle(fill: Color(hex: 0x54C826), bevel: Color(hex: 0x398E17), cornerRadius: 8))
                 }
             }
         }
         .padding(10)
-        .background(Color.black.opacity(0.28).cornerRadius(10))
+        .background(Color.black.opacity(0.25).cornerRadius(10))
     }
 }
 
@@ -167,7 +192,7 @@ struct PotionsModalView: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.72).edgesIgnoringSafeArea(.all).onTapGesture(perform: onClose)
+            Color.black.opacity(0.65).edgesIgnoringSafeArea(.all).onTapGesture(perform: onClose)
             VStack(spacing: 14) {
                 modalHeader(title: "Potions", onClose: onClose)
                 Text(lastReward)
@@ -187,7 +212,11 @@ struct PotionsModalView: View {
             }
             .padding(20)
             .frame(width: 350)
-            .background(Image("ui-btn-darkblue").resizable(capInsets: modalCapInsets, resizingMode: .stretch))
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Color(hex: 0x1A2E4C))
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.18), lineWidth: 2))
+            )
             .shadow(radius: 20)
         }
     }
@@ -204,7 +233,7 @@ struct PotionsModalView: View {
                 Text(name).font(.custom("UbuntuSans-Bold", size: 11)).foregroundColor(.white)
             }
             .frame(width: 90, height: 96)
-            .background(Color.black.opacity(0.28).cornerRadius(10))
+            .background(Color.black.opacity(0.25).cornerRadius(10))
         }
     }
 }
@@ -218,7 +247,7 @@ struct GiftsNewsModalView: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.72).edgesIgnoringSafeArea(.all).onTapGesture(perform: onClose)
+            Color.black.opacity(0.65).edgesIgnoringSafeArea(.all).onTapGesture(perform: onClose)
             VStack(spacing: 14) {
                 modalHeader(title: title, onClose: onClose)
                 if title == "Gifts" {
@@ -237,12 +266,12 @@ struct GiftsNewsModalView: View {
                             Text("Claim Gift").font(.custom("UbuntuSans-Bold", size: 17)).foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 46)
-                                .background(Image("ui-btn-green").resizable(capInsets: modalCapInsets, resizingMode: .stretch))
+                                .background(AgarBevelButtonStyle(fill: Color(hex: 0x54C826), bevel: Color(hex: 0x398E17), cornerRadius: 10))
                         }
                     }
                 } else {
                     Image("ui-news-icon").resizable().scaledToFit().frame(width: 64, height: 48)
-                    Text("Agar.io Mobile 1:1 Build\n• Authentic 11180×11180 arena & sqrt(mass)×10 physics\n• Adapted decay, 4/3 eat ratio & viewport camera zoom\n• Original SFX, emotes, minimap & 9-slice UI")
+                    Text("Agar.io Mobile Build\n• Calibrated 60/120Hz physics + IPA adapted decay & 4/3 eat ratio\n• Original SFX, emotes, minimap & match results")
                         .font(.custom("UbuntuSans-Bold", size: 13))
                         .foregroundColor(.white.opacity(0.85))
                         .multilineTextAlignment(.leading)
@@ -250,7 +279,11 @@ struct GiftsNewsModalView: View {
             }
             .padding(20)
             .frame(width: 340)
-            .background(Image("ui-btn-darkblue").resizable(capInsets: modalCapInsets, resizingMode: .stretch))
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Color(hex: 0x1A2E4C))
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.18), lineWidth: 2))
+            )
             .shadow(radius: 20)
         }
     }
@@ -265,7 +298,7 @@ struct MatchResultsModalView: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.68).edgesIgnoringSafeArea(.all)
+            Color.black.opacity(0.65).edgesIgnoringSafeArea(.all)
             VStack(spacing: 16) {
                 Text("Game Over")
                     .font(.custom("UbuntuSans-Bold", size: 32))
@@ -277,7 +310,7 @@ struct MatchResultsModalView: View {
                     statRow(label: "Time Alive", value: String(format: "%d:%02d", survivalSeconds / 60, survivalSeconds % 60))
                 }
                 .padding(14)
-                .background(Color.black.opacity(0.3).cornerRadius(12))
+                .background(Color.black.opacity(0.28).cornerRadius(12))
 
                 HStack(spacing: 12) {
                     Button(action: {
@@ -289,7 +322,7 @@ struct MatchResultsModalView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 48)
-                            .background(Image("ui-btn-orange").resizable(capInsets: modalCapInsets, resizingMode: .stretch))
+                            .background(AgarBevelButtonStyle(fill: Color(hex: 0xF57C00), bevel: Color(hex: 0xB55500), cornerRadius: 12))
                     }
                     Button(action: {
                         SoundManager.shared.play(.menuClick)
@@ -300,13 +333,17 @@ struct MatchResultsModalView: View {
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
                             .frame(height: 48)
-                            .background(Image("ui-btn-classic").resizable(capInsets: modalCapInsets, resizingMode: .stretch))
+                            .background(AgarBevelButtonStyle(fill: Color(hex: 0x54C826), bevel: Color(hex: 0x398E17), cornerRadius: 12))
                     }
                 }
             }
             .padding(22)
             .frame(width: 340)
-            .background(Image("ui-btn-darkblue").resizable(capInsets: modalCapInsets, resizingMode: .stretch))
+            .background(
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(Color(hex: 0x1A2E4C))
+                    .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.18), lineWidth: 2))
+            )
             .shadow(radius: 24)
         }
     }
@@ -341,5 +378,5 @@ private func currencyPill(icon: String, value: Int) -> some View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
-    .background(Image("ui-bar-darkcyan").resizable(capInsets: EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10), resizingMode: .stretch))
+    .background(RoundedRectangle(cornerRadius: 10).fill(Color(hex: 0x0E233A)).overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.cyan.opacity(0.35), lineWidth: 1)))
 }

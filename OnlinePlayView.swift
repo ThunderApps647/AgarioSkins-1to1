@@ -357,6 +357,10 @@ struct OnlineGameView: View {
     @State private var spawnFeedBots = false
     @State private var feedBotName = "Feeder"
     @State private var feedBotSkinID = ""
+    @State private var showEmotePicker = false
+    @State private var activeEmoteAsset: String? = nil
+    @State private var activeEmoteExpiresAt: TimeInterval = 0
+    @State private var emoteCooldownUntil: TimeInterval = 0
 
     // dual-skin swap (same phases as offline)
     @State private var dualSkinSwapPhase: DualSkinSwapPhase = .idle
@@ -470,8 +474,41 @@ struct OnlineGameView: View {
                     topHUD
                         .opacity(isLeavePopupPresented ? 0 : 1)
                         .allowsHitTesting(!isLeavePopupPresented)
+                    if showEmotePicker && !isLeavePopupPresented {
+                        EmotePickerBar(
+                            isOnCooldown: CACurrentMediaTime() < emoteCooldownUntil,
+                            onSelect: { asset in
+                                let now = CACurrentMediaTime()
+                                guard now >= emoteCooldownUntil else { return }
+                                SoundManager.shared.play(.menuClick)
+                                activeEmoteAsset = asset
+                                activeEmoteExpiresAt = now + 3.0
+                                emoteCooldownUntil = now + 3.0
+                                withAnimation(.easeInOut(duration: 0.15)) { showEmotePicker = false }
+                            }
+                        )
+                        .zIndex(2)
+                    }
+                    if let emote = activeEmoteAsset, CACurrentMediaTime() < activeEmoteExpiresAt, !isLeavePopupPresented {
+                        ActiveEmoteBubble(assetName: emote)
+                            .zIndex(1)
+                    }
                 }
                 if connectionPhase == .playing && !isLeavePopupPresented {
+                    MinimapHUD(
+                        playerPosition: playerCenter,
+                        teammatePositions: world.teammateUUIDs.compactMap { tid in
+                            let tCells = botCells.filter { $0.ownerID == tid }
+                            guard !tCells.isEmpty else { return nil }
+                            let total = tCells.reduce(CGFloat(0)) { $0 + $1.mass }
+                            guard total > 0 else { return nil }
+                            let x = tCells.reduce(CGFloat(0)) { $0 + $1.position.x * $1.mass } / total
+                            let y = tCells.reduce(CGFloat(0)) { $0 + $1.position.y * $1.mass } / total
+                            return CGPoint(x: x, y: y)
+                        },
+                        worldSize: 11000
+                    )
+                    .zIndex(1)
                     actionButtons
                     modMenuIcon(geometry: geometry)
                     if showModMenu { modMenuPanel(geometry: geometry) }
@@ -608,7 +645,11 @@ struct OnlineGameView: View {
                   friendCount: world.teammateUUIDs.count,
                   inParty: !world.localPartyCode.isEmpty,
                   leaderboardRows: computeLeaderboardRows(),
-                  onPause: { pause() })
+                  onPause: { pause() },
+                  onEmotes: {
+                      SoundManager.shared.play(.menuClick)
+                      withAnimation(.easeInOut(duration: 0.15)) { showEmotePicker.toggle() }
+                  })
         .equatable()
         .zIndex(1)
     }
@@ -620,7 +661,12 @@ struct OnlineGameView: View {
                          feedButtonScale: feedButtonScale,
                          macroButtonScale: macroButtonScale,
                          feedHoldThreshold: feedHoldThreshold,
-                         onSplit: { if canSplit() { net.sendSplit() } },
+                         onSplit: {
+                             if canSplit() {
+                                 SoundManager.shared.play(.split, minInterval: 0.005)
+                                 net.sendSplit()
+                             }
+                         },
                          onMacroDown: handleMacroDown,
                          onMacroUp: handleMacroUp,
                          onFeedDown: handleFeedDown,
@@ -915,6 +961,7 @@ struct OnlineGameView: View {
         if world.eatTriggeredSwap {
             world.eatTriggeredSwap = false
             triggerDualSkinSwap(now: currentTime)
+            SoundManager.shared.play(.eatCell)
         }
         if !world.remoteEatSwapOwners.isEmpty {
             for owner in world.remoteEatSwapOwners { triggerRemoteSwap(owner: owner, now: currentTime) }
