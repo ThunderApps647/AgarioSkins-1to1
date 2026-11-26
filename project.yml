@@ -20,6 +20,10 @@ targets:
           - "Package.swift"
           - "project.yml"
           - "Resources/extracted-images-1766733943703.zip"
+          - "Resources/AgarAssets/**"
+      - path: Resources/AgarAssets
+        type: folder
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.agario.recreation

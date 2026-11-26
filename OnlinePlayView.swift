@@ -313,6 +313,7 @@ struct OnlineGameView: View {
     @State private var joystickBasePosition: CGPoint? = nil
     @State private var joystickIsDragging = false
     @State private var lastJoystickDirection = CGSize.zero
+    @State private var agarJoystick = AgarJoystickInput()
     @State private var centerAimUntilCursorMoves = true
     @State private var isFeedingHeld = false
     @State private var feedHoldStartTime: Date? = nil
@@ -612,18 +613,28 @@ struct OnlineGameView: View {
                 } else {
                     joystickOffset = CGSize(width: dx, height: dy)
                 }
-                lastJoystickDirection = joystickOffset
+                agarJoystick.updateTouch(offset: joystickOffset)
+                lastJoystickDirection = agarJoystick.lastNonZeroDirection
                 sendInputNow()
             }
             .onEnded { value in
+                let stopOnRelease = UserDefaults.standard.bool(forKey: "macro.stopOnRelease")
+                agarJoystick.endTouch(stopOnRelease: stopOnRelease)
                 joystickIsDragging = false
                 joystickBasePosition = nil
                 let isTap = value.translation.width.magnitude < 5 && value.translation.height.magnitude < 5
                 if isTap {
                     let playerScreenCenter = CGPoint(x: geometry.size.width / 2,
                                                      y: (geometry.size.height + geometry.safeAreaInsets.top - geometry.safeAreaInsets.bottom) / 2)
-                    lastJoystickDirection = CGSize(width: value.startLocation.x - playerScreenCenter.x,
-                                                   height: value.startLocation.y - playerScreenCenter.y)
+                    let tapDir = CGSize(width: value.startLocation.x - playerScreenCenter.x,
+                                        height: value.startLocation.y - playerScreenCenter.y)
+                    let mag = hypot(tapDir.width, tapDir.height)
+                    if mag > 0.001 {
+                        agarJoystick.lastNonZeroDirection = CGSize(width: tapDir.width / mag, height: tapDir.height / mag)
+                    }
+                    lastJoystickDirection = tapDir
+                } else {
+                    lastJoystickDirection = agarJoystick.lastNonZeroDirection
                 }
                 joystickOffset = .zero
                 sendInputNow()
@@ -891,6 +902,7 @@ struct OnlineGameView: View {
         joystickIsDragging = false
         joystickOffset = .zero
         joystickBasePosition = nil
+        agarJoystick.reset()
         isFeedingHeld = false
         feedHoldStartTime = nil
         isMacroHeld = false
@@ -906,6 +918,7 @@ struct OnlineGameView: View {
         joystickIsDragging = false
         joystickOffset = .zero
         joystickBasePosition = nil
+        agarJoystick.reset()
         ejectControlSession &+= 1
         isLeavePopupPresented = false
         sendInputNow()
@@ -996,6 +1009,9 @@ struct OnlineGameView: View {
         if currTotalPlayerMass > CGFloat(highScore) { highScore = Int(currTotalPlayerMass) }
 
         // 2. visual-only passes (identical maths to offline)
+        agarJoystick.step(dt: deltaTime,
+                          isDragging: joystickIsDragging,
+                          stopOnRelease: UserDefaults.standard.bool(forKey: "macro.stopOnRelease"))
         updateVisibleObjects(screenSize: screenSize)
         updateCellDeformation(dt: deltaTime)
         world.persistVisualState(player: playerCells, bots: botCells)
@@ -1206,130 +1222,20 @@ struct OnlineGameView: View {
     private func updateCellDeformation(dt: CGFloat) {
         let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
         let visRect = visibleWorldRect
-        let relax = 1.0 - pow(0.05, dt)
-
-        func lerpValue(start: CGFloat, end: CGFloat, t: CGFloat) -> CGFloat {
-            return start + (end - start) * t
-        }
-
-        func processDeformation(cells: inout [PlayerCell]) {
-            let count = cells.count
-            guard count > 0 else { return }
-            let targetVertexCount = max(20, 128 / max(1, count))
-            let trig = TrigCache.get(count: targetVertexCount)
-            var objectBuf = [CGFloat](repeating: 0, count: targetVertexCount)
-            var smoothBuf = [CGFloat](repeating: 0, count: targetVertexCount)
-            var tmpBuf = [CGFloat](repeating: 0, count: targetVertexCount)
-            let zeroBuf = [CGFloat](repeating: 0, count: targetVertexCount)
-
-            for i in cells.indices {
-                let pos = cells[i].position
-                let visualRadius = cells[i].cachedSolidRadius
-
-                if cells[i].skinDeformation.count != targetVertexCount {
-                    let old = cells[i].skinDeformation
-                    if cells[i].hasActiveDeformation, old.count > 2 {
-                        var resampled = [CGFloat](repeating: 0, count: targetVertexCount)
-                        let ratio = CGFloat(old.count) / CGFloat(targetVertexCount)
-                        for v in 0..<targetVertexCount {
-                            let srcPos = CGFloat(v) * ratio
-                            let base = Int(srcPos)
-                            let t = srcPos - CGFloat(base)
-                            let a = old[base % old.count]
-                            let b = old[(base + 1) % old.count]
-                            resampled[v] = a * (1.0 - t) + b * t
-                        }
-                        cells[i].skinDeformation = resampled
-                    } else {
-                        cells[i].skinDeformation = zeroBuf
-                        cells[i].hasActiveDeformation = false
-                    }
-                }
-
-                let onScreen = visRect.isEmpty || visRect.insetBy(dx: -visualRadius - 50, dy: -visualRadius - 50).contains(pos)
-                let nearWall = (pos.x - visualRadius) < 0 || (pos.y - visualRadius) < 0
-                || (pos.x + visualRadius) > worldSize || (pos.y + visualRadius) > worldSize
-                let complexIndentations = !cells[i].isBot && onScreen && count <= 20
-
-                if !onScreen || (!complexIndentations && !nearWall) {
-                    guard cells[i].hasActiveDeformation else { continue }
-                    var stillActive = false
-                    for v in 0..<targetVertexCount {
-                        let d = cells[i].skinDeformation[v]
-                        let relaxed = d > 0.01 ? lerpValue(start: d, end: 0.0, t: relax) : 0
-                        cells[i].skinDeformation[v] = relaxed
-                        if relaxed > 0.01 { stillActive = true }
-                    }
-                    cells[i].hasActiveDeformation = stillActive
-                    continue
-                }
-
-                let maxCompression = visualRadius * 3.0
-                for v in 0..<targetVertexCount {
-                    cells[i].skinDeformation[v] = lerpValue(start: cells[i].skinDeformation[v], end: 0.0, t: relax)
-                }
-
-                var nearbyMass: [EjectedMass] = []
-                if complexIndentations {
-                    let searchRadius = visualRadius + 100
-                    let searchRect = CGRect(x: pos.x - searchRadius, y: pos.y - searchRadius,
-                                            width: searchRadius * 2, height: searchRadius * 2)
-                    nearbyMass = world.massManager.getLimitedVisibleMassesArray(in: searchRect, limit: 12)
-                }
-
-                for v in 0..<targetVertexCount {
-                    var overlap: CGFloat = 0
-                    if !nearbyMass.isEmpty {
-                        let uncompressedX = pos.x + trig[v].cos * visualRadius
-                        let uncompressedY = pos.y + trig[v].sin * visualRadius
-                        for mass in nearbyMass {
-                            let massRad: CGFloat = OriginalGameplay.shotMassBaseRadiusCGFloat
-                            let dx = uncompressedX - mass.position.x
-                            let dy = uncompressedY - mass.position.y
-                            let distSq = dx * dx + dy * dy
-                            if distSq < massRad * massRad {
-                                overlap = max(overlap, massRad - sqrt(distSq))
-                            }
-                        }
-                    }
-                    objectBuf[v] = min(overlap, maxCompression)
-                    smoothBuf[v] = objectBuf[v]
-                }
-
-                if !nearbyMass.isEmpty {
-                    for _ in 0..<2 {
-                        for v in 0..<targetVertexCount { tmpBuf[v] = smoothBuf[v] }
-                        for v in 0..<targetVertexCount {
-                            let prev = tmpBuf[(v - 1 + targetVertexCount) % targetVertexCount]
-                            let next = tmpBuf[(v + 1) % targetVertexCount]
-                            smoothBuf[v] = (prev * 0.25) + (tmpBuf[v] * 0.5) + (next * 0.25)
-                        }
-                    }
-                }
-
-                var stillActive = false
-                for v in 0..<targetVertexCount {
-                    var wallOverlap: CGFloat = 0
-                    if nearWall {
-                        let cosAngle = trig[v].cos
-                        let sinAngle = trig[v].sin
-                        let uncompressedX = pos.x + cosAngle * visualRadius
-                        let uncompressedY = pos.y + sinAngle * visualRadius
-                        if cosAngle < -0.01 { wallOverlap = max(wallOverlap, -uncompressedX) }
-                        if cosAngle > 0.01 { wallOverlap = max(wallOverlap, uncompressedX - worldSize) }
-                        if sinAngle < -0.01 { wallOverlap = max(wallOverlap, -uncompressedY) }
-                        if sinAngle > 0.01 { wallOverlap = max(wallOverlap, uncompressedY - worldSize) }
-                    }
-                    let finalVal = max(smoothBuf[v], min(wallOverlap, maxCompression))
-                    let result = max(cells[i].skinDeformation[v], finalVal)
-                    cells[i].skinDeformation[v] = result
-                    if result > 0.01 { stillActive = true }
-                }
-                cells[i].hasActiveDeformation = stillActive
-            }
-        }
-
-        processDeformation(cells: &playerCells)
-        processDeformation(cells: &botCells)
+        AgarPhysicsCore.deformVertices(
+            cells: &playerCells,
+            neighborsByOwner: true,
+            visibleWorldRect: visRect,
+            worldSize: worldSize,
+            dt: dt,
+            massManager: world.massManager
+        )
+        AgarPhysicsCore.deformVertices(
+            cells: &botCells,
+            neighborsByOwner: false,
+            visibleWorldRect: visRect,
+            worldSize: worldSize,
+            dt: dt
+        )
     }
 }

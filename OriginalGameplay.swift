@@ -23,6 +23,7 @@ enum OriginalGameplay {
     static let shotMassBaseRadiusCGFloat: CGFloat = 40
     static let virusBaseRadius: Double = 100.01
     static let virusSplitRadius: Double = 141.421356237
+    static let virusEdgeRadiusMultiplier: Double = 0.02
 
     static let velocityMultiplier: Double = 106.06601717
     static let inputFactorPow: Double = -0.45
