@@ -11636,29 +11636,37 @@ struct TopBarHUD: View, Equatable {
     var body: some View {
         GeometryReader { geometry in
             let s = OriginalGameplay.uiScale(for: geometry.size)
-            let btnSide = 39.17 * s
-            let pad = 5.11 * s
-            let leadPad = max(pad, geometry.safeAreaInsets.leading + 4)
-            let trailPad = max(pad, geometry.safeAreaInsets.trailing + 4)
-            VStack {
-                HStack(alignment: .top, spacing: 8 * s) {
-                    // PauseButton.ccbi (5.11, 5.11) + EmojiWidget.ccbi (5.11, 49.39)
-                    VStack(spacing: 5.11 * s) {
-                        Button(action: onPause) { Color.clear }
-                            .buttonStyle(HudSquareIconButtonStyle(icon: "hud-pause", pressedIcon: "hud-pause-pressed", size: btnSide, iconSize: 22 * s))
-                        
-                        if showEmojiWidget {
-                            Button(action: onEmotes) { Color.clear }
-                                .buttonStyle(HudSquareIconButtonStyle(icon: "hud-emoji-icon", pressedIcon: nil, size: btnSide, iconSize: 24 * s))
-                        }
-                    }
-                    
-                    // Score.ccbi metrics aligned beside PauseButton
-                    VStack(alignment: .leading, spacing: 2 * s) {
-                        StrokedHUDText(text: "Score: \(score)", fontSize: 15 * s, fill: .white)
+            let btnSide = 39.1724 * s
+            let pad = 5.1094 * s
+            let leadPad = max(0, geometry.safeAreaInsets.leading)
+            let trailPad = max(0, geometry.safeAreaInsets.trailing)
+            let topPad = max(0, geometry.safeAreaInsets.top)
+            ZStack(alignment: .topLeading) {
+                // Top-left: PauseButton.ccbi + Score.ccbi + EmojiSelectorButton.ccbi + Token/FPS badge
+                ZStack(alignment: .topLeading) {
+                    CCBISceneView(
+                        ccbFile: "PauseButton.ccbi",
+                        context: CCBIBindingContext(
+                            actions: ["pauseButtonCallback": onPause],
+                            designScaleModifier: { _ in s }
+                        )
+                    )
+                    .frame(width: 60 * s, height: 60 * s)
+
+                    CCBISceneView(
+                        ccbFile: "Score.ccbi",
+                        context: CCBIBindingContext(
+                            labelOverrides: ["_scoreLabel": "Score: \(score)"],
+                            designScaleModifier: { _ in s }
+                        )
+                    )
+                    .frame(width: 220 * s, height: 60 * s)
+                    .allowsHitTesting(false)
+
+                    HStack(spacing: 6 * s) {
                         HStack(spacing: 4 * s) {
-                            Image("token").resizable().aspectRatio(contentMode: .fit).frame(width: 17 * s, height: 17 * s)
-                            StrokedHUDText(text: "\(tokenCount)", fontSize: 14 * s, fill: .white)
+                            Image("token").resizable().aspectRatio(contentMode: .fit).frame(width: 15 * s, height: 15 * s)
+                            StrokedHUDText(text: "\(tokenCount)", fontSize: 13 * s, fill: .white)
                         }
                         if showFPS {
                             Text("\(fps) FPS")
@@ -11667,28 +11675,56 @@ struct TopBarHUD: View, Equatable {
                                 .shadow(color: .black.opacity(0.6), radius: 1)
                         }
                     }
-                    .padding(.top, 3 * s)
-                    
-                    Spacer()
-                    
-                    if inParty {
-                        HStack(spacing: 5 * s) {
-                            Image("friends-count-icon")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 20 * s, height: 20 * s)
-                            StrokedHUDText(text: "\(friendCount) friend\(friendCount == 1 ? "" : "s")", fontSize: 13.5 * s, fill: .white)
-                        }
-                        .frame(height: btnSide)
-                        .padding(.trailing, 4 * s)
+                    .offset(x: 50 * s, y: 27 * s)
+                    .allowsHitTesting(false)
+
+                    if showEmojiWidget {
+                        CCBISceneView(
+                            ccbFile: "EmojiSelectorButton.ccbi",
+                            centerRoot: true,
+                            context: CCBIBindingContext(
+                                actions: ["emojiSelectorButtonCallback": onEmotes],
+                                replacingSlotViews: [
+                                    "_emojiCellHolder": AnyView(
+                                        Image("hud-emoji-icon")
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 22 * s, height: 22 * s)
+                                    )
+                                ],
+                                designScaleModifier: { _ in s }
+                            )
+                        )
+                        .frame(width: 40 * s, height: 40 * s)
+                        .offset(x: pad, y: pad + btnSide + 5.1 * s)
                     }
-                    
-                    LeaderboardHUDButton(rows: leaderboardRows, uiScale: s)
                 }
                 .padding(.leading, leadPad)
-                .padding(.trailing, trailPad)
-                .padding(.top, max(pad, geometry.safeAreaInsets.top + 2))
-                Spacer()
+                .padding(.top, topPad)
+
+                // Top-right: FriendsCounter.ccbi + LeaderboardHUDButton
+                HStack(alignment: .top, spacing: 6 * s) {
+                    Spacer()
+                    if inParty {
+                        CCBISceneView(
+                            ccbFile: "FriendsCounter.ccbi",
+                            centerRoot: true,
+                            context: CCBIBindingContext(
+                                labelOverrides: [
+                                    "_friendsCounterLabel": "\(friendCount) friend\(friendCount == 1 ? "" : "s")"
+                                ],
+                                designScaleModifier: { _ in s }
+                            )
+                        )
+                        .frame(width: 120 * s, height: btnSide)
+                        .allowsHitTesting(false)
+                    }
+
+                    LeaderboardHUDButton(rows: leaderboardRows, uiScale: s)
+                        .padding(.top, pad)
+                        .padding(.trailing, max(pad, trailPad))
+                }
+                .padding(.top, topPad)
             }
         }
         .allowsHitTesting(true)
@@ -11860,29 +11896,38 @@ struct LeaderboardHUDButton: View {
     }
 
     private var rowsBlock: some View {
-        let showPfpColumn = rows.contains { $0.isPartyMember }
-        let rowTextMaxWidth = expandedWidth - iconInset * 2
-            - (showPfpColumn ? pfpSide + pfpNameGap : 0)
+        let rowColorWhite = Color.white
+        let rowColorPlayer = Color(hex: 0xFFE38A)
         return VStack(alignment: .leading, spacing: 0) {
             ForEach(rows, id: \.rank) { row in
-                HStack(spacing: pfpNameGap) {
-                    if showPfpColumn {
-                        if row.isPartyMember {
-                            partyPfp
-                        } else {
-                            Color.clear.frame(width: pfpSide, height: pfpSide)
-                        }
-                    }
-                    StrokedHUDText(text: fittedRowText("\(row.rank). \(row.name)",
-                                                       maxWidth: rowTextMaxWidth),
-                                   fontSize: rowFontSize,
-                                   fill: row.isPlayer ? Color(hex: 0xFFE38A) : .white)
-                }
-                .frame(height: rowSlot, alignment: .leading)
+                let maxNameW = expandedWidth - (row.isPartyMember ? 46 : 30) * uiScale
+                let rowCtx = CCBIBindingContext(
+                    labelOverrides: [
+                        "_positionLabel": "\(row.rank).",
+                        "_nameLabel": fittedRowText(row.name, maxWidth: maxNameW)
+                    ],
+                    labelColorOverrides: [
+                        "_positionLabel": row.isPlayer ? rowColorPlayer : rowColorWhite,
+                        "_nameLabel": row.isPlayer ? rowColorPlayer : rowColorWhite
+                    ],
+                    visibilityOverrides: [
+                        "_imagesNode": row.isPartyMember,
+                        "_outlineSprite": row.isPartyMember
+                    ],
+                    replacingSlotViews: [
+                        "_avatar": AnyView(partyPfp)
+                    ],
+                    designScaleModifier: { _ in uiScale }
+                )
+                CCBISceneView(
+                    ccbFile: "GameHUD-LeaderboardPlayer.ccbi",
+                    centerRoot: true,
+                    context: rowCtx
+                )
+                .frame(width: expandedWidth, height: rowSlot)
                 .transition(.identity)
             }
         }
-        .padding(.leading, iconInset)
         .padding(.top, headerBottom + separatorHeight + rowsVerticalMargin)
         .transaction { $0.animation = nil }
     }
@@ -12017,44 +12062,12 @@ struct ActionButtonsHUD: View, Equatable {
             let s = OriginalGameplay.uiScale(for: geometry.size)
             let buttonSide = 65.0 * s
             let macroSide = 54.0 * s
-            let maxSafeX = geometry.size.width - geometry.safeAreaInsets.trailing - buttonSide * 0.55
-            let splitX = min(maxSafeX, geometry.size.width * 0.92)
-            let shootX = min(maxSafeX, geometry.size.width * 0.863)
+            let trailInset = max(0, geometry.safeAreaInsets.trailing - 6)
+            let sceneW = max(1, geometry.size.width - trailInset)
+            let shootX = sceneW * 0.863
             let shootCenterY = geometry.size.height * 0.875
-            let splitCenterY = geometry.size.height * 0.67
-            ZStack {
-                Button(action: onSplit) {
-                    ZStack {
-                        Image("hud-splitshot-bg")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: buttonSide, height: buttonSide)
-                        Image("hud-split")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: buttonSide * 0.58, height: buttonSide * 0.58)
-                    }
-                    .opacity(canSplit ? 1.0 : 0.45)
-                }
-                .disabled(!canSplit)
-                .position(x: splitX, y: splitCenterY)
 
-                Image("macro")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: macroSide, height: macroSide)
-                    .scaleEffect(macroButtonScale)
-                    .padding(6)
-                    .overlay(
-                        ImmediatePressSurface(onDown: { macroPressed = true; onMacroDown() },
-                                              onUp: { macroPressed = false; onMacroUp() })
-                    )
-                    .opacity(canFeed ? (macroPressed ? 0.55 : 1.0) : 0.45)
-                    .allowsHitTesting(canFeed)
-                    .position(x: shootX - buttonSide * 1.15, y: shootCenterY)
-                    .accessibilityLabel("Fast eject")
-                    .accessibilityAddTraits(.isButton)
-
+            let ejectSlot = AnyView(
                 ZStack {
                     Image("hud-splitshot-bg")
                         .resizable()
@@ -12083,11 +12096,47 @@ struct ActionButtonsHUD: View, Equatable {
                     ImmediatePressSurface(onDown: { feedPressed = true; onFeedDown() },
                                           onUp: { feedPressed = false; onFeedUp() })
                 )
-                .opacity(canFeed ? (feedPressed ? 0.55 : 1.0) : 0.45)
                 .allowsHitTesting(canFeed)
-                .position(x: shootX, y: shootCenterY)
                 .accessibilityLabel("Eject mass")
                 .accessibilityAddTraits(.isButton)
+            )
+
+            let controlsCtx = CCBIBindingContext(
+                actions: [
+                    "splitButtonCallback": { if canSplit { onSplit() } }
+                ],
+                opacityOverrides: [
+                    "_splitButton": canSplit ? 1.0 : 0.45,
+                    "_shootButton": canFeed ? (feedPressed ? 0.55 : 1.0) : 0.45
+                ],
+                replacingSlotViews: [
+                    "_shootButton": ejectSlot
+                ],
+                designScaleModifier: { _ in s }
+            )
+
+            ZStack(alignment: .topLeading) {
+                CCBISceneView(
+                    ccbFile: "Controls-Right.ccbi",
+                    context: controlsCtx
+                )
+                .frame(width: sceneW, height: geometry.size.height)
+
+                Image("macro")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: macroSide, height: macroSide)
+                    .scaleEffect(macroButtonScale)
+                    .padding(6)
+                    .overlay(
+                        ImmediatePressSurface(onDown: { macroPressed = true; onMacroDown() },
+                                              onUp: { macroPressed = false; onMacroUp() })
+                    )
+                    .opacity(canFeed ? (macroPressed ? 0.55 : 1.0) : 0.45)
+                    .allowsHitTesting(canFeed)
+                    .position(x: shootX - buttonSide * 1.15, y: shootCenterY)
+                    .accessibilityLabel("Fast eject")
+                    .accessibilityAddTraits(.isButton)
             }
         }
     }
@@ -12975,15 +13024,11 @@ struct MainMenu: View {
                     ForEach(filteredSkins, id: \.self) { skin in
                         let isSelected = selectedSkinName == skin
                         let isDual = DualSkinCatalog.shared.isDual(skin)
-                        VStack(spacing: 5 * s) {
-                            Text(skin == "Dragon" ? "Dragon" : "Skin #\(skin)")
-                                .font(.custom("OpenSans-Bold", size: 9.5 * s))
-                                .foregroundColor(Color(hex: 0x5A5F66))
-                                .lineLimit(1)
-
+                        let cardTitle = skin == "Dragon" ? "Dragon" : "Skin #\(skin)"
+                        let skinPreview = AnyView(
                             ZStack(alignment: .topTrailing) {
                                 SkinSelectorPreview(skinName: skin)
-                                    .frame(width: 52 * s, height: 52 * s)
+                                    .frame(width: 44 * s, height: 44 * s)
                                 if isDual {
                                     Text("DUAL")
                                         .font(.custom("OpenSans-Bold", size: 7 * s))
@@ -12994,22 +13039,52 @@ struct MainMenu: View {
                                         .offset(x: 4 * s, y: -2 * s)
                                 }
                             }
-
-                            Button(action: {
-                                SoundManager.shared.play(.menuClick)
-                                selectedSkinName = skin
-                            }) {
-                                Text(isSelected ? "Using" : "Use")
-                                    .font(.custom("OpenSans-Bold", size: 10.5 * s))
-                                    .foregroundColor(.white)
-                                    .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 24 * s)
-                            }
-                            .buttonStyle(MCFSBevelStyle(frameAsset: isSelected ? "mcfs-green" : "mcfs-light-blue", showShadow: false))
-                        }
-                        .padding(7 * s)
-                        .background(MCFSFrame(name: isSelected ? "mcfs-skin-equipped" : "mcfs-white"))
+                            .frame(width: 10 * s, height: 10 * s)
+                        )
+                        let cardCtx = CCBIBindingContext(
+                            actions: [
+                                "useButtonCallback": { selectedSkinName = skin },
+                                "cancelButtonCallback": { selectedSkinName = nil }
+                            ],
+                            labelOverrides: [
+                                "_normalTitle": cardTitle,
+                                "_blueTitle": cardTitle
+                            ],
+                            visibilityOverrides: [
+                                "_whiteNode": !isSelected,
+                                "_blueNode": isSelected,
+                                "_buyButton": false,
+                                "_useButton": !isSelected,
+                                "_cancelButton": isSelected,
+                                "_whiteblock": false
+                            ],
+                            replacingSlotViews: [
+                                "_skin": skinPreview,
+                                "_cancelButton": AnyView(
+                                    ZStack {
+                                        if let mcfs = CCBIAtlasStore.shared.mcfs(for: "FramedSprites/Bundle/MCFS_white_blue.plist") {
+                                            let pair = mcfs.uiImageAndInsets(forUIScale: s)
+                                            Image(uiImage: pair.0).resizable(capInsets: pair.1, resizingMode: .stretch)
+                                        }
+                                        Text("Using")
+                                            .font(.custom("OpenSans-Bold", size: 13 * s))
+                                            .foregroundColor(Color(hex: 0x08A9C8))
+                                    }
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        SoundManager.shared.play(.menuClick)
+                                        selectedSkinName = nil
+                                    }
+                                )
+                            ],
+                            designScaleModifier: { _ in s }
+                        )
+                        CCBISceneView(
+                            ccbFile: "MenuShopSkinsNode.ccbi",
+                            centerRoot: true,
+                            context: cardCtx
+                        )
+                        .frame(height: 155 * s)
                     }
                 }
                 .padding(12 * s)

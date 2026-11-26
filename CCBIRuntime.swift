@@ -678,9 +678,13 @@ final class CCBIAtlasStore: @unchecked Sendable {
 
 struct CCBIBindingContext {
     var actions: [String: () -> Void] = [:]
+    var tapVarActions: [String: () -> Void] = [:]
     var labelOverrides: [String: String] = [:]
+    var labelColorOverrides: [String: Color] = [:]
     var visibilityOverrides: [String: Bool] = [:]
+    var opacityOverrides: [String: Double] = [:]
     var slotViews: [String: AnyView] = [:]
+    var replacingSlotViews: [String: AnyView] = [:]
     var designScaleModifier: ((CGSize) -> CGFloat)? = nil
     var ancestorVars: [String] = []
 
@@ -695,6 +699,7 @@ struct CCBIBindingContext {
 
 struct CCBISceneView: View {
     let ccbFile: String
+    var centerRoot: Bool = false
     var context: CCBIBindingContext
 
     var body: some View {
@@ -706,7 +711,9 @@ struct CCBISceneView: View {
                     node: root,
                     parentDesignSize: designSize,
                     scaleFactor: scale,
-                    context: context
+                    context: context,
+                    positionOverride: centerRoot ? (designSize.width * 0.5, designSize.height * 0.5) : nil,
+                    anchorOverride: centerRoot ? CGPoint(x: 0.5, y: 0.5) : nil
                 )
                 .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
             }
@@ -738,7 +745,12 @@ private struct CCBINodeRenderer: View {
             let (posSX, posSY) = positionOverride ?? resolvePosition(node: node, parentSize: parentDesignSize)
             let (scaleX, scaleY) = resolveScale(node: node)
             let rotationDeg = resolveFloat("rotation", default: 0)
-            let opacity = resolveFloat("opacity", default: 1)
+            let opacity: CGFloat = {
+                if let ov = context.scopedLookup(context.opacityOverrides, varName: node.varName) {
+                    return CGFloat(ov)
+                }
+                return resolveFloat("opacity", default: 1)
+            }()
 
             let swiftAnchorX = anchor.x
             let swiftAnchorY = 1.0 - anchor.y
@@ -755,10 +767,17 @@ private struct CCBINodeRenderer: View {
                     y: (posSY + (0.5 - swiftAnchorY) * resolvedSize.height) * scaleFactor
                 )
 
-            if let blockName = resolveBlockSelector(),
-               let handler = context.scopedLookup(context.actions, varName: blockName)
-                    ?? context.scopedLookup(context.actions, varName: node.varName)
-                    ?? context.actions[blockName] {
+            let varTapHandler = context.scopedLookup(context.tapVarActions, varName: node.varName)
+            let blockHandler: (() -> Void)? = {
+                if let blockName = resolveBlockSelector() {
+                    return context.scopedLookup(context.actions, varName: blockName)
+                        ?? context.scopedLookup(context.actions, varName: node.varName)
+                        ?? context.actions[blockName]
+                }
+                return nil
+            }()
+
+            if let handler = blockHandler ?? varTapHandler {
                 core.contentShape(Rectangle()).onTapGesture {
                     SoundManager.shared.play(.menuClick)
                     handler()
@@ -918,15 +937,31 @@ private struct CCBINodeRenderer: View {
             let gap = alignmentSpacing(node)
             let visibleChildren = node.children.filter { childIsVisible($0) }
             if !visibleChildren.isEmpty {
-                var totalW: CGFloat = 0
-                var maxH: CGFloat = 0
-                for c in visibleChildren {
-                    let cs = resolveContentSize(node: c, parentSize: parentSize, subRoot: nil)
-                    totalW += cs.width
-                    maxH = max(maxH, cs.height)
+                let isVertical: Bool = {
+                    if case let .int(d) = node.props["direction"], d == 1 { return true }
+                    return false
+                }()
+                if isVertical {
+                    var maxW: CGFloat = 0
+                    var totalH: CGFloat = 0
+                    for c in visibleChildren {
+                        let cs = resolveContentSize(node: c, parentSize: parentSize, subRoot: nil)
+                        maxW = max(maxW, cs.width)
+                        totalH += cs.height
+                    }
+                    totalH += gap * CGFloat(max(0, visibleChildren.count - 1))
+                    return CGSize(width: maxW, height: totalH)
+                } else {
+                    var totalW: CGFloat = 0
+                    var maxH: CGFloat = 0
+                    for c in visibleChildren {
+                        let cs = resolveContentSize(node: c, parentSize: parentSize, subRoot: nil)
+                        totalW += cs.width
+                        maxH = max(maxH, cs.height)
+                    }
+                    totalW += gap * CGFloat(max(0, visibleChildren.count - 1))
+                    return CGSize(width: totalW, height: maxH)
                 }
-                totalW += gap * CGFloat(max(0, visibleChildren.count - 1))
-                return CGSize(width: totalW, height: maxH)
             }
         }
         if node.cls == "MCLabelTTF" || node.base == "MCLabelTTF" || node.cls == "CCLabelTTF" {
@@ -982,11 +1017,24 @@ private struct CCBINodeRenderer: View {
         if node.cls == "MCAlignmentNode" || node.base == "MCAlignmentNode" {
             let gap = alignmentSpacing(node)
             var out: [(CCBINode, (CGFloat, CGFloat)?, CGPoint?)] = []
-            var curX: CGFloat = 0
-            for c in node.children where childIsVisible(c) {
-                let cs = resolveContentSize(node: c, parentSize: parentDesignSize, subRoot: nil)
-                out.append((c, (curX + cs.width * 0.5, designSize.height * 0.5), CGPoint(x: 0.5, y: 0.5)))
-                curX += cs.width + gap
+            let isVertical: Bool = {
+                if case let .int(d) = node.props["direction"], d == 1 { return true }
+                return false
+            }()
+            if isVertical {
+                var curY: CGFloat = 0
+                for c in node.children where childIsVisible(c) {
+                    let cs = resolveContentSize(node: c, parentSize: parentDesignSize, subRoot: nil)
+                    out.append((c, (designSize.width * 0.5, curY + cs.height * 0.5), CGPoint(x: 0.5, y: 0.5)))
+                    curY += cs.height + gap
+                }
+            } else {
+                var curX: CGFloat = 0
+                for c in node.children where childIsVisible(c) {
+                    let cs = resolveContentSize(node: c, parentSize: parentDesignSize, subRoot: nil)
+                    out.append((c, (curX + cs.width * 0.5, designSize.height * 0.5), CGPoint(x: 0.5, y: 0.5)))
+                    curX += cs.width + gap
+                }
             }
             return out
         }
@@ -1022,14 +1070,15 @@ private struct CCBINodeRenderer: View {
     private func nodeContent(designSize: CGSize, subFileRoot: CCBINode?) -> some View {
         let wPx = max(0, designSize.width * scaleFactor)
         let hPx = max(0, designSize.height * scaleFactor)
-        let customSlot = context.scopedLookup(context.slotViews, varName: node.varName)
-        let suppressDefaultsForSlot = customSlot != nil && (
+        let replacingSlot = context.scopedLookup(context.replacingSlotViews, varName: node.varName)
+        let customSlot = replacingSlot ?? context.scopedLookup(context.slotViews, varName: node.varName)
+        let suppressDefaultsForSlot = (replacingSlot != nil) || (customSlot != nil && (
             node.varName == "_playerAvatar" ||
             node.varName == "_rewardSprite" ||
             node.varName == "_buttonIcon" ||
             node.varName == "_skinsButtonSprite" ||
             node.varName == "_staticPlayButtonsContainer"
-        )
+        ))
 
         ZStack(alignment: .topLeading) {
             if suppressDefaultsForSlot, let customSlot {
@@ -1170,7 +1219,8 @@ private struct CCBINodeRenderer: View {
         let spec = resolveLabelTextAndFont()
         let fc = normalizedRGBA(node.props["fontColor"])
         let cc = normalizedRGBA(node.props["color"])
-        let textColor = Color(red: fc.r * cc.r, green: fc.g * cc.g, blue: fc.b * cc.b, opacity: fc.a * cc.a)
+        let baseColor = Color(red: fc.r * cc.r, green: fc.g * cc.g, blue: fc.b * cc.b, opacity: fc.a * cc.a)
+        let textColor = context.scopedLookup(context.labelColorOverrides, varName: node.varName) ?? baseColor
 
         var outlineColor: Color? = nil
         var outlinePx: CGFloat = 0

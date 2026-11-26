@@ -115,12 +115,40 @@ struct ShopModalView: View {
 
     @State private var selectedSection: ShopTab? = nil
     @State private var statusMessage: String = ""
+    @State private var showLeftBoostInfo = false
+    @State private var showRightBoostInfo = false
 
-    private let columns = [
-        GridItem(.flexible(), spacing: 10),
-        GridItem(.flexible(), spacing: 10),
-        GridItem(.flexible(), spacing: 10)
-    ]
+    private struct CurrencyTierSpec {
+        let rowVar: String
+        let orig: Int
+        let pct: Int
+        let finalAmt: Int
+        let cost: Int
+        let priceLabel: String
+        let banner: String
+    }
+
+    private func currencyTiers(isCoins: Bool) -> [CurrencyTierSpec] {
+        if isCoins {
+            return [
+                CurrencyTierSpec(rowVar: "_node6", orig: 25000, pct: 100, finalAmt: 50000, cost: 150, priceLabel: "150 DNA", banner: "Best"),
+                CurrencyTierSpec(rowVar: "_node5", orig: 10000, pct: 80,  finalAmt: 18000, cost: 75,  priceLabel: "75 DNA",  banner: "Popular"),
+                CurrencyTierSpec(rowVar: "_node4", orig: 4000,  pct: 50,  finalAmt: 6000,  cost: 40,  priceLabel: "40 DNA",  banner: "Hot"),
+                CurrencyTierSpec(rowVar: "_node3", orig: 1500,  pct: 30,  finalAmt: 1950,  cost: 20,  priceLabel: "20 DNA",  banner: "+30%"),
+                CurrencyTierSpec(rowVar: "_node2", orig: 500,   pct: 20,  finalAmt: 600,   cost: 10,  priceLabel: "10 DNA",  banner: ""),
+                CurrencyTierSpec(rowVar: "_node",  orig: 250,   pct: 0,   finalAmt: 250,   cost: 5,   priceLabel: "5 DNA",   banner: "")
+            ]
+        } else {
+            return [
+                CurrencyTierSpec(rowVar: "_node6", orig: 500, pct: 100, finalAmt: 1000, cost: 8000, priceLabel: "8000 C", banner: "Best"),
+                CurrencyTierSpec(rowVar: "_node5", orig: 200, pct: 75,  finalAmt: 350,  cost: 3500, priceLabel: "3500 C", banner: "Popular"),
+                CurrencyTierSpec(rowVar: "_node4", orig: 100, pct: 50,  finalAmt: 150,  cost: 1800, priceLabel: "1800 C", banner: "Hot"),
+                CurrencyTierSpec(rowVar: "_node3", orig: 40,  pct: 25,  finalAmt: 50,   cost: 600,  priceLabel: "600 C",  banner: "+25%"),
+                CurrencyTierSpec(rowVar: "_node2", orig: 15,  pct: 10,  finalAmt: 17,   cost: 250,  priceLabel: "250 C",  banner: ""),
+                CurrencyTierSpec(rowVar: "_node",  orig: 5,   pct: 0,   finalAmt: 5,    cost: 100,  priceLabel: "100 C",  banner: "")
+            ]
+        }
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -129,95 +157,172 @@ struct ShopModalView: View {
             ZStack {
                 Color.white.edgesIgnoringSafeArea(.all)
 
-                VStack(spacing: 0) {
-                    genericFullHeader(
-                        title: selectedSection == nil ? "Shop" : (selectedSection == .xp || selectedSection == .boosts ? "Boosts" : selectedSection!.rawValue),
-                        coins: coins,
-                        dna: dna,
-                        scale: s
-                    ) {
-                        if selectedSection != nil {
+                if let section = selectedSection {
+                    switch section {
+                    case .coins, .dna:
+                        let isCoins = (section == .coins)
+                        let tiers = currencyTiers(isCoins: isCoins)
+                        let backAction = {
                             withAnimation(.easeOut(duration: 0.15)) {
                                 selectedSection = nil
                                 statusMessage = ""
                             }
-                        } else {
-                            onClose()
                         }
-                    }
-
-                    if !statusMessage.isEmpty {
-                        Text(statusMessage)
-                            .font(.custom("OpenSans-Bold", size: 12 * s))
-                            .foregroundColor(Color(hex: 0x43A81D))
-                            .padding(.vertical, 5 * s)
-                            .frame(maxWidth: .infinity)
-                            .background(Color(hex: 0xF2F5F8))
-                    }
-
-                    if let section = selectedSection {
-                        ScrollView {
-                            LazyVGrid(columns: columns, spacing: 10 * s) {
-                                switch section {
-                                case .boosts, .xp:
-                                    shopTile(icon: "ui-mass-20", title: "+20 Start Mass", subtitle: "Start match bigger", cost: 150, costIsDNA: false, scale: s) {
-                                        activeStartBoost = 20
-                                        statusMessage = "Equipped +20 Start Mass!"
+                        let labels: [String: String] = {
+                            var d: [String: String] = [
+                                "_titleLabel": isCoins ? "Coins" : "DNA",
+                                "_coinBar._barCurrencyValue": "\(coins)",
+                                "_dnaBar._barCurrencyValue": "\(dna)",
+                                "_removeAdsLabel": statusMessage.isEmpty ? (isCoins ? "Tap any Coins pack to add" : "Tap any DNA pack to add") : statusMessage
+                            ]
+                            for t in tiers {
+                                d["\(t.rowVar)._originalLabel"] = "\(t.orig)"
+                                d["\(t.rowVar)._percentageLabel"] = t.pct > 0 ? "\(t.pct)%" : "Base"
+                                d["\(t.rowVar)._finalLabel"] = "\(t.finalAmt)"
+                                d["\(t.rowVar)._priceLabel"] = t.priceLabel
+                                if !t.banner.isEmpty { d["\(t.rowVar)._bannerLabel"] = t.banner }
+                            }
+                            return d
+                        }()
+                        let vis: [String: Bool] = {
+                            var d: [String: Bool] = ["_notEnoughTitleLabel": false]
+                            for t in tiers {
+                                d["\(t.rowVar)._coinSprite"] = isCoins
+                                d["\(t.rowVar)._DNASprite"] = !isCoins
+                                d["\(t.rowVar)._freeCoinsBanner"] = false
+                            }
+                            return d
+                        }()
+                        let taps: [String: () -> Void] = {
+                            var d: [String: () -> Void] = [:]
+                            for t in tiers {
+                                d[t.rowVar] = {
+                                    if isCoins {
+                                        guard dna >= t.cost else { statusMessage = "Not enough DNA"; return }
+                                        dna -= t.cost
+                                        coins += t.finalAmt
+                                        statusMessage = "Added +\(t.finalAmt) Coins!"
+                                    } else {
+                                        guard coins >= t.cost else { statusMessage = "Not enough Coins"; return }
+                                        coins -= t.cost
+                                        dna += t.finalAmt
+                                        statusMessage = "Added +\(t.finalAmt) DNA!"
                                     }
-                                    shopTile(icon: "ui-mass-40", title: "+40 Start Mass", subtitle: "Start match huge", cost: 300, costIsDNA: false, scale: s) {
-                                        activeStartBoost = 40
-                                        statusMessage = "Equipped +40 Start Mass!"
-                                    }
-                                    shopTile(icon: "shop-mass-2x", title: "2x Mass Boost", subtitle: "Double mass gain", cost: 250, costIsDNA: false, scale: s) {
-                                        statusMessage = "2x Mass Boost activated!"
-                                    }
-                                    shopTile(icon: "shop-mass-3x", title: "3x Mass Boost", subtitle: "Triple mass gain", cost: 25, costIsDNA: true, scale: s) {
-                                        statusMessage = "3x Mass Boost activated!"
-                                    }
-                                    shopTile(icon: "shop-xp-2x", title: "2x XP Boost", subtitle: "Double XP gain", cost: 200, costIsDNA: false, scale: s) {
-                                        statusMessage = "2x XP Boost activated!"
-                                    }
-                                    shopTile(icon: "shop-xp-3x", title: "3x XP Boost", subtitle: "Triple XP gain", cost: 20, costIsDNA: true, scale: s) {
-                                        statusMessage = "3x XP Boost activated!"
-                                    }
-                                case .coins:
-                                    shopTile(icon: "shop-coins", title: "Coin Pouch", subtitle: "+500 Coins", cost: 10, costIsDNA: true, iconScale: 0.9, scale: s) {
-                                        coins += 500
-                                        statusMessage = "Added +500 Coins!"
-                                    }
-                                    shopTile(icon: "shop-coins", title: "Coin Stack", subtitle: "+1,500 Coins", cost: 25, costIsDNA: true, iconScale: 1.05, scale: s) {
-                                        coins += 1500
-                                        statusMessage = "Added +1,500 Coins!"
-                                    }
-                                    shopTile(icon: "shop-coins", title: "Coin Chest", subtitle: "+4,000 Coins", cost: 60, costIsDNA: true, iconScale: 1.15, scale: s) {
-                                        coins += 4000
-                                        statusMessage = "Added +4,000 Coins!"
-                                    }
-                                case .dna:
-                                    shopTile(icon: "shop-dna", title: "DNA Vial", subtitle: "+15 DNA", cost: 250, costIsDNA: false, iconScale: 0.9, scale: s) {
-                                        dna += 15
-                                        statusMessage = "Added +15 DNA!"
-                                    }
-                                    shopTile(icon: "shop-dna", title: "DNA Flask", subtitle: "+40 DNA", cost: 600, costIsDNA: false, iconScale: 1.05, scale: s) {
-                                        dna += 40
-                                        statusMessage = "Added +40 DNA!"
-                                    }
-                                    shopTile(icon: "shop-dna", title: "DNA Crate", subtitle: "+100 DNA", cost: 1400, costIsDNA: false, iconScale: 1.15, scale: s) {
-                                        dna += 100
-                                        statusMessage = "Added +100 DNA!"
-                                    }
-                                case .potions, .skins:
-                                    EmptyView()
                                 }
                             }
-                            .padding(14 * s)
-                        }
-                        .background(MCFSFrame(name: "mcfs-gray"))
-                    }
-                }
-                .frame(width: geometry.size.width, height: geometry.size.height)
+                            return d
+                        }()
 
-                if selectedSection == nil {
+                        CCBISceneView(
+                            ccbFile: "MenuShopCurrency.ccbi",
+                            context: CCBIBindingContext(
+                                actions: ["backButtonCallback": backAction, "_backButton": backAction],
+                                tapVarActions: taps,
+                                labelOverrides: labels,
+                                visibilityOverrides: vis,
+                                designScaleModifier: { _ in s }
+                            )
+                        )
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+
+                    case .boosts, .xp:
+                        let isMass = (section == .boosts)
+                        let backAction = {
+                            withAnimation(.easeOut(duration: 0.15)) {
+                                selectedSection = nil
+                                statusMessage = ""
+                                showLeftBoostInfo = false
+                                showRightBoostInfo = false
+                            }
+                        }
+                        let leftGreenCost = isMass ? 150 : 120
+                        let leftOrangeCost = isMass ? 300 : 250
+                        let rightGreenCost = isMass ? 250 : 200
+                        let rightOrangeCost = isMass ? 450 : 400
+                        let boostActions: [String: () -> Void] = [
+                            "backButtonCallback": backAction,
+                            "_backButton": backAction,
+                            "leftInfoButtonCallback": { showRightBoostInfo = false; showLeftBoostInfo.toggle() },
+                            "rightInfoButtonCallback": { showLeftBoostInfo = false; showRightBoostInfo.toggle() },
+                            "closeHelpButtonCallback": { showLeftBoostInfo = false; showRightBoostInfo = false },
+                            "leftGreenButtonCallback": {
+                                guard coins >= leftGreenCost else { statusMessage = "Not enough Coins"; return }
+                                coins -= leftGreenCost
+                                if isMass { activeStartBoost = 20; statusMessage = "Equipped +20 Start Mass (1h)!" }
+                                else { statusMessage = "2x XP Boost activated (1h)!" }
+                            },
+                            "leftOrangeButtonCallback": {
+                                guard coins >= leftOrangeCost else { statusMessage = "Not enough Coins"; return }
+                                coins -= leftOrangeCost
+                                if isMass { activeStartBoost = 20; statusMessage = "Equipped +20 Start Mass (24h)!" }
+                                else { statusMessage = "2x XP Boost activated (24h)!" }
+                            },
+                            "rightGreenButtonCallback": {
+                                guard coins >= rightGreenCost else { statusMessage = "Not enough Coins"; return }
+                                coins -= rightGreenCost
+                                if isMass { activeStartBoost = 40; statusMessage = "Equipped +40 Start Mass (1h)!" }
+                                else { statusMessage = "3x XP Boost activated (1h)!" }
+                            },
+                            "rightOrangeButtonCallback": {
+                                guard coins >= rightOrangeCost else { statusMessage = "Not enough Coins"; return }
+                                coins -= rightOrangeCost
+                                if isMass { activeStartBoost = 40; statusMessage = "Equipped +40 Start Mass (24h)!" }
+                                else { statusMessage = "3x XP Boost activated (24h)!" }
+                            }
+                        ]
+                        let boostLabels: [String: String] = [
+                            "_titleLabel": isMass ? "Mass Boost" : "XP Boost",
+                            "_coinBar._barCurrencyValue": "\(coins)",
+                            "_dnaBar._barCurrencyValue": "\(dna)",
+                            "_leftTitleLabel": isMass ? "2x Start Mass (+20)" : "2x XP Boost",
+                            "_rightTitleLabel": isMass ? "3x Start Mass (+40)" : "3x XP Boost",
+                            "_leftGreenPriceLabel": "\(leftGreenCost)",
+                            "_leftOrangePriceLabel": "\(leftOrangeCost)",
+                            "_rightGreenPriceLabel": "\(rightGreenCost)",
+                            "_rightOrangePriceLabel": "\(rightOrangeCost)"
+                        ]
+                        let boostVis: [String: Bool] = [
+                            "_leftInfo": showLeftBoostInfo,
+                            "_rightInfo": showRightBoostInfo,
+                            "_menuHelp": showLeftBoostInfo || showRightBoostInfo,
+                            "_leftGreenUse": false, "_leftGreenUseIcon": false,
+                            "_leftOrangeUse": false, "_leftOrangeUseIcon": false,
+                            "_rightGreenUse": false, "_rightGreenUseIcon": false,
+                            "_rightOrangeUse": false, "_rightOrangeUseIcon": false
+                        ]
+                        let boostSlots: [String: AnyView] = [
+                            "_leftImageRoot": AnyView(Image(isMass ? "shop-mass-2x" : "shop-xp-2x").resizable().scaledToFit().frame(width: 78 * s, height: 78 * s)),
+                            "_rightImageRoot": AnyView(Image(isMass ? "shop-mass-3x" : "shop-xp-3x").resizable().scaledToFit().frame(width: 78 * s, height: 78 * s))
+                        ]
+
+                        ZStack(alignment: .bottom) {
+                            CCBISceneView(
+                                ccbFile: "MenuShopBoosts.ccbi",
+                                context: CCBIBindingContext(
+                                    actions: boostActions,
+                                    labelOverrides: boostLabels,
+                                    visibilityOverrides: boostVis,
+                                    replacingSlotViews: boostSlots,
+                                    designScaleModifier: { geo in min(s, geo.height / 320.0) }
+                                )
+                            )
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+
+                            if !statusMessage.isEmpty {
+                                Text(statusMessage)
+                                    .font(.custom("OpenSans-Bold", size: 12 * s))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 14 * s)
+                                    .padding(.vertical, 6 * s)
+                                    .background(Capsule().fill(Color(hex: 0x43A81D).opacity(0.92)))
+                                    .padding(.bottom, 10 * s)
+                            }
+                        }
+
+                    case .potions, .skins:
+                        EmptyView()
+                    }
+                } else {
                     CCBISceneView(
                         ccbFile: "MenuShop.ccbi",
                         context: CCBIBindingContext(
@@ -345,7 +450,7 @@ struct ShopModalView: View {
     }
 }
 
-// MARK: - MenuQuestTracker.ccbi (Full-Screen 1:1)
+// MARK: - MenuDailyQuestActive.ccbi & MenuDailyQuestCompleted.ccbi (1:1 Native Quests)
 struct QuestsModalView: View {
     @Binding var coins: Int
     @Binding var dna: Int
@@ -357,6 +462,7 @@ struct QuestsModalView: View {
     @AppStorage("macro.questChestClaimed") private var chestClaimed: Bool = false
     @AppStorage("macro.offlineQuestStage") private var offlineQuestStage: Int = 0
     @AppStorage("macro.offlineQuestProgress") private var offlineQuestProgress: Int = 0
+    @State private var showChestCompletedPopup = false
 
     private var claimedCount: Int {
         (q1Claimed ? 1 : 0) + (q2Claimed ? 1 : 0) + (q3Claimed ? 1 : 0)
@@ -365,81 +471,56 @@ struct QuestsModalView: View {
     var body: some View {
         GeometryReader { geometry in
             let s = max(1.0, min(OriginalGameplay.uiScale(for: geometry.size), geometry.size.width / 460.0))
+            let foodProg = min(100, offlineQuestProgress + 100 * offlineQuestStage)
 
             ZStack {
-                Color(hex: 0xF2F5F8).edgesIgnoringSafeArea(.all)
+                Color.black.opacity(0.65).edgesIgnoringSafeArea(.all)
+                    .onTapGesture { onClose() }
 
-                VStack(spacing: 0) {
-                    genericFullHeader(title: "Daily Quests", coins: coins, dna: dna, scale: s, onClose: onClose)
-
-                    ScrollView {
-                        VStack(spacing: 10 * s) {
-                            // MenuQuestTracker.ccbi Milestone Chest Banner with BG_MicroWorld
-                            HStack(spacing: 12 * s) {
-                                Image("quest-chest")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 50 * s, height: 50 * s)
-
-                                VStack(alignment: .leading, spacing: 5 * s) {
-                                    HStack {
-                                        Text("Daily Milestone Chest")
-                                            .font(.custom("OpenSans-Bold", size: 13.5 * s))
-                                            .foregroundColor(.white)
-                                            .shadow(color: .black.opacity(0.45), radius: 0, x: 0, y: 1)
-                                        Spacer()
-                                        Text("\(claimedCount) / 3")
-                                            .font(.custom("OpenSans-Bold", size: 12 * s))
-                                            .foregroundColor(.white)
-                                    }
-
-                                    GeometryReader { geo in
-                                        ZStack(alignment: .leading) {
-                                            MCFSFrame(name: "mcfs-hud-xp-box")
-                                            MCFSFrame(name: "mcfs-hud-xp")
-                                                .frame(width: max(0, geo.size.width * CGFloat(claimedCount) / 3.0))
-                                                .animation(.easeOut(duration: 0.25), value: claimedCount)
-                                        }
-                                    }
-                                    .frame(height: 12 * s)
-                                }
-
-                                if chestClaimed {
-                                    Image("ui-quest-check").resizable().scaledToFit().frame(width: 26 * s, height: 26 * s)
-                                } else {
-                                    Button(action: {
-                                        guard claimedCount >= 3 else { return }
-                                        SoundManager.shared.play(.menuClick)
-                                        chestClaimed = true
-                                        coins += 500
-                                        dna += 25
-                                    }) {
-                                        Text("Claim Chest")
-                                            .font(.custom("OpenSans-Bold", size: 11 * s))
-                                            .foregroundColor(.white)
-                                            .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
-                                            .padding(.horizontal, 12 * s)
-                                            .frame(height: 30 * s)
-                                    }
-                                    .disabled(claimedCount < 3)
-                                    .opacity(claimedCount >= 3 ? 1.0 : 0.55)
-                                    .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
-                                }
+                if showChestCompletedPopup || (claimedCount >= 3 && !chestClaimed) {
+                    let compActions: [String: () -> Void] = [
+                        "acceptRewardButtonCallback": {
+                            if !chestClaimed {
+                                chestClaimed = true
+                                coins += 500
+                                dna += 25
+                                showChestCompletedPopup = false
+                            } else {
+                                onClose()
                             }
-                            .padding(12 * s)
-                            .background(
-                                ZStack {
-                                    Image("quest-microworld-bg")
-                                        .resizable()
-                                        .scaledToFill()
-                                        .clipped()
-                                    Color(hex: 0x0A2540).opacity(0.35)
-                                }
-                                .clipShape(RoundedRectangle(cornerRadius: 8 * s))
-                            )
+                        }
+                    ]
+                    let compLabels: [String: String] = [
+                        "_title": "Daily Quests",
+                        "_questDescription": chestClaimed ? "Milestone Chest Claimed!" : "All 3 Daily Quests Complete!",
+                        "_rewardDescription": "+500 Coins & +25 DNA",
+                        "_actionButtonLabel": chestClaimed ? "Done" : "Open Chest"
+                    ]
+                    let compVis: [String: Bool] = [
+                        "_doubleOpenQuestButton": false,
+                        "_subtitleReward": chestClaimed,
+                        "_subtitleComplete": !chestClaimed,
+                        "_chest": !chestClaimed,
+                        "_chestBottom": chestClaimed,
+                        "_chestTop": chestClaimed,
+                        "_rewardDescription": chestClaimed,
+                        "_doubleRewardsIconNode": false
+                    ]
 
-                            let foodProg = min(100, offlineQuestProgress + 100 * offlineQuestStage)
-                            sideQuestTile(
+                    CCBISceneView(
+                        ccbFile: "MenuDailyQuestCompleted.ccbi",
+                        context: CCBIBindingContext(
+                            actions: compActions,
+                            labelOverrides: compLabels,
+                            visibilityOverrides: compVis,
+                            designScaleModifier: { _ in s }
+                        )
+                    )
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                } else {
+                    let questListSlot = AnyView(
+                        VStack(spacing: 4.5 * s) {
+                            compactQuestRow(
                                 title: "Eat 100 food pellets",
                                 progress: q1Claimed ? 100 : foodProg,
                                 target: 100,
@@ -448,91 +529,123 @@ struct QuestsModalView: View {
                                 claimed: q1Claimed,
                                 scale: s
                             ) {
-                                q1Claimed = true; coins += 250
+                                q1Claimed = true
+                                coins += 250
                             }
-
-                            sideQuestTile(
+                            compactQuestRow(
                                 title: "Survive 3 minutes",
-                                progress: q2Claimed ? 180 : 180,
+                                progress: 180,
                                 target: 180,
                                 rewardIcon: "shop-coins-s",
                                 rewardText: "+300",
                                 claimed: q2Claimed,
                                 scale: s
                             ) {
-                                q2Claimed = true; coins += 300
+                                q2Claimed = true
+                                coins += 300
                             }
-
-                            sideQuestTile(
+                            compactQuestRow(
                                 title: "Split 15 times",
-                                progress: q3Claimed ? 15 : 15,
+                                progress: 15,
                                 target: 15,
                                 rewardIcon: "shop-dna-s",
                                 rewardText: "+25",
                                 claimed: q3Claimed,
                                 scale: s
                             ) {
-                                q3Claimed = true; dna += 25
+                                q3Claimed = true
+                                dna += 25
                             }
                         }
-                        .padding(14 * s)
-                    }
-                    .background(MCFSFrame(name: "mcfs-gray"))
+                        .frame(width: 238 * s, height: 140 * s)
+                        .offset(y: 12 * s)
+                    )
+
+                    let activeActions: [String: () -> Void] = [
+                        "backButtonCallback": onClose,
+                        "playButtonCallback": {
+                            if claimedCount >= 3 && !chestClaimed {
+                                showChestCompletedPopup = true
+                            } else {
+                                onClose()
+                            }
+                        }
+                    ]
+                    let activeLabels: [String: String] = [
+                        "_timerText": chestClaimed ? "All rewards claimed!" : "Milestone Chest: \(claimedCount) / 3"
+                    ]
+                    let activeVis: [String: Bool] = [
+                        "_loadingAnim": false,
+                        "_questDescriptionTitle": false,
+                        "_questDescription": false
+                    ]
+
+                    CCBISceneView(
+                        ccbFile: "MenuDailyQuestActive.ccbi",
+                        context: CCBIBindingContext(
+                            actions: activeActions,
+                            labelOverrides: activeLabels,
+                            visibilityOverrides: activeVis,
+                            replacingSlotViews: ["_imageNode": questListSlot],
+                            designScaleModifier: { _ in s }
+                        )
+                    )
+                    .frame(width: geometry.size.width, height: geometry.size.height)
                 }
-                .frame(width: geometry.size.width, height: geometry.size.height)
             }
         }
     }
 
-    private func sideQuestTile(title: String, progress: Int, target: Int, rewardIcon: String, rewardText: String, claimed: Bool, scale s: CGFloat, onClaim: @escaping () -> Void) -> some View {
+    private func compactQuestRow(title: String, progress: Int, target: Int, rewardIcon: String, rewardText: String, claimed: Bool, scale s: CGFloat, onClaim: @escaping () -> Void) -> some View {
         let ratio = min(1.0, max(0.0, CGFloat(progress) / CGFloat(max(1, target))))
-        return HStack(spacing: 10 * s) {
-            VStack(alignment: .leading, spacing: 5 * s) {
-                Text(title).font(.custom("OpenSans-Bold", size: 12.5 * s)).foregroundColor(Color(hex: 0x3D4347))
-
+        return HStack(spacing: 6 * s) {
+            VStack(alignment: .leading, spacing: 2.5 * s) {
+                Text(title)
+                    .font(.custom("OpenSans-Bold", size: 9.5 * s))
+                    .foregroundColor(Color(hex: 0x3D4347))
+                    .lineLimit(1)
                 GeometryReader { geo in
                     ZStack {
                         Capsule().fill(Color(hex: 0xDCE3EC))
                         HStack(spacing: 0) {
-                            Capsule()
-                                .fill(Color(hex: 0x00C8F8))
-                                .frame(width: geo.size.width * ratio)
+                            Capsule().fill(Color(hex: 0x00C8F8)).frame(width: geo.size.width * ratio)
                             Spacer(minLength: 0)
                         }
                         Text("\(min(progress, target)) / \(target)")
-                            .font(.custom("OpenSans-Bold", size: 10 * s))
+                            .font(.custom("OpenSans-Bold", size: 8 * s))
                             .foregroundColor(Color(hex: 0x3D4347))
                     }
                 }
-                .frame(height: 15 * s)
+                .frame(height: 11 * s)
             }
 
-            HStack(spacing: 4 * s) {
-                Image(rewardIcon).resizable().scaledToFit().frame(width: 14 * s, height: 14 * s)
-                Text(rewardText).font(.custom("OpenSans-Bold", size: 11.5 * s)).foregroundColor(Color(hex: 0x3D4347))
+            HStack(spacing: 2.5 * s) {
+                Image(rewardIcon).resizable().scaledToFit().frame(width: 11 * s, height: 11 * s)
+                Text(rewardText).font(.custom("OpenSans-Bold", size: 9.5 * s)).foregroundColor(Color(hex: 0x3D4347))
             }
-            .padding(.horizontal, 8 * s)
-            .padding(.vertical, 4 * s)
+            .padding(.horizontal, 5 * s)
+            .padding(.vertical, 3 * s)
             .background(MCFSFrame(name: "mcfs-white-green"))
 
             if claimed {
-                Image("ui-quest-check").resizable().scaledToFit().frame(width: 24 * s, height: 24 * s)
+                Image("ui-quest-check").resizable().scaledToFit().frame(width: 18 * s, height: 18 * s)
             } else {
                 Button(action: {
                     SoundManager.shared.play(.menuClick)
                     onClaim()
                 }) {
                     Text("Claim")
-                        .font(.custom("OpenSans-Bold", size: 11.5 * s))
+                        .font(.custom("OpenSans-Bold", size: 9.5 * s))
                         .foregroundColor(.white)
                         .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
-                        .padding(.horizontal, 12 * s)
-                        .frame(height: 28 * s)
+                        .padding(.horizontal, 8 * s)
+                        .frame(height: 22 * s)
                 }
                 .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
             }
         }
-        .padding(9 * s)
+        .padding(.horizontal, 7 * s)
+        .padding(.vertical, 5 * s)
         .background(MCFSFrame(name: "mcfs-white"))
     }
 }
@@ -862,43 +975,95 @@ struct GiftsNewsModalView: View {
         GeometryReader { geometry in
             let s = max(1.0, min(OriginalGameplay.uiScale(for: geometry.size), geometry.size.width / 460.0))
 
-            AgarModalContainer(dismissOnBackdrop: true, onClose: onClose) { triggerClose in
-                VStack(spacing: 12 * s) {
-                    modalHeader(title: title, scale: s, onClose: triggerClose)
-                    if title == "Gifts" {
-                        Image("menu-gift-icon").resizable().scaledToFit().frame(width: 52 * s, height: 52 * s)
-                        Text(giftClaimed ? "Daily gift claimed!" : "Daily Login Gift: +500 Coins & +15 DNA")
-                            .font(.custom("OpenSans-Bold", size: 13.5 * s))
-                            .foregroundColor(Color(hex: 0x3D4347))
-                            .multilineTextAlignment(.center)
+            if title == "Gifts" {
+                let giftNodeRow = AnyView(
+                    CCBISceneView(
+                        ccbFile: "MenuGiftCenterNode.ccbi",
+                        centerRoot: true,
+                        context: CCBIBindingContext(
+                            actions: [
+                                "actionButtonPressed": {
+                                    if !giftClaimed {
+                                        coins += 500
+                                        dna += 15
+                                        giftClaimed = true
+                                    }
+                                }
+                            ],
+                            labelOverrides: [
+                                "_usernameLabel": "Daily Login Gift",
+                                "_descriptionLabel": "+500 Coins & +15 DNA",
+                                "_actionLabelEnabled": "Accept"
+                            ],
+                            replacingSlotViews: [
+                                "_playerAvatar": AnyView(
+                                    Image("menu-gift-icon")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 30 * s, height: 30 * s)
+                                )
+                            ],
+                            designScaleModifier: { _ in s }
+                        )
+                    )
+                    .frame(width: 388 * s, height: 49 * s)
+                )
+
+                let inboxActions: [String: () -> Void] = [
+                    "backButtonCallback": onClose,
+                    "acceptAllButtonPressed": {
                         if !giftClaimed {
-                            Button(action: {
-                                SoundManager.shared.play(.menuClick)
-                                coins += 500
-                                dna += 15
-                                giftClaimed = true
-                            }) {
-                                Text("Claim Gift")
-                                    .font(.custom("OpenSans-Bold", size: 14 * s))
-                                    .foregroundColor(.white)
-                                    .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 36 * s)
-                            }
-                            .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
+                            coins += 500
+                            dna += 15
+                            giftClaimed = true
                         }
-                    } else {
+                    },
+                    "requestGiftsButtonPressed": onClose,
+                    "sendGiftTabButtonCallback": {}
+                ]
+
+                ZStack {
+                    Color.black.opacity(0.65).edgesIgnoringSafeArea(.all)
+                        .onTapGesture { onClose() }
+
+                    CCBISceneView(
+                        ccbFile: "MenuGiftCenterInbox.ccbi",
+                        context: CCBIBindingContext(
+                            actions: inboxActions,
+                            labelOverrides: [
+                                "_inboxCountLabel": giftClaimed ? "0" : "1"
+                            ],
+                            visibilityOverrides: [
+                                "_inboxBadge": !giftClaimed,
+                                "_emptyInboxNode": giftClaimed,
+                                "_tableNode": !giftClaimed,
+                                "_acceptAllButton": !giftClaimed,
+                                "_requestGiftsButton": giftClaimed,
+                                "_inviteFriendsButton": false
+                            ],
+                            slotViews: [
+                                "_tableNode": giftClaimed ? AnyView(EmptyView()) : giftNodeRow
+                            ],
+                            designScaleModifier: { _ in s }
+                        )
+                    )
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                }
+            } else {
+                AgarModalContainer(dismissOnBackdrop: true, onClose: onClose) { triggerClose in
+                    VStack(spacing: 12 * s) {
+                        modalHeader(title: title, scale: s, onClose: triggerClose)
                         Image("menu-news-icon").resizable().scaledToFit().frame(width: 52 * s, height: 40 * s)
                         Text("Agar.io Mobile Build\n• 1:1 320-height CCBI UI scaling + crisp 9-slice buttons\n• Calibrated 50u grid, darker cell borders, & glide physics\n• Mystery Potions brewing + animated chest opening")
                             .font(.custom("Lato-Regular", size: 11.5 * s))
                             .foregroundColor(Color(hex: 0x5A5F66))
                             .multilineTextAlignment(.leading)
                     }
+                    .padding(16 * s)
+                    .frame(width: min(geometry.size.width * 0.85, 340 * s))
+                    .background(MCFSFrame(name: "mcfs-white"))
+                    .shadow(radius: 20)
                 }
-                .padding(16 * s)
-                .frame(width: min(geometry.size.width * 0.85, 340 * s))
-                .background(MCFSFrame(name: "mcfs-white"))
-                .shadow(radius: 20)
             }
         }
     }
@@ -917,21 +1082,38 @@ struct MatchResultsModalView: View {
     var body: some View {
         GeometryReader { geometry in
             let s = max(1.0, min(OriginalGameplay.uiScale(for: geometry.size), geometry.size.width / 460.0))
+            let timeStr = String(format: "%dm %02ds", survivalSeconds / 60, survivalSeconds % 60)
+
+            let statsLabels: [String: String] = [
+                "_highestMassValue": "\(highScore)",
+                "_foodEatenLabel": "Tokens:",
+                "_foodEatenValue": "\(tokensCollected)",
+                "_cellsEatenLabel": "Time Alive:",
+                "_cellsEatenValue": timeStr
+            ]
+            let statsVis: [String: Bool] = [
+                "_timeAliveLabel": false,
+                "_timeAliveValue": false,
+                "_leaderboardTimeLabel": false,
+                "_leaderboardTimeValue": false,
+                "_topPositionLabel": false,
+                "_topPositionValue": false
+            ]
 
             AgarModalContainer(dismissOnBackdrop: false, onClose: onMainMenu) { _ in
-                VStack(spacing: 10 * s) {
-                    Text("Game Over")
-                        .font(.custom("OpenSans-Bold", size: 22 * s))
-                        .foregroundColor(Color(hex: 0x4A4F55))
-                    Image("mcfs-divider").resizable().frame(height: max(1.5, 2 * s))
-
-                    VStack(spacing: 7 * s) {
-                        statRow(label: "Highest Mass", value: "\(highScore)", scale: s)
-                        statRow(label: "Tokens Collected", value: "\(tokensCollected)", scale: s)
-                        statRow(label: "Time Alive", value: String(format: "%d:%02d", survivalSeconds / 60, survivalSeconds % 60), scale: s)
-                    }
-                    .padding(10 * s)
-                    .background(MCFSFrame(name: "mcfs-light-grey"))
+                VStack(spacing: 8 * s) {
+                    CCBISceneView(
+                        ccbFile: "ClassicMatchStats.ccbi",
+                        centerRoot: true,
+                        context: CCBIBindingContext(
+                            labelOverrides: statsLabels,
+                            visibilityOverrides: statsVis,
+                            designScaleModifier: { _ in s }
+                        )
+                    )
+                    .frame(width: 160 * s, height: 189 * s)
+                    .frame(height: 122 * s, alignment: .top)
+                    .clipped()
 
                     if let dropped = awardedTier {
                         HStack(spacing: 8 * s) {
@@ -960,7 +1142,7 @@ struct MatchResultsModalView: View {
                                 .foregroundColor(.white)
                                 .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 38 * s)
+                                .frame(height: 36 * s)
                         }
                         .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-orange"))
                         Button(action: {
@@ -972,14 +1154,14 @@ struct MatchResultsModalView: View {
                                 .foregroundColor(.white)
                                 .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 38 * s)
+                                .frame(height: 36 * s)
                         }
                         .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
                     }
                 }
-                .padding(16 * s)
-                .frame(width: min(geometry.size.width * 0.88, 340 * s))
-                .background(MCFSFrame(name: "mcfs-white"))
+                .padding(14 * s)
+                .frame(width: min(geometry.size.width * 0.88, 300 * s))
+                .background(MCFSFrame(name: "mcfs-white-gray"))
                 .shadow(radius: 24)
             }
             .onAppear {
@@ -988,14 +1170,6 @@ struct MatchResultsModalView: View {
                     awardedTier = PotionStore.shared.awardPostMatchPotion(score: highScore, survivalSeconds: survivalSeconds)
                 }
             }
-        }
-    }
-
-    private func statRow(label: String, value: String, scale s: CGFloat) -> some View {
-        HStack {
-            Text(label).font(.custom("Lato-Regular", size: 12.5 * s)).foregroundColor(Color(hex: 0x5A5F66))
-            Spacer()
-            Text(value).font(.custom("OpenSans-Bold", size: 14 * s)).foregroundColor(Color(hex: 0xE57200))
         }
     }
 }
