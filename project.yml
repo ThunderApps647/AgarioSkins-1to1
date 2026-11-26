@@ -46,6 +46,8 @@ targets:
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
         UIAppFonts:
+          - OpenSans-Bold.ttf
+          - OpenSans-SemiboldItalic.ttf
           - Lato-Regular.ttf
           - lato-heavy.ttf
           - Ubuntu-Bold.ttf

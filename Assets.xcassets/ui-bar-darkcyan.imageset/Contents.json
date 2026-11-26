@@ -1,8 +1,42 @@
 {
   "images": [
     {
-      "filename": "ui-bar-darkcyan.png",
-      "idiom": "universal"
+      "filename": "ui-bar-darkcyan@2x.png",
+      "idiom": "universal",
+      "scale": "2x",
+      "resizing": {
+        "mode": "9-part",
+        "center": {
+          "mode": "stretch",
+          "width": 2,
+          "height": 9
+        },
+        "cap-insets": {
+          "top": 1,
+          "bottom": 1,
+          "left": 5,
+          "right": 5
+        }
+      }
+    },
+    {
+      "filename": "ui-bar-darkcyan@3x.png",
+      "idiom": "universal",
+      "scale": "3x",
+      "resizing": {
+        "mode": "9-part",
+        "center": {
+          "mode": "stretch",
+          "width": 2,
+          "height": 9
+        },
+        "cap-insets": {
+          "top": 1,
+          "bottom": 1,
+          "left": 5,
+          "right": 5
+        }
+      }
     }
   ],
   "info": {

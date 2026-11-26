@@ -1,8 +1,42 @@
 {
   "images": [
     {
-      "filename": "ui-xp-fill.png",
-      "idiom": "universal"
+      "filename": "ui-xp-fill@2x.png",
+      "idiom": "universal",
+      "scale": "2x",
+      "resizing": {
+        "mode": "9-part",
+        "center": {
+          "mode": "stretch",
+          "width": 2,
+          "height": 1
+        },
+        "cap-insets": {
+          "top": 3,
+          "bottom": 3,
+          "left": 1,
+          "right": 1
+        }
+      }
+    },
+    {
+      "filename": "ui-xp-fill@3x.png",
+      "idiom": "universal",
+      "scale": "3x",
+      "resizing": {
+        "mode": "9-part",
+        "center": {
+          "mode": "stretch",
+          "width": 2,
+          "height": 1
+        },
+        "cap-insets": {
+          "top": 3,
+          "bottom": 3,
+          "left": 1,
+          "right": 1
+        }
+      }
     }
   ],
   "info": {

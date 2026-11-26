@@ -54,22 +54,22 @@ struct SrvGridKey: Hashable { let x: Int; let y: Int }
 // MARK: - Constants (client parity)
 
 enum SrvRules {
-    static let worldSize: Double = 11000
+    static let worldSize: Double = OriginalGameplay.arenaSideLength
     static let foodCount = 4500
     static let virusCount = 80
     static let tokenCount = 200
     static let maxPlayerMass: Double = 22500
     static let maxCellsPerOwner = 16
-    static let radiusFactor: Double = 6.3245          // sqrt(mass) * this
-    static let minSplitMass: Double = 36
-    static let minEjectMass: Double = 32
-    static let ejectPelletMass: Double = 16
-    static let splitEjectionForce: Double = 26
-    static let eatMassRatio: Double = 4.0 / 3.0
-    static let virusBaseMass: Double = 220
-    static let virusSplitThreshold: Double = 220 + 7 * 14
-    static let virusPopMinMass: Double = 133
-    static let decayRate: Double = 0.002              // 0.2%/s above mass 10
+    static let radiusFactor: Double = 10
+    static let minSplitMass: Double = OriginalGameplay.minSplitMass
+    static let minEjectMass: Double = OriginalGameplay.minEjectMass
+    static let ejectPelletMass: Double = OriginalGameplay.ejectPelletMass
+    static let splitEjectionForce: Double = OriginalGameplay.splitImpulsePerSecond
+    static let eatMassRatio: Double = 1.0 / (OriginalGameplay.scaleFactorForEating * OriginalGameplay.scaleFactorForEating)
+    static let virusBaseMass: Double = OriginalGameplay.virusBaseMass
+    static let virusSplitThreshold: Double = OriginalGameplay.virusSplitMass
+    static let virusPopMinMass: Double = OriginalGameplay.virusBaseMass * eatMassRatio
+    static let decayRate: Double = 0.002              // custom offline decay retained
     static let baseAnimationFactor: Double = 0.15
     static let foodMass: Double = 1
     static let tokenMass: Double = 4
@@ -77,11 +77,10 @@ enum SrvRules {
 }
 
 @inline(__always) func radiusForMass(_ m: Double) -> Double {
-    (max(m, 0)).squareRoot() * SrvRules.radiusFactor
+    OriginalGameplay.radius(forMass: m)
 }
 @inline(__always) func speedForMass(_ m: Double) -> Double {
-    // IPA inputFactorPow = -0.45 on radius -> -0.225 on mass (agar.io 0x100047408)
-    650 / pow(max(m, 1), 0.225)
+    OriginalGameplay.speed(forMass: m)
 }
 
 // MARK: - Entities
@@ -344,7 +343,7 @@ struct SrvVirus {
     var velocity: SrvVec2 = .zero
     /// v4.2: owner who fed the 7th pellet on a launched virus (kill credit).
     var shooterID: UInt32? = nil
-    var radius: Double { mass.squareRoot() * 5.3 }
+    var radius: Double { SrvRules.radiusForMass(mass) }
 }
 
 struct SrvToken {
@@ -753,7 +752,7 @@ final class SrvWorld {
     }
 
     func spawnVirus() -> SrvVirus {
-        let margin = SrvRules.virusBaseMass.squareRoot() * 5.3
+        let margin = SrvRules.radiusForMass(SrvRules.virusBaseMass)
         return SrvVirus(id: newID(), position: SrvVec2(x: .random(in: margin...(SrvRules.worldSize - margin)),
                                                  y: .random(in: margin...(SrvRules.worldSize - margin))))
     }
@@ -979,7 +978,7 @@ final class SrvWorld {
             var spawnPos = cells[index].position
             spawnPos.x += launchDirection.x * spawnOffset
             spawnPos.y += launchDirection.y * spawnOffset
-            let physicsRadius = visualRadius * 0.55
+            let physicsRadius = visualRadius
             spawnPos.x = min(ws - physicsRadius, max(physicsRadius, spawnPos.x))
             spawnPos.y = min(ws - physicsRadius, max(physicsRadius, spawnPos.y))
 
@@ -1078,28 +1077,20 @@ final class SrvWorld {
         }
         guard baseDirection != .zero else { return false }
 
-        // Client parity (v25 eject overhaul): spread + trail follow the targetMass
-        // rim while the pellet still SPAWNS on the drawn (mass) rim; the travel is
-        // trimmed by half the drawn rim's overhang so pellet k of a fast macro dump
-        // lands exactly where a slow macro's pellet k lands - equally long trails.
-        let baseSpread = 0.17
-        let solidRadius = min(cell.cachedRadius, max(cell.targetMass, 0).squareRoot() * SrvRules.radiusFactor)
-        let sizeRatio = 100.0 / max(100.0, solidRadius)
-        let dynamicSpread = baseSpread * sizeRatio.squareRoot()
+        // Original trajectory: ±directionAngleVariation radians, initial velocity
+        // onShootFoodVelocity with ±spawnFoodVelocityVariation, then cellDeceleration.
         let baseAngle = atan2(baseDirection.y, baseDirection.x)
-        let spreadJitter = Double.random(in: -dynamicSpread...dynamicSpread)
-        let travelAngle = baseAngle + spreadJitter
+        let travelAngle = baseAngle + Double.random(in: -OriginalGameplay.directionAngleVariation...OriginalGameplay.directionAngleVariation)
         let travelDirection = SrvVec2(x: cos(travelAngle), y: sin(travelAngle)).normalized()
         let startPosition = SrvVec2(x: cell.position.x + travelDirection.x * (cell.cachedRadius + 1),
                                  y: cell.position.y + travelDirection.y * (cell.cachedRadius + 1))
-        let rimOverhang = cell.cachedRadius - solidRadius
-        let distanceJitter = Double.random(in: -50...50)
-        let travelDistance = max(30.0, (200.0 + distanceJitter) * min(1.6, max(0.30, distanceScale)) - rimOverhang * 0.5)
+        let speedVariation = Double.random(in: (1.0 - OriginalGameplay.spawnFoodVelocityVariation)...(1.0 + OriginalGameplay.spawnFoodVelocityVariation))
+        let initialSpeed = OriginalGameplay.ejectImpulsePerSecond * speedVariation * min(1.6, max(0.30, distanceScale))
 
         var pellet = SrvEjected(id: newID(), ownerID: cell.ownerID,
                              position: borderSafeEjectedPosition(startPosition),
                              direction: travelDirection,
-                             currentSpeed: travelDistance * 5.0,
+                             currentSpeed: initialSpeed,
                              creationTime: time)
         pellet.sourceCellID = cell.id   // v4.16: grace blocks only the source
         pellet.isStatic = false
@@ -1207,7 +1198,7 @@ final class SrvWorld {
 
     // MARK: - SrvEjected helpers
 
-    private let ejectedRenderedRadius: Double = 4.0 * 6.3245
+    private let ejectedRenderedRadius: Double = OriginalGameplay.shotMassBaseRadius
     private let ejectedStrokeHalf: Double = 4.0
 
     @inline(__always)
@@ -1588,19 +1579,15 @@ final class SrvWorld {
 
     @inline(__always)
     private func applySharedKinematics(i: Int, timeScale: Double, dt: Double, ws: Double) {
-        cells[i].position.x += cells[i].velocity.x * timeScale
-        cells[i].position.y += cells[i].velocity.y * timeScale
-        let decayFactor = pow(0.92, timeScale)
-        let splitDecayFactor = pow(0.96, timeScale)
+        cells[i].position.x += cells[i].velocity.x * dt
+        cells[i].position.y += cells[i].velocity.y * dt
+        let impulseDecay = OriginalGameplay.impulseDecay(dt: dt)
+        cells[i].velocity.x *= impulseDecay
+        cells[i].velocity.y *= impulseDecay
         if cells[i].splitTimer > 0 {
-            cells[i].velocity.x *= splitDecayFactor
-            cells[i].velocity.y *= splitDecayFactor
             cells[i].splitTimer -= dt
-        } else {
-            cells[i].velocity.x *= decayFactor
-            cells[i].velocity.y *= decayFactor
         }
-        let hardPhysicsRadius = cells[i].cachedRadius * 0.55
+        let hardPhysicsRadius = cells[i].cachedRadius
         if cells[i].position.x < hardPhysicsRadius { cells[i].position.x = hardPhysicsRadius; cells[i].velocity.x = 0 }
         else if cells[i].position.x > ws - hardPhysicsRadius { cells[i].position.x = ws - hardPhysicsRadius; cells[i].velocity.x = 0 }
         if cells[i].position.y < hardPhysicsRadius { cells[i].position.y = hardPhysicsRadius; cells[i].velocity.y = 0 }
@@ -2277,7 +2264,7 @@ final class SrvWorld {
                     if dx < -vr || dx > vr { continue }
                     let dy = mass.position.y - virus.position.y
                     if dy < -vr || dy > vr { continue }
-                    let virusRadiusSq = virus.mass * 28.09
+                    let virusRadiusSq = vr * vr
                     if dx * dx + dy * dy < virusRadiusSq {
                         resolveBotMacro(mass.id, eaterOwner: nil, virusID: virus.id)
                         feedVirusAndLaunchIfReady(at: vIdx, with: mass, launched: &launched)
@@ -2422,8 +2409,7 @@ final class SrvWorld {
     }
 
     private func updateEjectedFlight(dt: Double) {
-        let timeScale = dt * 60.0
-        let decay = pow(0.96, timeScale)
+        let decay = OriginalGameplay.impulseDecay(dt: dt)
         var i = activeEjected.count - 1
         while i >= 0 {
             let distanceStep = activeEjected[i].currentSpeed * dt
@@ -2446,7 +2432,7 @@ final class SrvWorld {
                     activeEjected[i].currentSpeed = 0
                 }
             }
-            if activeEjected[i].currentSpeed <= 10.0 {
+            if activeEjected[i].currentSpeed <= 0.2 {
                 activeEjected[i].isStatic = true
                 let key = SrvGridKey(x: Int(activeEjected[i].position.x / ejectedGridSize),
                                   y: Int(activeEjected[i].position.y / ejectedGridSize))

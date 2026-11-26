@@ -7,6 +7,10 @@ public struct MyFont {
     
     public static func registerFonts() {
         let fonts = [
+            "OpenSans-Bold.ttf",
+            "OpenSans-SemiboldItalic.ttf",
+            "Lato-Regular.ttf",
+            "lato-heavy.ttf",
             "Ubuntu-Medium.ttf",
             "Ubuntu-Bold.ttf",
             "Ubuntu-Semibold.ttf",

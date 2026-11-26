@@ -513,7 +513,7 @@ final class RemoteWorldModel {
         var best: UInt32? = nil
         var bestDistSq = CGFloat.greatestFiniteMagnitude
         for wc in snap.cells {
-            let r = sqrt(CGFloat(max(wc.mass, 0))) * 6.3245
+            let r = OriginalGameplay.radius(forMass: CGFloat(max(wc.mass, 0)))
             let dx = CGFloat(wc.x) - point.x, dy = CGFloat(wc.y) - point.y
             let d = dx * dx + dy * dy
             if d < r * r && d < bestDistSq { bestDistSq = d; best = wc.ownerID }
@@ -536,7 +536,7 @@ final class RemoteWorldModel {
             var best: UUID? = nil
             var bestDistSq = CGFloat.greatestFiniteMagnitude
             for wc in snap.cells {
-                let r = sqrt(CGFloat(max(wc.mass, 0))) * 6.3245 + slack
+                let r = OriginalGameplay.radius(forMass: CGFloat(max(wc.mass, 0))) + slack
                 let dx = CGFloat(wc.x) - point.x, dy = CGFloat(wc.y) - point.y
                 let d = dx * dx + dy * dy
                 if d < r * r && d < bestDistSq, let mirror = cellMirrors[wc.id] {
@@ -726,22 +726,22 @@ final class RemoteWorldModel {
         playerCells = mine
         botCells = others
 
+        let ws = OriginalGameplay.arenaSideLengthCGFloat
         // pellet flight — identical physics to offline, run locally
-        massManager.update(dt: dt, worldSize: 11000)
+        massManager.update(dt: dt, worldSize: ws)
         // virus flight between snapshots (launched viruses)
-        let timeScale = dt * 60.0
         for i in viruses.indices where viruses[i].velocity != .zero {
             viruses[i].position.x += viruses[i].velocity.width * dt
             viruses[i].position.y += viruses[i].velocity.height * dt
-            let decay = pow(0.95, timeScale)
+            let decay = OriginalGameplay.impulseDecay(dt: dt)
             viruses[i].velocity.width *= decay
             viruses[i].velocity.height *= decay
-            if abs(viruses[i].velocity.width) < 5 && abs(viruses[i].velocity.height) < 5 {
+            if abs(viruses[i].velocity.width) < 0.2 && abs(viruses[i].velocity.height) < 0.2 {
                 viruses[i].velocity = .zero
             }
             let r = viruses[i].radius
-            viruses[i].position.x = max(r, min(11000 - r, viruses[i].position.x))
-            viruses[i].position.y = max(r, min(11000 - r, viruses[i].position.y))
+            viruses[i].position.x = max(r, min(ws - r, viruses[i].position.x))
+            viruses[i].position.y = max(r, min(ws - r, viruses[i].position.y))
         }
     }
 

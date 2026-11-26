@@ -1,0 +1,18 @@
+{
+  "images": [
+    {
+      "filename": "menu-whitegrey-tab@2x.png",
+      "idiom": "universal",
+      "scale": "2x"
+    },
+    {
+      "filename": "menu-whitegrey-tab@3x.png",
+      "idiom": "universal",
+      "scale": "3x"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}
