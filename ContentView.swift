@@ -4854,7 +4854,7 @@ struct ContentView: View {
     
     var playerCenter: CGPoint {
         OriginalGameplay.radiusWeightedCenter(
-            playerCells.map { ($0.position, $0.cachedSolidRadius) }
+            positionsAndRadii: playerCells.map { ($0.position, $0.cachedSolidRadius) }
         )
     }
     
