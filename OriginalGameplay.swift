@@ -11,6 +11,9 @@ import UIKit
 enum OriginalGameplay {
     static let arenaSideLength: Double = 11180
     static let arenaSideLengthCGFloat: CGFloat = 11180
+    /// `Offline Mode - Settings`: `arenaSizeRatio = 0.5` -> `round(arenaSideLength * sqrt(0.5))` = `7905` (`0x10003f48c`).
+    static let offlineArenaSizeRatio: Double = 0.5
+    static let offlineArenaSideLength: CGFloat = CGFloat(Int((arenaSideLength * sqrt(offlineArenaSizeRatio)).rounded()))
 
     static let baseRadius: Double = 31.6227766016837
     static let minRadiusToShoot: Double = 56.56854249
@@ -54,11 +57,13 @@ enum OriginalGameplay {
         let w = max(viewportSize.width, 1)
         let h = max(viewportSize.height, 1)
         #if canImport(UIKit)
-        let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+        // BaseArenaView::calculateWindowHeight (`0x10037506c`): only deviceType == 0 (iPad)
+        // divides windowHeight by `(winW/winH)/zoomMultiplier`; iPhone uses `view.bounds.height`.
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
         #else
-        let isPhone = true
+        let isPad = false
         #endif
-        let phoneRatio = isPhone ? ((w / h) / zoomMultiplier) : 1.0
+        let phoneRatio = isPad ? ((w / h) / zoomMultiplier) : 1.0
         let windowHeight = h / max(phoneRatio, 0.001)
         let rEff = max(totalRadius, CGFloat(baseRadius))
         let n = CGFloat(max(1, cellCount))
@@ -67,6 +72,21 @@ enum OriginalGameplay {
         let minZoom = max(minZoomValue, (0.37 * windowHeight * maxScaleFactor) / rEff)
         let q = min(1.0, windowHeight / (42.0 * rEff))
         return min(pow(q, 0.4) * scaleFactor, minZoom) * customZoomMultiplier
+    }
+
+    /// `BaseArenaView::calcPlayerCellsMassCenter` (`0x100375878`): weights by cell radius, not mass.
+    static func radiusWeightedCenter(positionsAndRadii: [(CGPoint, CGFloat)]) -> CGPoint {
+        var totalR: CGFloat = 0
+        var sumX: CGFloat = 0
+        var sumY: CGFloat = 0
+        for (pos, r) in positionsAndRadii {
+            let w = max(r, 0.001)
+            totalR += w
+            sumX += pos.x * w
+            sumY += pos.y * w
+        }
+        guard totalR > 0 else { return .zero }
+        return CGPoint(x: sumX / totalR, y: sumY / totalR)
     }
 
     static func radius(forMass mass: Double) -> Double {
@@ -128,13 +148,11 @@ struct MCFSFrame: View {
         switch name {
         case "mcfs-divider", "mcfs-leaderboard-party-outline":
             return (0, 0, 0, 0)
-        case "mcfs-hud-xp", "ui-xp-fill":
-            return (0.14, 0.25, 0.14, 0.25)
-        case "mcfs-hud-xp-box", "ui-xp-frame":
-            return (0.35, 0.35, 0.35, 0.35)
         case "mcfs-leaderboard-content-float":
             return (0.10, 0.40, 0.80, 0.40)
-        case "mcfs-blue-profile", "mcfs-bar-darkcyan", "ui-bar-darkcyan":
+        case "mcfs-red-timer-frame":
+            return (0.0, 0.33, 0.0, 0.65)
+        case "mcfs-bar-darkcyan", "ui-bar-darkcyan":
             return (0.0, 0.40, 0.0, 0.40)
         default:
             return (0.40, 0.40, 0.40, 0.40)
@@ -150,10 +168,14 @@ struct MCFSFrame: View {
         if let img = UIImage(named: name) {
             let w = img.size.width
             let h = img.size.height
-            let top = min(h * 0.48, h * f.top)
-            let bottom = min(h * 0.48, h * f.bottom)
-            let leading = min(w * 0.48, w * f.leading)
-            let trailing = min(w * 0.48, w * f.trailing)
+            let vSum = f.top + f.bottom
+            let hSum = f.leading + f.trailing
+            let vScale = vSum > 0.96 ? (0.96 / vSum) : 1.0
+            let hScale = hSum > 0.96 ? (0.96 / hSum) : 1.0
+            let top = h * f.top * vScale
+            let bottom = h * f.bottom * vScale
+            let leading = w * f.leading * hScale
+            let trailing = w * f.trailing * hScale
             return EdgeInsets(top: top, leading: leading, bottom: bottom, trailing: trailing)
         }
         #endif

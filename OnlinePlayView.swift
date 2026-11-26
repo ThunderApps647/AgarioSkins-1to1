@@ -437,17 +437,9 @@ struct OnlineGameView: View {
     }
 
     var playerCenter: CGPoint {
-        var totalRadius: CGFloat = 0
-        var weightedX: CGFloat = 0
-        var weightedY: CGFloat = 0
-        for cell in playerCells {
-            let weight = max(cell.cachedVisualRadius, 1)
-            totalRadius += weight
-            weightedX += cell.position.x * weight
-            weightedY += cell.position.y * weight
-        }
-        guard totalRadius > 0 else { return .zero }
-        return CGPoint(x: weightedX / totalRadius, y: weightedY / totalRadius)
+        OriginalGameplay.radiusWeightedCenter(
+            playerCells.map { ($0.position, $0.cachedSolidRadius) }
+        )
     }
 
     private var renderedOwnerLevels: [UUID: Int] {
@@ -1009,22 +1001,14 @@ struct OnlineGameView: View {
         world.persistVisualState(player: playerCells, bots: botCells)
         updateEatenCellsAnimation(dt: deltaTime)
 
-        // 3. camera — exact copy of the offline behaviour
+        // 3. camera — direct radius-weighted center + cameraPositionSnapRate (0.315)
         let targetPos = playerCenter
-        if playerCells.count != lastCameraCellCount, let previous = lastCameraTargetPos {
-            cameraJumpOffset.width += previous.x - targetPos.x
-            cameraJumpOffset.height += previous.y - targetPos.y
-        }
+        cameraJumpOffset = .zero
         lastCameraCellCount = playerCells.count
         lastCameraTargetPos = targetPos
-        let jumpDecay = getLerpFactor(base: 0.10, dt: deltaTime)
-        cameraJumpOffset.width *= (1.0 - jumpDecay)
-        cameraJumpOffset.height *= (1.0 - jumpDecay)
-        if abs(cameraJumpOffset.width) < 0.05 { cameraJumpOffset.width = 0 }
-        if abs(cameraJumpOffset.height) < 0.05 { cameraJumpOffset.height = 0 }
         let camSmooth = getLerpFactor(base: OriginalGameplay.cameraPositionSnapRate, dt: deltaTime)
-        smoothedPlayerPosition.x += (targetPos.x + cameraJumpOffset.width - smoothedPlayerPosition.x) * camSmooth
-        smoothedPlayerPosition.y += (targetPos.y + cameraJumpOffset.height - smoothedPlayerPosition.y) * camSmooth
+        smoothedPlayerPosition.x += (targetPos.x - smoothedPlayerPosition.x) * camSmooth
+        smoothedPlayerPosition.y += (targetPos.y - smoothedPlayerPosition.y) * camSmooth
         updateCameraZoom(dt: deltaTime)
 
         // 4. feed / macro cadence → network
@@ -1080,15 +1064,11 @@ struct OnlineGameView: View {
     }
 
     private func updateCameraZoom(dt: CGFloat) {
-        let smoothFactor = getLerpFactor(base: 0.15, dt: dt)
-        smoothedTotalMass += (totalPlayerMass - smoothedTotalMass) * smoothFactor
-
-        let rawMass = max(totalPlayerMass, 1)
-        let rawRadiusSum = playerCells.reduce(CGFloat(0)) { $0 + $1.cachedVisualRadius }
-        let smoothedRadiusSum = rawRadiusSum * sqrt(max(smoothedTotalMass, 1) / rawMass)
+        smoothedTotalMass = totalPlayerMass
+        let totalRadius = playerCells.reduce(CGFloat(0)) { $0 + $1.cachedSolidRadius }
         let customZoomMultiplier = 1.0 - ((CGFloat(zoomSliderValue) - 1.0) / 49.0) * 0.9
         let targetZoom = OriginalGameplay.calculateZoom(
-            totalRadius: max(smoothedRadiusSum, CGFloat(OriginalGameplay.baseRadius)),
+            totalRadius: max(totalRadius, CGFloat(OriginalGameplay.baseRadius)),
             cellCount: max(playerCells.count, 1),
             viewportSize: UIScreen.main.bounds.size,
             customZoomMultiplier: customZoomMultiplier

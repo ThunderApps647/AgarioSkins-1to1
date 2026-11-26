@@ -528,6 +528,7 @@ struct PotionsModalView: View {
     @State private var nowTimestamp: TimeInterval = Date().timeIntervalSince1970
     @State private var statusBanner: String = "Brew Mystery Potions to unlock Coins, DNA & Skin Pieces!"
     @State private var activeReward: PotionReward? = nil
+    @State private var showHelpModal: Bool = false
 
     private let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -539,7 +540,21 @@ struct PotionsModalView: View {
                 Color.white.edgesIgnoringSafeArea(.all)
 
                 VStack(spacing: 0) {
-                    genericFullHeader(title: "Mystery Potions", coins: coins, dna: dna, scale: s, onClose: onClose)
+                    ZStack(alignment: .trailing) {
+                        genericFullHeader(title: "Mystery Potions", coins: coins, dna: dna, scale: s, onClose: onClose)
+                        Button(action: {
+                            SoundManager.shared.play(.menuClick)
+                            withAnimation(.easeInOut(duration: 0.16)) { showHelpModal = true }
+                        }) {
+                            Text("?")
+                                .font(.custom("OpenSans-Bold", size: 13 * s))
+                                .foregroundColor(.white)
+                                .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
+                                .frame(width: 26 * s, height: 26 * s)
+                        }
+                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-light-blue"))
+                        .padding(.trailing, 46 * s)
+                    }
 
                     VStack(spacing: 8 * s) {
                         Text(statusBanner)
@@ -548,7 +563,7 @@ struct PotionsModalView: View {
                             .multilineTextAlignment(.center)
                             .padding(.top, 8 * s)
 
-                        // PotionSlot.ccbi: 4 vertical slot cards with wide flaskslot_top_* ribbon header
+                        // PotionSlot.ccbi: 4 vertical slot cards with full-bleed flaskslot_top_* ribbon header
                         HStack(spacing: 8 * s) {
                             ForEach(potionStore.slots) { slot in
                                 potionPedestalCard(slot: slot, scale: s)
@@ -568,6 +583,13 @@ struct PotionsModalView: View {
                     }
                     .zIndex(5)
                 }
+
+                if showHelpModal {
+                    PotionsHelpOverlayView(s: s, containerSize: geometry.size) {
+                        withAnimation(.easeInOut(duration: 0.15)) { showHelpModal = false }
+                    }
+                    .zIndex(6)
+                }
             }
             .onReceive(ticker) { date in
                 nowTimestamp = date.timeIntervalSince1970
@@ -582,169 +604,257 @@ struct PotionsModalView: View {
         let headerRibbon = isReady ? "potion-slot-orange" : (tier != nil ? "potion-slot-blue" : "potion-slot-grey")
         let statusTitle: String = isReady ? "Ready!" : (isBrewing ? "Brewing" : (tier != nil ? "Stored" : "Empty"))
 
-        return VStack(spacing: 6 * s) {
+        return VStack(spacing: 0) {
             ZStack {
                 Image(headerRibbon)
                     .resizable()
-                    .frame(height: 28 * s)
+                    .frame(height: 30 * s)
                 Text(statusTitle)
                     .font(.custom("OpenSans-Bold", size: 11.5 * s))
                     .foregroundColor(.white)
                     .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 6 * s))
 
-            if let tier = tier {
-                Spacer(minLength: 2 * s)
+            VStack(spacing: 5 * s) {
+                if let tier = tier {
+                    Spacer(minLength: 2 * s)
 
-                Image(tier.iconAsset)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 58 * s, height: 74 * s)
+                    Image(tier.iconAsset)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 58 * s, height: 72 * s)
 
-                Text(tier.rawValue)
-                    .font(.custom("OpenSans-Bold", size: 12 * s))
-                    .foregroundColor(tier.badgeColor)
+                    Text(tier.rawValue)
+                        .font(.custom("OpenSans-Bold", size: 12 * s))
+                        .foregroundColor(tier.badgeColor)
 
-                if isReady {
-                    Text("Tap Open!")
-                        .font(.custom("OpenSans-Bold", size: 10 * s))
-                        .foregroundColor(Color(hex: 0x43A81D))
-                } else if isBrewing {
-                    let rem = Int(ceil(slot.remainingSeconds(now: nowTimestamp)))
-                    let progress = min(1.0, max(0.05, 1.0 - (slot.remainingSeconds(now: nowTimestamp) / max(1, slot.brewDuration))))
-                    VStack(spacing: 3 * s) {
+                    if isReady {
+                        Text("Tap Open!")
+                            .font(.custom("OpenSans-Bold", size: 10 * s))
+                            .foregroundColor(Color(hex: 0x43A81D))
+                    } else if isBrewing {
+                        let rem = Int(ceil(slot.remainingSeconds(now: nowTimestamp)))
+                        let progress = min(1.0, max(0.05, 1.0 - (slot.remainingSeconds(now: nowTimestamp) / max(1, slot.brewDuration))))
+                        VStack(spacing: 3 * s) {
+                            HStack(spacing: 3 * s) {
+                                Image("potion-clock-grey").resizable().scaledToFit().frame(width: 11 * s, height: 11 * s)
+                                Text(String(format: "%02d:%02d", rem / 60, rem % 60))
+                                    .font(.custom("OpenSans-Bold", size: 10.5 * s))
+                                    .foregroundColor(Color(hex: 0x5A5F66))
+                            }
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Image("potion-progressbar-bg").resizable()
+                                    Image("potion-progressbar-blue")
+                                        .resizable()
+                                        .frame(width: max(4 * s, geo.size.width * progress))
+                                }
+                            }
+                            .frame(height: 7 * s)
+                            .padding(.horizontal, 4 * s)
+                        }
+                    } else {
                         HStack(spacing: 3 * s) {
                             Image("potion-clock-grey").resizable().scaledToFit().frame(width: 11 * s, height: 11 * s)
-                            Text(String(format: "%02d:%02d", rem / 60, rem % 60))
-                                .font(.custom("OpenSans-Bold", size: 10.5 * s))
-                                .foregroundColor(Color(hex: 0x5A5F66))
+                            Text("\(Int(tier.brewDurationSeconds / 60))m \(Int(tier.brewDurationSeconds) % 60)s")
+                                .font(.custom("Lato-Regular", size: 10 * s))
+                                .foregroundColor(Color(hex: 0x6E767E))
                         }
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Image("potion-progressbar-bg").resizable()
-                                Image("potion-progressbar-blue")
-                                    .resizable()
-                                    .frame(width: max(4 * s, geo.size.width * progress))
+                    }
+
+                    Spacer(minLength: 2 * s)
+
+                    if isReady {
+                        Button(action: {
+                            SoundManager.shared.play(.menuClick)
+                            if let reward = potionStore.openPotion(slotIndex: slot.id, coins: &coins, dna: &dna, now: nowTimestamp) {
+                                statusBanner = "Opened \(reward.tier.rawValue) Potion: +\(reward.coins) Coins & +\(reward.dna) DNA!"
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
+                                    activeReward = reward
+                                }
                             }
+                        }) {
+                            Text("Open")
+                                .font(.custom("OpenSans-Bold", size: 12 * s))
+                                .foregroundColor(.white)
+                                .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 30 * s)
                         }
-                        .frame(height: 7 * s)
-                        .padding(.horizontal, 6 * s)
+                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
+                    } else if isBrewing {
+                        let rushCost = slot.rushDNACost(now: nowTimestamp)
+                        Button(action: {
+                            SoundManager.shared.play(.menuClick)
+                            if potionStore.rushWithDNA(slotIndex: slot.id, dna: &dna, now: nowTimestamp),
+                               let reward = potionStore.openPotion(slotIndex: slot.id, coins: &coins, dna: &dna, now: nowTimestamp) {
+                                statusBanner = "Rushed \(reward.tier.rawValue) Potion: +\(reward.coins) Coins & +\(reward.dna) DNA!"
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
+                                    activeReward = reward
+                                }
+                            } else {
+                                statusBanner = "Need \(rushCost) DNA to rush!"
+                            }
+                        }) {
+                            HStack(spacing: 4 * s) {
+                                Image("shop-dna-s").resizable().scaledToFit().frame(width: 13 * s, height: 13 * s)
+                                Text("Rush \(rushCost)")
+                                    .font(.custom("OpenSans-Bold", size: 11 * s))
+                                    .foregroundColor(.white)
+                                    .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 30 * s)
+                        }
+                        .buttonStyle(MCFSBevelStyle(frameAsset: dna >= rushCost ? "mcfs-green" : "mcfs-orange"))
+                    } else {
+                        let rushCost = slot.rushDNACost(now: nowTimestamp)
+                        HStack(spacing: 5 * s) {
+                            Button(action: {
+                                SoundManager.shared.play(.menuClick)
+                                potionStore.startBrew(slotIndex: slot.id, now: nowTimestamp)
+                                statusBanner = "Brewing \(tier.rawValue) Potion!"
+                            }) {
+                                Text("Brew")
+                                    .font(.custom("OpenSans-Bold", size: 11 * s))
+                                    .foregroundColor(.white)
+                                    .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 30 * s)
+                            }
+                            .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-light-blue"))
+
+                            Button(action: {
+                                SoundManager.shared.play(.menuClick)
+                                if potionStore.rushWithDNA(slotIndex: slot.id, dna: &dna, now: nowTimestamp),
+                                   let reward = potionStore.openPotion(slotIndex: slot.id, coins: &coins, dna: &dna, now: nowTimestamp) {
+                                    statusBanner = "Opened \(reward.tier.rawValue) Potion: +\(reward.coins) Coins & +\(reward.dna) DNA!"
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
+                                        activeReward = reward
+                                    }
+                                } else {
+                                    statusBanner = "Need \(rushCost) DNA to open immediately!"
+                                }
+                            }) {
+                                HStack(spacing: 2 * s) {
+                                    Image("shop-dna-s").resizable().scaledToFit().frame(width: 11 * s, height: 11 * s)
+                                    Text("\(rushCost)")
+                                        .font(.custom("OpenSans-Bold", size: 10 * s))
+                                        .foregroundColor(.white)
+                                        .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
+                                }
+                                .padding(.horizontal, 6 * s)
+                                .frame(height: 30 * s)
+                            }
+                            .buttonStyle(MCFSBevelStyle(frameAsset: dna >= rushCost ? "mcfs-green" : "mcfs-orange"))
+                        }
                     }
                 } else {
-                    HStack(spacing: 3 * s) {
-                        Image("potion-clock-grey").resizable().scaledToFit().frame(width: 11 * s, height: 11 * s)
-                        Text("\(Int(tier.brewDurationSeconds / 60))m \(Int(tier.brewDurationSeconds) % 60)s")
-                            .font(.custom("Lato-Regular", size: 10 * s))
-                            .foregroundColor(Color(hex: 0x6E767E))
-                    }
-                }
+                    Spacer(minLength: 4 * s)
 
-                Spacer(minLength: 2 * s)
+                    Image(systemName: "flask")
+                        .font(.system(size: 32 * s, weight: .medium))
+                        .foregroundColor(Color(hex: 0xCBD3DD))
 
-                if isReady {
+                    Text("Play matches or claim below")
+                        .font(.custom("Lato-Regular", size: 9.5 * s))
+                        .foregroundColor(Color(hex: 0x8A939E))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 4 * s)
+
+                    Spacer(minLength: 4 * s)
+
                     Button(action: {
                         SoundManager.shared.play(.menuClick)
-                        if let reward = potionStore.openPotion(slotIndex: slot.id, coins: &coins, dna: &dna, now: nowTimestamp) {
-                            statusBanner = "Opened \(reward.tier.rawValue) Potion: +\(reward.coins) Coins & +\(reward.dna) DNA!"
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
-                                activeReward = reward
-                            }
+                        if potionStore.collectSamplePotion() {
+                            statusBanner = "Found a Mystery Potion! Tap Brew to start."
                         }
                     }) {
-                        Text("Open")
-                            .font(.custom("OpenSans-Bold", size: 12 * s))
+                        Text("Find Potion")
+                            .font(.custom("OpenSans-Bold", size: 10.5 * s))
                             .foregroundColor(.white)
                             .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
                             .frame(maxWidth: .infinity)
                             .frame(height: 30 * s)
                     }
                     .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
-                } else if isBrewing {
-                    let rushCost = slot.rushDNACost(now: nowTimestamp)
-                    Button(action: {
-                        SoundManager.shared.play(.menuClick)
-                        if potionStore.rushWithDNA(slotIndex: slot.id, dna: &dna, now: nowTimestamp),
-                           let reward = potionStore.openPotion(slotIndex: slot.id, coins: &coins, dna: &dna, now: nowTimestamp) {
-                            statusBanner = "Rushed \(reward.tier.rawValue) Potion: +\(reward.coins) Coins & +\(reward.dna) DNA!"
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.78)) {
-                                activeReward = reward
-                            }
-                        } else {
-                            statusBanner = "Need \(rushCost) DNA to rush!"
-                        }
-                    }) {
-                        HStack(spacing: 4 * s) {
-                            Image("shop-dna-s").resizable().scaledToFit().frame(width: 13 * s, height: 13 * s)
-                            Text("Rush \(rushCost)")
-                                .font(.custom("OpenSans-Bold", size: 11 * s))
-                                .foregroundColor(.white)
-                                .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 30 * s)
-                    }
-                    .buttonStyle(MCFSBevelStyle(frameAsset: dna >= rushCost ? "mcfs-green" : "mcfs-orange"))
-                } else {
-                    Button(action: {
-                        SoundManager.shared.play(.menuClick)
-                        potionStore.startBrew(slotIndex: slot.id, now: nowTimestamp)
-                        statusBanner = "Brewing \(tier.rawValue) Potion!"
-                    }) {
-                        Text("Brew")
-                            .font(.custom("OpenSans-Bold", size: 12 * s))
-                            .foregroundColor(.white)
-                            .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 30 * s)
-                    }
-                    .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-light-blue"))
                 }
-            } else {
-                Spacer(minLength: 4 * s)
-
-                Image(systemName: "flask")
-                    .font(.system(size: 32 * s, weight: .medium))
-                    .foregroundColor(Color(hex: 0xCBD3DD))
-
-                Text("Play matches or claim below")
-                    .font(.custom("Lato-Regular", size: 9.5 * s))
-                    .foregroundColor(Color(hex: 0x8A939E))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 4 * s)
-
-                Spacer(minLength: 4 * s)
-
-                Button(action: {
-                    SoundManager.shared.play(.menuClick)
-                    if potionStore.collectSamplePotion() {
-                        statusBanner = "Found a Mystery Potion! Tap Brew to start."
-                    }
-                }) {
-                    Text("Find Potion")
-                        .font(.custom("OpenSans-Bold", size: 10.5 * s))
-                        .foregroundColor(.white)
-                        .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 30 * s)
-                }
-                .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
             }
+            .padding(7 * s)
         }
-        .padding(7 * s)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: 6 * s))
         .background(MCFSFrame(name: "mcfs-light-grey"))
     }
 }
 
-/// MenuMysteryPotionMinigame_v2.ccbi — Two-column animated potion reward reveal
+private struct PotionsHelpOverlayView: View {
+    let s: CGFloat
+    let containerSize: CGSize
+    let onClose: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.65).edgesIgnoringSafeArea(.all).onTapGesture { onClose() }
+            VStack(spacing: 10 * s) {
+                HStack {
+                    Spacer().frame(width: 24 * s)
+                    Spacer()
+                    Text("How Mystery Potions Work")
+                        .font(.custom("OpenSans-Bold", size: 16 * s))
+                        .foregroundColor(Color(hex: 0x3D4347))
+                    Spacer()
+                    Button(action: { SoundManager.shared.play(.menuClick); onClose() }) {
+                        Image("menu-exit-btn").resizable().scaledToFit().frame(width: 24 * s, height: 24 * s)
+                    }
+                }
+                Image("mcfs-divider").resizable().frame(height: max(1.5, 2 * s))
+                VStack(alignment: .leading, spacing: 6 * s) {
+                    Text("• Score higher in matches to win rarer Potions (Common → Legendary).")
+                    Text("• You can hold up to 4 Potions in your pedestal slots.")
+                    Text("• Tap Brew to start the timer, or spend DNA to open immediately.")
+                    Text("• Every Mystery Potion awards Coins, DNA & Skin Pieces.")
+                }
+                .font(.custom("Lato-Regular", size: 11.5 * s))
+                .foregroundColor(Color(hex: 0x5A5F66))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Button(action: { SoundManager.shared.play(.menuClick); onClose() }) {
+                    Text("Got it")
+                        .font(.custom("OpenSans-Bold", size: 13 * s))
+                        .foregroundColor(.white)
+                        .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
+                        .frame(width: 140 * s, height: 34 * s)
+                }
+                .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
+            }
+            .padding(14 * s)
+            .frame(width: min(containerSize.width * 0.86, 390 * s))
+            .background(MCFSFrame(name: "mcfs-white"))
+            .shadow(radius: 16)
+        }
+    }
+}
+
+/// MenuMysteryPotionMinigame_v2.ccbi — Step-by-step interactive potion reward reveal
 private struct PotionOpeningMinigameView: View {
     let reward: PotionReward
     let s: CGFloat
     let containerSize: CGSize
     let onCollect: () -> Void
 
-    @State private var revealed = false
+    @State private var revealStage: Int = 0
+    @State private var bottleBounce: Bool = false
+
+    private func advanceReveal() {
+        SoundManager.shared.play(.menuClick)
+        if revealStage < 3 {
+            withAnimation(.spring(response: 0.36, dampingFraction: 0.7)) {
+                revealStage += 1
+            }
+        } else {
+            onCollect()
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -766,74 +876,92 @@ private struct PotionOpeningMinigameView: View {
 
                 Image("mcfs-divider").resizable().frame(height: max(1.5, 2 * s))
 
-                // Two-column CCBI layout: Left (pellets + bottle) | Right (Coins, DNA, Skin Pieces)
+                // Two-column CCBI layout: Left (pellets + bottle) | Right (Coins -> DNA -> Skin Pieces)
                 HStack(spacing: 12 * s) {
                     ZStack {
                         Image("potion-pellets-open")
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 120 * s, height: 120 * s)
-                            .rotationEffect(.degrees(revealed ? 12 : -18))
-                            .scaleEffect(revealed ? 1.08 : 0.72)
+                            .frame(width: 124 * s, height: 124 * s)
+                            .rotationEffect(.degrees(revealStage > 0 ? 14 : -18))
+                            .scaleEffect(revealStage > 0 ? 1.1 : 0.45)
+                            .opacity(revealStage > 0 ? 1.0 : 0.18)
                         Image(reward.tier.iconAsset)
                             .resizable()
                             .scaledToFit()
                             .frame(width: 74 * s, height: 94 * s)
-                            .scaleEffect(revealed ? 1.05 : 0.6)
+                            .scaleEffect(revealStage > 0 ? 1.04 : (bottleBounce ? 1.06 : 0.94))
+                            .rotationEffect(.degrees(revealStage == 0 ? (bottleBounce ? 4 : -4) : 0))
                     }
-                    .frame(width: 126 * s, height: 136 * s)
+                    .frame(width: 130 * s, height: 146 * s)
                     .background(MCFSFrame(name: "mcfs-light-grey"))
+                    .contentShape(Rectangle())
+                    .onTapGesture { advanceReveal() }
 
-                    VStack(spacing: 8 * s) {
+                    VStack(spacing: 7 * s) {
                         HStack(spacing: 8 * s) {
                             rewardBox(icon: "shop-coins-s", title: "+\(reward.coins)", subtitle: "Coins", scale: s)
+                                .opacity(revealStage >= 1 ? 1.0 : 0.25)
+                                .scaleEffect(revealStage >= 1 ? 1.0 : 0.92)
                             rewardBox(icon: "shop-dna-s", title: "+\(reward.dna)", subtitle: "DNA", scale: s)
+                                .opacity(revealStage >= 2 ? 1.0 : 0.25)
+                                .scaleEffect(revealStage >= 2 ? 1.0 : 0.92)
                         }
 
-                        HStack(spacing: 8 * s) {
-                            SkinSelectorPreview(skinName: reward.skinName)
-                                .frame(width: 34 * s, height: 34 * s)
-                            VStack(alignment: .leading, spacing: 1 * s) {
-                                Text("Skin #\(reward.skinName)")
-                                    .font(.custom("OpenSans-Bold", size: 11 * s))
-                                    .foregroundColor(Color(hex: 0x3D4347))
-                                HStack(spacing: 3 * s) {
-                                    Image("potion-skinpiece").resizable().scaledToFit().frame(width: 12 * s, height: 12 * s)
-                                    Text("+\(reward.skinPieces) Pieces")
-                                        .font(.custom("Lato-Regular", size: 10 * s))
-                                        .foregroundColor(Color(hex: 0x43A81D))
+                        VStack(spacing: 4 * s) {
+                            HStack(spacing: 8 * s) {
+                                SkinSelectorPreview(skinName: reward.skinName)
+                                    .frame(width: 34 * s, height: 34 * s)
+                                VStack(alignment: .leading, spacing: 1 * s) {
+                                    Text("Skin #\(reward.skinName)")
+                                        .font(.custom("OpenSans-Bold", size: 11 * s))
+                                        .foregroundColor(Color(hex: 0x3D4347))
+                                    HStack(spacing: 3 * s) {
+                                        Image("potion-skinpiece").resizable().scaledToFit().frame(width: 12 * s, height: 12 * s)
+                                        Text("+\(reward.skinPieces) Pieces")
+                                            .font(.custom("Lato-Regular", size: 10 * s))
+                                            .foregroundColor(Color(hex: 0x43A81D))
+                                    }
+                                }
+                                Spacer()
+                            }
+                            GeometryReader { geo in
+                                ZStack(alignment: .leading) {
+                                    Image("potion-progressbar-bg").resizable()
+                                    Image("potion-progressbar-green")
+                                        .resizable()
+                                        .frame(width: max(6 * s, geo.size.width * min(1.0, CGFloat(reward.skinPieces) / 10.0)))
                                 }
                             }
-                            Spacer()
+                            .frame(height: 7 * s)
                         }
                         .padding(7 * s)
                         .background(MCFSFrame(name: "mcfs-white"))
+                        .opacity(revealStage >= 3 ? 1.0 : 0.25)
+                        .scaleEffect(revealStage >= 3 ? 1.0 : 0.94)
 
-                        Button(action: {
-                            SoundManager.shared.play(.menuClick)
-                            onCollect()
-                        }) {
-                            Text("Collect Rewards")
+                        Button(action: { advanceReveal() }) {
+                            Text(revealStage == 0 ? "Tap to Open!" : (revealStage < 3 ? "Reveal Next (\(revealStage)/3)" : "Collect Rewards"))
                                 .font(.custom("OpenSans-Bold", size: 13 * s))
                                 .foregroundColor(.white)
                                 .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 32 * s)
                         }
-                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
+                        .buttonStyle(MCFSBevelStyle(frameAsset: revealStage >= 3 ? "mcfs-green" : "mcfs-light-blue"))
                     }
                     .padding(10 * s)
                     .background(MCFSFrame(name: "mcfs-light-grey"))
                 }
             }
             .padding(14 * s)
-            .frame(width: min(containerSize.width * 0.9, 430 * s))
+            .frame(width: min(containerSize.width * 0.9, 435 * s))
             .background(MCFSFrame(name: "mcfs-white"))
             .shadow(color: .black.opacity(0.4), radius: 16, y: 6)
         }
         .onAppear {
-            withAnimation(.spring(response: 0.42, dampingFraction: 0.65)) {
-                revealed = true
+            withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
+                bottleBounce = true
             }
         }
     }

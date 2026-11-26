@@ -1709,7 +1709,7 @@ class FoodManager: ObservableObject {
     // over and dragged the whole SwiftUI graph through a diff each time.
     var grid: [GridKey: [Food]] = [:]
     let gridSize: CGFloat = 300
-    let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
+    var worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
     
     func spawn(count: Int) {
         for _ in 0..<count {
@@ -2478,14 +2478,18 @@ class EjectedMassManager: ObservableObject {
     let gridSize: CGFloat = 500
     let friction: CGFloat = CGFloat(OriginalGameplay.cellDeceleration)
     let stopThreshold: CGFloat = CGFloat(OriginalGameplay.minVelocityToMove * OriginalGameplay.baseVelocityCompensation)
-    private let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
+    private var worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
     // Renderer geometry is intentionally asymmetric (1.8r rect beginning at centre-r).
     // Include half of the 8pt stroke so no pixel can cross the world plate.
     private let renderedRadius: CGFloat = CGFloat(OriginalGameplay.shotMassBaseRadius)
     private let renderedStrokeHalfWidth: CGFloat = 5.0
     
+    func setWorldSize(_ size: CGFloat) {
+        worldSize = size
+    }
+
     @inline(__always)
-    private func borderSafePosition(_ point: CGPoint) -> CGPoint {
+    private func borderSafePosition(_ point: CGPoint, worldSize: CGFloat) -> CGPoint {
         let margin = renderedRadius + renderedStrokeHalfWidth
         return CGPoint(x: min(worldSize - margin, max(margin, point.x)),
                        y: min(worldSize - margin, max(margin, point.y)))
@@ -2514,7 +2518,7 @@ class EjectedMassManager: ObservableObject {
         // could spend one whole frame beyond the wall when hold-ejecting into the border.
         let newMass = EjectedMass(ownerID: ownerID,
                                   sourceCellID: sourceCellID,
-                                  position: borderSafePosition(position),
+                                  position: borderSafePosition(position, worldSize: worldSize),
                                   direction: direction,
                                   currentSpeed: initialSpeed,
                                   creationTime: now,
@@ -2527,6 +2531,7 @@ class EjectedMassManager: ObservableObject {
     }
     
     func update(dt: CGFloat, worldSize: CGFloat) {
+        self.worldSize = worldSize
         let timeScale = dt * 60.0
         let decay = OriginalGameplay.impulseDecay(dt: dt)
         
@@ -2551,7 +2556,7 @@ class EjectedMassManager: ObservableObject {
             activeMasses[i].position.y += activeMasses[i].direction.height * distanceStep
             
             let unclamped = activeMasses[i].position
-            activeMasses[i].position = borderSafePosition(unclamped)
+            activeMasses[i].position = borderSafePosition(unclamped, worldSize: worldSize)
             let hitVerticalWall = activeMasses[i].position.x != unclamped.x
             let hitHorizontalWall = activeMasses[i].position.y != unclamped.y
             
@@ -2826,7 +2831,7 @@ enum LeagueBadge {
 }
 
 struct GameWorldView: View {
-    let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
+    var worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
     let cellSize: CGFloat = 50
     let screenSize: CGSize
     
@@ -2909,7 +2914,8 @@ struct GameWorldView: View {
             context.fill(Path(screenBounds), with: .color(Color(hex: darkModeGrid ? 0x000000 : 0xFFFFFF)))
             
             // 2. Classic FFA Grid (`OptimizedArenaBackground::draw` 0x10030e108):
-            // Bounded to [0, worldSize] with Retina 1px light / 2px dark hairlines and a matching subtle perimeter frame.
+            // Infinite 50u grid across the entire viewport (including beyond [0, worldSize],
+            // shaded outside the border by ArenaBoundaryShaderEffect).
             let boundaryRect = CGRect(x: cameraOffsetX,
                                       y: cameraOffsetY,
                                       width: worldSize * zoom,
@@ -2918,45 +2924,33 @@ struct GameWorldView: View {
                 let gridIntensity = min(0.85, max(0.10, (50.0 * 50.0 * zoom * zoom) / 5000.0 + 0.10))
                 let gridGray = darkModeGrid ? gridIntensity : (1.0 - gridIntensity)
                 let gridColor = Color(red: gridGray, green: gridGray, blue: gridGray)
-                let hairline = 1.0 / max(1.0, UIScreen.main.scale)
-                let lineWidth: CGFloat = darkModeGrid ? max(1.0, hairline * 2.0) : hairline
-                
-                let minScreenX = max(0, boundaryRect.minX)
-                let maxScreenX = min(size.width, boundaryRect.maxX)
-                let minScreenY = max(0, boundaryRect.minY)
-                let maxScreenY = min(size.height, boundaryRect.maxY)
-                
-                if maxScreenX > minScreenX && maxScreenY > minScreenY {
-                    let startX = max(0, floor(visibleRect.minX / cellSize) * cellSize)
-                    let endX = min(worldSize, ceil(visibleRect.maxX / cellSize) * cellSize)
-                    let gridPathX = Path { p in
-                        for x in stride(from: startX, through: endX, by: cellSize) {
-                            let screenX = x * zoom + cameraOffsetX
-                            if screenX >= minScreenX - 1 && screenX <= maxScreenX + 1 {
-                                p.move(to: CGPoint(x: screenX, y: minScreenY))
-                                p.addLine(to: CGPoint(x: screenX, y: maxScreenY))
-                            }
-                        }
-                    }
-                    context.stroke(gridPathX, with: .color(gridColor), lineWidth: lineWidth)
-                    
-                    let startY = max(0, floor(visibleRect.minY / cellSize) * cellSize)
-                    let endY = min(worldSize, ceil(visibleRect.maxY / cellSize) * cellSize)
-                    let gridPathY = Path { p in
-                        for y in stride(from: startY, through: endY, by: cellSize) {
-                            let screenY = y * zoom + cameraOffsetY
-                            if screenY >= minScreenY - 1 && screenY <= maxScreenY + 1 {
-                                p.move(to: CGPoint(x: minScreenX, y: screenY))
-                                p.addLine(to: CGPoint(x: maxScreenX, y: screenY))
-                            }
-                        }
-                    }
-                    context.stroke(gridPathY, with: .color(gridColor), lineWidth: lineWidth)
-                }
+                let lineWidth: CGFloat = darkModeGrid ? 1.33 : 1.0
 
-                if boundaryRect.intersects(screenBounds) {
-                    context.stroke(Path(boundaryRect), with: .color(gridColor), lineWidth: max(1.0, lineWidth * 1.5))
+                let startX = floor(visibleRect.minX / cellSize) * cellSize
+                let endX = ceil(visibleRect.maxX / cellSize) * cellSize
+                let gridPathX = Path { p in
+                    for x in stride(from: startX, through: endX, by: cellSize) {
+                        let screenX = x * zoom + cameraOffsetX
+                        if screenX >= -1 && screenX <= size.width + 1 {
+                            p.move(to: CGPoint(x: screenX, y: 0))
+                            p.addLine(to: CGPoint(x: screenX, y: size.height))
+                        }
+                    }
                 }
+                context.stroke(gridPathX, with: .color(gridColor), lineWidth: lineWidth)
+
+                let startY = floor(visibleRect.minY / cellSize) * cellSize
+                let endY = ceil(visibleRect.maxY / cellSize) * cellSize
+                let gridPathY = Path { p in
+                    for y in stride(from: startY, through: endY, by: cellSize) {
+                        let screenY = y * zoom + cameraOffsetY
+                        if screenY >= -1 && screenY <= size.height + 1 {
+                            p.move(to: CGPoint(x: 0, y: screenY))
+                            p.addLine(to: CGPoint(x: size.width, y: screenY))
+                        }
+                    }
+                }
+                context.stroke(gridPathY, with: .color(gridColor), lineWidth: lineWidth)
             }
             
             // 3. Food - same pellets, same 0.5px cutoff as before. The win is that the
@@ -3009,25 +3003,27 @@ struct GameWorldView: View {
             }
             visibleMasses.sort { $0.zIndex < $1.zIndex }
             
-            let massRadius = OriginalGameplay.shotMassBaseRadiusCGFloat * zoom
-            // SoftBodyCellView border on r = 40 (> 18): 10 world units (5 out + 5 in)
-            let massStroke = 10 * zoom
+            // SoftBodyCellView outer (r + 5) border fill then inner (r - 5) fill on top (no stroke halo).
+            let outerRadius = (OriginalGameplay.shotMassBaseRadiusCGFloat + 5.0) * zoom
+            let innerRadius = max(1.0, OriginalGameplay.shotMassBaseRadiusCGFloat - 5.0) * zoom
             for mass in visibleMasses {
                 guard let style = massManager.renderStyle(for: mass.styleID) else { continue }
                 // renderPosition = physical position + decaying spawn offset, so fresh
                 // burst pellets are drawn emerging from the cell's single eject spot.
                 let massScreenX = mass.renderPosition.x * zoom + cameraOffsetX
                 let massScreenY = mass.renderPosition.y * zoom + cameraOffsetY
-                
-                let drawRect = CGRect(x: massScreenX - massRadius,
-                                      y: massScreenY - massRadius,
-                                      width: massRadius * 2,
-                                      height: massRadius * 2)
-                
-                if screenBounds.intersects(drawRect) {
-                    let massPath = Path(ellipseIn: drawRect)
-                    context.fill(massPath, with: .color(style.color))
-                    context.stroke(massPath, with: .color(style.borderColor), lineWidth: massStroke)
+
+                let outerRect = CGRect(x: massScreenX - outerRadius,
+                                       y: massScreenY - outerRadius,
+                                       width: outerRadius * 2,
+                                       height: outerRadius * 2)
+                if screenBounds.intersects(outerRect) {
+                    context.fill(Path(ellipseIn: outerRect), with: .color(style.borderColor))
+                    let innerRect = CGRect(x: massScreenX - innerRadius,
+                                           y: massScreenY - innerRadius,
+                                           width: innerRadius * 2,
+                                           height: innerRadius * 2)
+                    context.fill(Path(ellipseIn: innerRect), with: .color(style.color))
                 }
             }
             
@@ -3051,13 +3047,13 @@ struct GameWorldView: View {
                     }
                 case .ejected(let styleID):
                     guard let style = massManager.renderStyle(for: styleID) else { continue }
-                    let r = OriginalGameplay.shotMassBaseRadiusCGFloat * animation.scale * zoom
-                    let rect = CGRect(x: animScreenX - r, y: animScreenY - r, width: r * 2, height: r * 2)
-                    if screenBounds.intersects(rect) {
-                        let path = Path(ellipseIn: rect)
-                        context.fill(path, with: .color(style.color.opacity(animation.alpha)))
-                        context.stroke(path, with: .color(style.borderColor.opacity(animation.alpha)),
-                                       lineWidth: 10 * animation.scale * zoom)
+                    let outerR = (OriginalGameplay.shotMassBaseRadiusCGFloat + 5.0) * animation.scale * zoom
+                    let innerR = max(0.5, (OriginalGameplay.shotMassBaseRadiusCGFloat - 5.0) * animation.scale * zoom)
+                    let outerRect = CGRect(x: animScreenX - outerR, y: animScreenY - outerR, width: outerR * 2, height: outerR * 2)
+                    if screenBounds.intersects(outerRect) {
+                        context.fill(Path(ellipseIn: outerRect), with: .color(style.borderColor.opacity(animation.alpha)))
+                        let innerRect = CGRect(x: animScreenX - innerR, y: animScreenY - innerR, width: innerR * 2, height: innerR * 2)
+                        context.fill(Path(ellipseIn: innerRect), with: .color(style.color.opacity(animation.alpha)))
                     }
                 case .token:
                     let r = 26 * animation.scale * zoom
@@ -3603,17 +3599,22 @@ struct GameWorldView: View {
         }
 
         // Exact ArenaBoundaryShaderEffect out-of-bounds fade:
-        // Light mode: Multiply (#5A5A5A with alpha mix(1.0, 0.35, tEase)) -> shades over grid cleanly
-        // Dark mode: Alpha (#B4B4B4 with 0.863 * alphaFactor)
+        // Light mode: Multiply opaque mix(mix(vec3(1.0), fillColor, 0.35), fillColor, 1.0 - tEase)
+        //             -> #5A5A5A at border transitioning to #C5C5C5 far out, tinting infinite grid lines cleanly
+        // Dark mode: Alpha #B4B4B4 with 0.863 * alphaFactor over dark grid
         let fadeDist = max(1.0, 2.0 * screenBounds.width)
-        let r: Double = darkMode ? (180.0 / 255.0) : (90.0 / 255.0)
-        let baseAlpha: Double = darkMode ? 0.863 : 1.0
+        let fillScalar: Double = darkMode ? (180.0 / 255.0) : (90.0 / 255.0)
         let samplePositions: [CGFloat] = [0.0, 0.12, 0.28, 0.48, 0.72, 1.0]
         let stops: [Gradient.Stop] = samplePositions.map { t in
             let distSq = min(1.0, Double(t * t))
             let tEase = 1.0 - pow(1.0 - distSq, 0.75)
             let alphaFactor = 1.0 - 0.65 * tEase
-            return Gradient.Stop(color: Color(red: r, green: r, blue: r).opacity(baseAlpha * alphaFactor), location: t)
+            if darkMode {
+                return Gradient.Stop(color: Color(red: fillScalar, green: fillScalar, blue: fillScalar).opacity(0.863 * alphaFactor), location: t)
+            } else {
+                let multGray = 1.0 - (1.0 - fillScalar) * alphaFactor
+                return Gradient.Stop(color: Color(red: multGray, green: multGray, blue: multGray), location: t)
+            }
         }
         let fadeGradient = Gradient(stops: stops)
 
@@ -4852,17 +4853,9 @@ struct ContentView: View {
     }
     
     var playerCenter: CGPoint {
-        var totalRadius: CGFloat = 0
-        var weightedX: CGFloat = 0
-        var weightedY: CGFloat = 0
-        for cell in playerCells {
-            let weight = max(cell.cachedVisualRadius, 1)
-            totalRadius += weight
-            weightedX += cell.position.x * weight
-            weightedY += cell.position.y * weight
-        }
-        guard totalRadius > 0 else { return .zero }
-        return CGPoint(x: weightedX / totalRadius, y: weightedY / totalRadius)
+        OriginalGameplay.radiusWeightedCenter(
+            playerCells.map { ($0.position, $0.cachedSolidRadius) }
+        )
     }
     
     @State private var zoomLevel: CGFloat = 1.0
@@ -5009,6 +5002,7 @@ struct ContentView: View {
                 
                 if isPlaying {
                     GameWorldView(
+                        worldSize: OriginalGameplay.offlineArenaSideLength,
                         screenSize: CGSize(width: geometry.size.width, height: geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom),
                         smoothedPlayerPosition: $smoothedPlayerPosition,
                         zoomLevel: $zoomLevel,
@@ -5171,7 +5165,7 @@ struct ContentView: View {
                                 let y = tCells.reduce(CGFloat(0)) { $0 + $1.position.y * $1.mass } / total
                                 return [CGPoint(x: x, y: y)]
                             } ?? [],
-                            worldSize: OriginalGameplay.arenaSideLengthCGFloat
+                            worldSize: OriginalGameplay.offlineArenaSideLength
                         )
                         .zIndex(1)
                     }
@@ -5525,7 +5519,7 @@ struct ContentView: View {
                 performOptimizedMassCollisions(nowTS: currentTime, index: cellIndex)
                 
                 updateMassAbsorption(dt: deltaTime)
-                massManager.update(dt: deltaTime, worldSize: OriginalGameplay.arenaSideLengthCGFloat)
+                massManager.update(dt: deltaTime, worldSize: OriginalGameplay.offlineArenaSideLength)
                 
                 updateCellState(cells: &playerCells, dt: deltaTime)
                 updateCellState(cells: &botCells, dt: deltaTime)
@@ -5534,26 +5528,13 @@ struct ContentView: View {
                 handleCellMerging(cells: &botCells, dt: deltaTime)
                 
                 let targetPos = playerCenter
-                // When the cell roster changes, the mass-weighted centre teleports. Bank the
-                // teleport into an offset (so this frame renders from the same place as the
-                // last one) and let the offset decay smoothly instead of snapping the camera.
-                // Splits keep the weighted centre, so their banked offset is ~one frame of
-                // ordinary movement - negligible. Normal frames still track exactly as before.
-                if playerCells.count != lastCameraCellCount, let previous = lastCameraTargetPos {
-                    cameraJumpOffset.width += previous.x - targetPos.x
-                    cameraJumpOffset.height += previous.y - targetPos.y
-                }
+                cameraJumpOffset = .zero
                 lastCameraCellCount = playerCells.count
                 lastCameraTargetPos = targetPos
-                let jumpDecay = getLerpFactor(base: 0.10, dt: deltaTime)
-                cameraJumpOffset.width *= (1.0 - jumpDecay)
-                cameraJumpOffset.height *= (1.0 - jumpDecay)
-                if abs(cameraJumpOffset.width) < 0.05 { cameraJumpOffset.width = 0 }
-                if abs(cameraJumpOffset.height) < 0.05 { cameraJumpOffset.height = 0 }
                 
                 let camSmooth = getLerpFactor(base: OriginalGameplay.cameraPositionSnapRate, dt: deltaTime)
-                smoothedPlayerPosition.x += (targetPos.x + cameraJumpOffset.width - smoothedPlayerPosition.x) * camSmooth
-                smoothedPlayerPosition.y += (targetPos.y + cameraJumpOffset.height - smoothedPlayerPosition.y) * camSmooth
+                smoothedPlayerPosition.x += (targetPos.x - smoothedPlayerPosition.x) * camSmooth
+                smoothedPlayerPosition.y += (targetPos.y - smoothedPlayerPosition.y) * camSmooth
                 
                 updateCameraZoom(dt: deltaTime)
                 
@@ -5988,7 +5969,7 @@ struct ContentView: View {
     
     @inline(__always)
     private func clampToWorld(_ point: CGPoint, margin: CGFloat = 120) -> CGPoint {
-        let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
+        let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
         return CGPoint(x: min(worldSize - margin, max(margin, point.x)),
                        y: min(worldSize - margin, max(margin, point.y)))
     }
@@ -6036,7 +6017,7 @@ struct ContentView: View {
     }
     
     private func spawnSingleBot() {
-        let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
+        let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
         let spawnMass: CGFloat
         if randomizeBotStartMass {
             if initialBotFillActive {
@@ -6132,7 +6113,7 @@ struct ContentView: View {
     }
     
     private func spawnSingleFeedBot() {
-        let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
+        let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
         let botRadius = OriginalGameplay.radius(forMass: 100.0)
         var safePos: CGPoint = .zero
         var found = false
@@ -6449,8 +6430,8 @@ struct ContentView: View {
         }
         
         let predictedTarget = CGPoint(
-            x: min(OriginalGameplay.arenaSideLengthCGFloat, max(0, target.x + target.vx * 16)),
-            y: min(OriginalGameplay.arenaSideLengthCGFloat, max(0, target.y + target.vy * 16))
+            x: min(OriginalGameplay.offlineArenaSideLength, max(0, target.x + target.vx * 16)),
+            y: min(OriginalGameplay.offlineArenaSideLength, max(0, target.y + target.vy * 16))
         )
         var bestShot: (virusIndex: Int, firingPoint: CGPoint, score: CGFloat)? = nil
         
@@ -6473,7 +6454,7 @@ struct ContentView: View {
                 y: virus.position.y - shotDirection.height * standOff
             )
             let margin = brain.cachedVisualRadius * 0.55 + 25
-            let worldSize = OriginalGameplay.arenaSideLengthCGFloat
+            let worldSize = OriginalGameplay.offlineArenaSideLength
             if firingPoint.x < margin || firingPoint.x > worldSize - margin
                 || firingPoint.y < margin || firingPoint.y > worldSize - margin {
                 return
@@ -6617,8 +6598,8 @@ struct ContentView: View {
             if centreDX * centreDX + centreDY * centreDY > 3_200 * 3_200 { continue }
             
             // Lead a moving/split target modestly; over-leading is worse than a late shot.
-            let predicted = CGPoint(x: min(OriginalGameplay.arenaSideLengthCGFloat, max(0, enemy.x + enemy.vx * 18)),
-                                    y: min(OriginalGameplay.arenaSideLengthCGFloat, max(0, enemy.y + enemy.vy * 18)))
+            let predicted = CGPoint(x: min(OriginalGameplay.offlineArenaSideLength, max(0, enemy.x + enemy.vx * 18)),
+                                    y: min(OriginalGameplay.offlineArenaSideLength, max(0, enemy.y + enemy.vy * 18)))
             
             worldObjectIndex.forEachVirus(
                 near: predicted,
@@ -6635,7 +6616,7 @@ struct ContentView: View {
                 let standOff = virus.radius + teammateRadius + 110
                 let firingPoint = CGPoint(x: virus.position.x - shotDirection.width * standOff,
                                           y: virus.position.y - shotDirection.height * standOff)
-                let worldSize = OriginalGameplay.arenaSideLengthCGFloat
+                let worldSize = OriginalGameplay.offlineArenaSideLength
                 if firingPoint.x < teammateRadius + 20 || firingPoint.x > worldSize - teammateRadius - 20
                     || firingPoint.y < teammateRadius + 20 || firingPoint.y > worldSize - teammateRadius - 20 {
                     return
@@ -8212,7 +8193,7 @@ struct ContentView: View {
 
     private func botMindPerceive(oid: UUID, brain: PlayerCell, skill: Double,
                                  index: CellIndex) -> BotMindBox.Sense {
-        let worldSize = Double(OriginalGameplay.arenaSideLength)
+        let worldSize = Double(OriginalGameplay.offlineArenaSideLength)
         var s = BotMindBox.Sense()
         let myPos = BMVec(brain.position)
         let myMass = Double(brain.mass)
@@ -8320,13 +8301,13 @@ struct ContentView: View {
     }
 
     private func botMindClamp(_ t: BMVec) -> CGPoint {
-        let m = 120.0, ws = OriginalGameplay.arenaSideLength
+        let m = 120.0, ws = Double(OriginalGameplay.offlineArenaSideLength)
         return CGPoint(x: min(ws - m, max(m, t.x)), y: min(ws - m, max(m, t.y)))
     }
 
     private func botMindForwardWaypoint(from p: BMVec, heading: BMVec,
                                         reach: ClosedRange<Double> = 1200...2600) -> BMVec {
-        let ws = OriginalGameplay.arenaSideLength
+        let ws = Double(OriginalGameplay.offlineArenaSideLength)
         var base: Double
         if heading == .zero {
             let seed = sin(p.x * 0.013 + p.y * 0.021) * 43758.5453
@@ -8349,7 +8330,7 @@ struct ContentView: View {
     }
 
     private func botMindNearestWallPoint(_ p: BMVec) -> BMVec {
-        let ws = OriginalGameplay.arenaSideLength
+        let ws = Double(OriginalGameplay.offlineArenaSideLength)
         let d = [p.x, ws - p.x, p.y, ws - p.y]
         switch d.firstIndex(of: d.min()!)! {
         case 0: return BMVec(x: 130, y: p.y)
@@ -8360,7 +8341,7 @@ struct ContentView: View {
     }
 
     private func botMindWallRunDest(from: BMVec, dest: BMVec) -> BMVec {
-        let ws = OriginalGameplay.arenaSideLength
+        let ws = Double(OriginalGameplay.offlineArenaSideLength)
         let d = [from.x, ws - from.x, from.y, ws - from.y]
         switch d.firstIndex(of: d.min()!)! {
         case 0: return BMVec(x: 130, y: dest.y)
@@ -8479,7 +8460,7 @@ struct ContentView: View {
                     var drift = BotMindBox.Plan()
                     drift.kind = .travel; drift.variant = BotMindBox.tvPlain
                     drift.bornAt = now; drift.commitUntil = now + 1.6
-                    let m = 120.0, wsz = OriginalGameplay.arenaSideLength
+                    let m = 120.0, wsz = Double(OriginalGameplay.offlineArenaSideLength)
                     drift.target = BMVec(x: min(wsz - m, max(m, myPosP.x + awayG.x * 1100)),
                                          y: min(wsz - m, max(m, myPosP.y + awayG.y * 1100)))
                     st.plan = drift
@@ -8635,7 +8616,7 @@ struct ContentView: View {
     private func botMindEscape(oid: UUID, brainIdx: Int, frame: BotOwnerFrame,
                                sense: BotMindBox.Sense, st: inout BotMindBox.BotState,
                                now: Double) {
-        let ws = OriginalGameplay.arenaSideLength
+        let ws = Double(OriginalGameplay.offlineArenaSideLength)
         let brain = botCells[brainIdx]
         let myPos = BMVec(brain.position)
         let myR = Double(brain.cachedSolidRadius)
@@ -8866,7 +8847,7 @@ struct ContentView: View {
                                    sense: BotMindBox.Sense, st: inout BotMindBox.BotState,
                                    now: Double, allyCentre: CGPoint?, allyMass: CGFloat)
         -> BotMindBox.Plan {
-        let ws = OriginalGameplay.arenaSideLength
+        let ws = Double(OriginalGameplay.offlineArenaSideLength)
         let brain = botCells[brainIdx]
         let myPos = BMVec(brain.position)
         let myMass = Double(brain.mass)
@@ -9630,7 +9611,7 @@ struct ContentView: View {
 
     private func updateBotAI(dt: CGFloat, index: CellIndex) {
         guard !botCells.isEmpty else { return }
-        let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
+        let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
         let globalSkill = CGFloat(max(0.3, min(2.0, botSkill)))
         
         // ---- 1. Group bookkeeping (single pass, one UUID dictionary) ----
@@ -9944,7 +9925,7 @@ struct ContentView: View {
     }
     
     private func moveBots(dt: CGFloat) {
-        let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
+        let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
         let timeScale = dt * 60.0
         // Mutate one uniquely owned local array, then publish one State write. Directly
         // subscript-mutating @State dozens of times per cell repeatedly entered its modify
@@ -10039,15 +10020,15 @@ struct ContentView: View {
                     return
                 }
                 
-                let overlapFactor: CGFloat = 0.5
-                let threshold = eater.solidRadius - victim.solidRadius * overlapFactor
+                // Arena_canEat (0x10004da4c): ((rA + rB) - dist) * 0.5 / rB >= 0.5  <=>  dist <= rA
+                let threshold = eater.solidRadius
                 if threshold <= 0 { return }
                 
                 let dx = eater.x - victim.x
                 if dx < -threshold || dx > threshold { return }
                 let dy = eater.y - victim.y
                 if dy < -threshold || dy > threshold { return }
-                if dx * dx + dy * dy >= threshold * threshold { return }
+                if dx * dx + dy * dy > threshold * threshold { return }
                 
                 eaterByVictimID[victim.id] = eater.id
                 eatenMassByVictimID[victim.id] = victim.mass
@@ -10502,7 +10483,7 @@ struct ContentView: View {
     
     @discardableResult
     private func moveViruses(dt: CGFloat) -> Bool {
-        let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
+        let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
         var movedAny = false
         for i in viruses.indices {
             if viruses[i].velocity.width != 0 || viruses[i].velocity.height != 0 {
@@ -10539,75 +10520,50 @@ struct ContentView: View {
             radii[i] = cells[i].cachedVisualRadius
         }
         
-        for _ in 0..<2 {
-            var resolvedAnyOverlap = false
-            for (_, indices) in groups {
-                guard indices.count > 1 else { continue }
-                for i in 0..<indices.count {
-                    for j in (i + 1)..<indices.count {
-                        let idx1 = indices[i]
-                        let idx2 = indices[j]
-                        guard cells[idx1].mergeTimer > 0 || cells[idx2].mergeTimer > 0 else { continue }
-                        
-                        let cell1 = cells[idx1]
-                        let cell2 = cells[idx2]
-                        
-                        let totalRadius = radii[idx1] + radii[idx2]
-                        let dx = cell2.position.x - cell1.position.x
-                        if dx < -totalRadius || dx > totalRadius { continue }
-                        let dy = cell2.position.y - cell1.position.y
-                        if dy < -totalRadius || dy > totalRadius { continue }
-                        
-                        let distSq = dx*dx + dy*dy
-                        
-                        if distSq < (totalRadius * totalRadius) {
-                            resolvedAnyOverlap = true
-                            var distance = sqrt(distSq)
-                            var safeDx = dx
-                            var safeDy = dy
-                            if distance == 0 { distance = 1.0; safeDx = 1.0; safeDy = 0.0 }
-                            
-                            let overlap = totalRadius - distance
-                            let direction = CGSize(width: safeDx / distance, height: safeDy / distance)
-                            let totalMass = cell1.mass + cell2.mass
-                            guard totalMass > 0 else { continue }
-                            
-                            let timer1 = cells[idx1].splitTimer
-                            let timer2 = cells[idx2].splitTimer
-                            let maxTimer = max(timer1, timer2)
-                            let normalizedTimer = min(max(maxTimer, 0.0), 1.0)
-                            let resolutionForce: CGFloat = 0.65 - (normalizedTimer * 0.60)
-                            
-                            let actualPush = overlap * resolutionForce
-                            // v5.8: a piece fully ENGULFED by a bigger cell used
-                            // to shove it around (overlap ≈ both radii → even a
-                            // tiny mass share moved the giant fast). Contained
-                            // piece now slides out on its own; the big cell
-                            // holds its ground.
-                            let contained = distance + min(radii[idx1], radii[idx2])
-                                <= max(radii[idx1], radii[idx2])
-                            if contained {
-                                if radii[idx1] >= radii[idx2] {
-                                    cells[idx2].position.x += direction.width * actualPush
-                                    cells[idx2].position.y += direction.height * actualPush
-                                } else {
-                                    cells[idx1].position.x -= direction.width * actualPush
-                                    cells[idx1].position.y -= direction.height * actualPush
-                                }
-                            } else {
-                                let pushback1 = (cell2.mass / totalMass) * actualPush
-                                let pushback2 = (cell1.mass / totalMass) * actualPush
-                                
-                                cells[idx1].position.x -= direction.width * pushback1
-                                cells[idx1].position.y -= direction.height * pushback1
-                                cells[idx2].position.x += direction.width * pushback2
-                                cells[idx2].position.y += direction.height * pushback2
-                            }
-                        }
+        for (_, indices) in groups {
+            guard indices.count > 1 else { continue }
+            for i in 0..<indices.count {
+                for j in (i + 1)..<indices.count {
+                    let idx1 = indices[i]
+                    let idx2 = indices[j]
+                    guard cells[idx1].mergeTimer > 0 || cells[idx2].mergeTimer > 0 else { continue }
+                    if cells[idx1].immuneToCellID == cells[idx2].id || cells[idx2].immuneToCellID == cells[idx1].id {
+                        continue
+                    }
+
+                    let cell1 = cells[idx1]
+                    let cell2 = cells[idx2]
+                    let r1 = radii[idx1]
+                    let r2 = radii[idx2]
+                    let totalRadius = r1 + r2
+                    let dx = cell2.position.x - cell1.position.x
+                    if dx < -totalRadius || dx > totalRadius { continue }
+                    let dy = cell2.position.y - cell1.position.y
+                    if dy < -totalRadius || dy > totalRadius { continue }
+
+                    let distSq = dx * dx + dy * dy
+                    if distSq < (totalRadius * totalRadius) {
+                        var distance = sqrt(distSq)
+                        var safeDx = dx
+                        var safeDy = dy
+                        if distance == 0 { distance = 1.0; safeDx = 1.0; safeDy = 0.0 }
+
+                        // Arena_selfCollision (0x10004e5e0): mass-ratio overlap pushout proportional to r^2
+                        let overlap = totalRadius - distance
+                        let denom = r1 * r1 + r2 * r2
+                        guard denom > 0 else { continue }
+                        let nx = safeDx / distance
+                        let ny = safeDy / distance
+                        let pushback1 = overlap * ((r2 * r2) / denom)
+                        let pushback2 = overlap * ((r1 * r1) / denom)
+
+                        cells[idx1].position.x -= nx * pushback1
+                        cells[idx1].position.y -= ny * pushback1
+                        cells[idx2].position.x += nx * pushback2
+                        cells[idx2].position.y += ny * pushback2
                     }
                 }
             }
-            if !resolvedAnyOverlap { break }
         }
     }
     
@@ -10616,15 +10572,11 @@ struct ContentView: View {
     }
     
     private func updateCameraZoom(dt: CGFloat) {
-        let smoothFactor = getLerpFactor(base: 0.15, dt: dt)
-        smoothedTotalMass += (totalPlayerMass - smoothedTotalMass) * smoothFactor
-
-        let rawMass = max(totalPlayerMass, 1)
-        let rawRadiusSum = playerCells.reduce(CGFloat(0)) { $0 + $1.cachedVisualRadius }
-        let smoothedRadiusSum = rawRadiusSum * sqrt(max(smoothedTotalMass, 1) / rawMass)
+        smoothedTotalMass = totalPlayerMass
+        let totalRadius = playerCells.reduce(CGFloat(0)) { $0 + $1.cachedSolidRadius }
         let customZoomMultiplier = 1.0 - ((CGFloat(zoomSliderValue) - 1.0) / 49.0) * 0.9
         let targetZoom = OriginalGameplay.calculateZoom(
-            totalRadius: max(smoothedRadiusSum, CGFloat(OriginalGameplay.baseRadius)),
+            totalRadius: max(totalRadius, CGFloat(OriginalGameplay.baseRadius)),
             cellCount: max(playerCells.count, 1),
             viewportSize: UIScreen.main.bounds.size,
             customZoomMultiplier: customZoomMultiplier
@@ -10648,7 +10600,7 @@ struct ContentView: View {
     }
     
     private func movePlayer(dt: CGFloat) {
-        let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
+        let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
         var globalDirectionNorm: CGSize = .zero
         var inputScale: CGFloat = 0
         
@@ -10656,9 +10608,10 @@ struct ContentView: View {
             let joyX = joystickOffset.width
             let joyY = joystickOffset.height
             let joyMagnitude = sqrt(joyX * joyX + joyY * joyY)
+            let minJoy: CGFloat = 8.0
             let maxJoy: CGFloat = 65.0
-            // minDPadRadiusFactor = 0.6 -> full speed at ~65% stick throw, smooth ramp below.
-            inputScale = joyMagnitude < 4.0 ? 0.0 : min(1.0, max(0.20, joyMagnitude / (maxJoy * 0.65)))
+            // Smooth 0..1 curve from deadzone (8pt) to outer throw (65pt)
+            inputScale = joyMagnitude <= minJoy ? 0.0 : min(1.0, (joyMagnitude - minJoy) / (maxJoy - minJoy))
             if joyMagnitude > 0.001 {
                 globalDirectionNorm = CGSize(width: joyX / joyMagnitude, height: joyY / joyMagnitude)
             }
@@ -10666,12 +10619,14 @@ struct ContentView: View {
             globalDirectionNorm = lastJoystickDirection.normalized()
         }
 
-        // Virtual world cursor ahead of cluster so multi-cell packs converge organically like desktop/mobile Agar.io.
+        // Virtual world cursor well outside clusterExtent so multi-cell packs never fold backwards
         let flockCenter = playerCenter
+        let clusterExtent: CGFloat = playerCells.reduce(0) { best, c in
+            max(best, hypot(c.position.x - flockCenter.x, c.position.y - flockCenter.y) + c.cachedVisualRadius)
+        }
         let focalWorldCursor: CGPoint? = {
             guard globalDirectionNorm != .zero else { return nil }
-            let screenFocusScale: CGFloat = joystickIsDragging ? max(0.25, inputScale) : 1.0
-            let focalDistance = max(140.0 / max(zoomLevel, 0.05), 420.0 * screenFocusScale / max(zoomLevel, 0.05))
+            let focalDistance = max(clusterExtent + 600.0 / max(zoomLevel, 0.05), 800.0 / max(zoomLevel, 0.05))
             return CGPoint(x: flockCenter.x + globalDirectionNorm.width * focalDistance,
                            y: flockCenter.y + globalDirectionNorm.height * focalDistance)
         }()
@@ -10760,7 +10715,7 @@ struct ContentView: View {
                               for ownerID: UUID,
                               direction: CGSize,
                               toward targetPoint: CGPoint? = nil) {
-        let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
+        let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
         var splitDirection = direction.normalized()
         if splitDirection == .zero { splitDirection = CGSize(width: 0, height: 1) }
         var newCells:[PlayerCell] = []
@@ -10815,7 +10770,7 @@ struct ContentView: View {
                     name: cells[index].name, skinName: cells[index].skinName, isBot: cells[index].isBot,
                     isFeedBot: cells[index].isFeedBot, aiSkillTier: cells[index].aiSkillTier
                 )
-                newCell.splitImmunityTimer = 0.2
+                newCell.splitImmunityTimer = 0.12
                 newCell.immuneToCellID = cells[index].id
                 // Font lineage: ONLY the new piece coming out of an at/above-threshold
                 // cell is born at the half ratio. The splitting cell itself keeps
@@ -10879,7 +10834,7 @@ struct ContentView: View {
     }
     
     private func updateCellDeformation(dt: CGFloat) {
-        let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
+        let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
         let visRect = visibleWorldRect
         let relax = 1.0 - pow(0.05, dt)
         
@@ -11132,12 +11087,12 @@ struct ContentView: View {
                 if popped { return }
                 if c.mass < popThreshold { return }
                 if poppedCellIDs.contains(c.id) { return }
-                let triggerRadius = max(c.radius * 0.4, c.radius - virus.radius * CGFloat(OriginalGameplay.overlapRatioForEating * 0.6))
+                let triggerRadius = c.radius
                 let dx = c.x - virus.position.x
                 if dx < -triggerRadius || dx > triggerRadius { return }
                 let dy = c.y - virus.position.y
                 if dy < -triggerRadius || dy > triggerRadius { return }
-                guard dx * dx + dy * dy < triggerRadius * triggerRadius else { return }
+                guard dx * dx + dy * dy <= triggerRadius * triggerRadius else { return }
                 
                 popped = true
                 poppedCellIDs.insert(c.id)
@@ -11172,7 +11127,7 @@ struct ContentView: View {
             for i in virusIndicesToRemove.sorted(by: >) where i < viruses.count {
                 viruses.remove(at: i)
             }
-            let missingViruses = 35 - viruses.count
+            let missingViruses = 16 - viruses.count
             if missingViruses > 0 {
                 for _ in 0..<missingViruses {
                     viruses.append(spawnSingleVirusSafely())
@@ -11194,7 +11149,7 @@ struct ContentView: View {
                 }
                 continue
             }
-            let worldSize = OriginalGameplay.arenaSideLengthCGFloat
+            let worldSize = OriginalGameplay.offlineArenaSideLength
             let spawnOffset = CGFloat(OriginalGameplay.mitosisPositionFactor)
             let impulse = CGFloat(OriginalGameplay.splitImpulsePerSecond)
             let pieceRadius = OriginalGameplay.radius(forMass: pieceMass)
@@ -11235,7 +11190,7 @@ struct ContentView: View {
                         isFeedBot: botCells[action.cellIndex].isFeedBot,
                         aiSkillTier: botCells[action.cellIndex].aiSkillTier
                     )
-                    newCell.splitImmunityTimer = 0.2
+                    newCell.splitImmunityTimer = 0.12
                     newCell.immuneToCellID = botCells[action.cellIndex].id
                     newCell.massFontHalved = poppedHalvesFont
                     newCell.massFontScale = poppedHalvesFont ? 0.5 : 1.0
@@ -11243,7 +11198,7 @@ struct ContentView: View {
                     newCell.aiCaution = botCells[action.cellIndex].aiCaution
                     let impulseScale = CGFloat.random(in: 0.85...1.15)
                     newCell.velocity.width += direction.width * impulse * impulseScale
-                    newCell.velocity.height += direction.height * impulse * impulseScale
+                    newCell.velocity.height += direction.height * impulseScale * impulse
                     botCells.append(newCell)
                 }
             } else {
@@ -11280,7 +11235,7 @@ struct ContentView: View {
                         name: playerCells[action.cellIndex].name,
                         skinName: playerCells[action.cellIndex].skinName
                     )
-                    newCell.splitImmunityTimer = 0.2
+                    newCell.splitImmunityTimer = 0.12
                     newCell.immuneToCellID = playerCells[action.cellIndex].id
                     newCell.massFontHalved = poppedHalvesFont
                     newCell.massFontScale = poppedHalvesFont ? 0.5 : 1.0
@@ -11438,15 +11393,15 @@ struct ContentView: View {
                     }
                     
                     let bigRadius = cells[bigIdx].cachedSolidRadius
-                    let smallRadius = cells[smallIdx].cachedSolidRadius
-                    let threshold = bigRadius - (smallRadius * 0.15)
+                    // Arena_canEat (0x10004da4c) merge overlap check: dist <= bigRadius
+                    let threshold = bigRadius
                     guard threshold > 0 else { continue }
                     
                     let dx = cells[smallIdx].position.x - cells[bigIdx].position.x
                     if dx < -threshold || dx > threshold { continue }
                     let dy = cells[smallIdx].position.y - cells[bigIdx].position.y
                     if dy < -threshold || dy > threshold { continue }
-                    if dx * dx + dy * dy >= threshold * threshold { continue }
+                    if dx * dx + dy * dy > threshold * threshold { continue }
                     
                     let bigID = cells[bigIdx].id
                     cells[smallIdx].isMerging = true
@@ -11635,6 +11590,8 @@ struct ContentView: View {
         dualSkinSwapPhase = .idle
         dualSkinSwapPhaseEndsAt = 0
         dualSkinSwapStartedAt = 0
+        foodManager.worldSize = OriginalGameplay.offlineArenaSideLength
+        massManager.setWorldSize(OriginalGameplay.offlineArenaSideLength)
         spawnInitialFood()
         spawnInitialViruses()
         spawnInitialTokens()
@@ -11642,7 +11599,7 @@ struct ContentView: View {
     }
     
     private func spawnPlayerSafely() {
-        let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
+        let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
         let boost = CGFloat(UserDefaults.standard.integer(forKey: "macro.activeStartBoost"))
         if boost > 0 { UserDefaults.standard.set(0, forKey: "macro.activeStartBoost") }
         let startMass: CGFloat = playerStartMass + boost
@@ -11694,7 +11651,7 @@ struct ContentView: View {
         self.lastCameraCellCount = playerCells.count
     }
     
-    private func spawnInitialFood() { foodManager.spawn(count: 4500) }
+    private func spawnInitialFood() { foodManager.spawn(count: 625) }
     
     /// Random virus replacements must not materialize on top of ejected mass. Besides looking
     /// wrong, the entire settled bucket could be swallowed in one collision pass. This path is
@@ -11756,7 +11713,7 @@ struct ContentView: View {
     }
     
     private func spawnInitialViruses() {
-        for _ in 0..<35 { viruses.append(spawnSingleVirusSafely()) }
+        for _ in 0..<16 { viruses.append(spawnSingleVirusSafely()) }
     }
     private func spawnInitialTokens() { for _ in 0..<200 { tokens.append(spawnSingleToken(existing: tokens)) } }
     
@@ -12982,6 +12939,7 @@ struct MainMenu: View {
     
     @State private var showSettings = false
     @State private var showPartyMenu = false
+    @State private var showPartyJoinInput = false
     @State private var partyJoinCode: String = ""
     /// Active party code (6 chars A-Z/0-9), "" = not in a party. Shared with the
     /// online session, which sends it in the hello so the server can group the party.
@@ -13008,16 +12966,32 @@ struct MainMenu: View {
     var onPlayOnline: () -> Void = {}
     let availableSkins = (1...387).map { String($0) }
 
-    /// MenuPartyModeShareWithFriends.ccbi: crisp light 9-slice Party dialog.
+    /// ContentPartyMode.ccbi / ContentPartyJoin.ccbi / ContentPartyCreatedOrJoined.ccbi
     private func partyOverlay(scale s: CGFloat, containerSize: CGSize) -> some View {
         ZStack {
             Color.black.opacity(0.62)
                 .edgesIgnoringSafeArea(.all)
-                .onTapGesture { withAnimation { showPartyMenu = false } }
+                .onTapGesture {
+                    showPartyJoinInput = false
+                    withAnimation { showPartyMenu = false }
+                }
 
             VStack(spacing: 10 * s) {
                 HStack {
-                    Color.clear.frame(width: 28 * s, height: 28 * s)
+                    if partyCode.isEmpty && showPartyJoinInput {
+                        Button(action: {
+                            SoundManager.shared.play(.menuClick)
+                            withAnimation(.easeInOut(duration: 0.15)) { showPartyJoinInput = false }
+                        }) {
+                            Image("arrow")
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 18 * s, height: 18 * s)
+                                .padding(4 * s)
+                        }
+                    } else {
+                        Color.clear.frame(width: 28 * s, height: 28 * s)
+                    }
                     Spacer()
                     Text("Party")
                         .font(.custom("OpenSans-Bold", size: 18 * s))
@@ -13025,6 +12999,7 @@ struct MainMenu: View {
                     Spacer()
                     Button(action: {
                         SoundManager.shared.play(.menuClick)
+                        showPartyJoinInput = false
                         withAnimation { showPartyMenu = false }
                     }) {
                         Image("menu-exit-btn")
@@ -13039,66 +13014,116 @@ struct MainMenu: View {
                     .frame(height: max(1.5, 2 * s))
 
                 if partyCode.isEmpty {
-                    Image("party-bigicon")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(height: 36 * s)
+                    if !showPartyJoinInput {
+                        // ContentPartyMode.ccbi: Create & Join illustrated option cards
+                        Text("Play in the same arena with friends using a shared 6-character Party Code.")
+                            .font(.custom("Lato-Regular", size: 11 * s))
+                            .foregroundColor(Color(hex: 0x6E767E))
+                            .multilineTextAlignment(.center)
+                            .fixedSize(horizontal: false, vertical: true)
 
-                    Text("Create a party and share the code, or enter a friend's code to play together in Play Online.")
-                        .font(.custom("Lato-Regular", size: 11.5 * s))
-                        .foregroundColor(Color(hex: 0x6E767E))
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    HStack(spacing: 10 * s) {
-                        Button(action: {
-                            SoundManager.shared.play(.menuClick)
-                            let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-                            partyCode = String((0..<6).map { _ in alphabet.randomElement()! })
-                        }) {
-                            HStack(spacing: 6 * s) {
-                                Image("party-create-btn")
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 18 * s, height: 18 * s)
-                                menuStrokedText("Create", size: 14 * s)
+                        HStack(spacing: 12 * s) {
+                            Button(action: {
+                                SoundManager.shared.play(.menuClick)
+                                let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+                                partyCode = String((0..<6).map { _ in alphabet.randomElement()! })
+                            }) {
+                                VStack(spacing: 6 * s) {
+                                    Image("party-create-btn")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(height: 64 * s)
+                                    Text("Create")
+                                        .font(.custom("OpenSans-Bold", size: 14 * s))
+                                        .foregroundColor(.white)
+                                        .shadow(color: Color.black.opacity(0.45), radius: 0, x: 0, y: 1.5)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 32 * s)
+                                        .background(MCFSFrame(name: "mcfs-green"))
+                                }
+                                .padding(8 * s)
+                                .frame(maxWidth: .infinity)
+                                .background(MCFSFrame(name: "mcfs-light-grey"))
                             }
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 38 * s)
-                        }
-                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
+                            .buttonStyle(.plain)
 
-                        HStack(spacing: 6 * s) {
-                            TextField("ABC123", text: $partyJoinCode)
-                                .textInputAutocapitalization(.characters)
-                                .autocorrectionDisabled()
-                                .font(.custom("OpenSans-Bold", size: 14 * s))
-                                .foregroundColor(Color(hex: 0x3D4347))
-                                .multilineTextAlignment(.center)
-                                .frame(height: 38 * s)
-                                .padding(.horizontal, 6 * s)
-                                .background(MCFSFrame(name: "mcfs-white"))
+                            Button(action: {
+                                SoundManager.shared.play(.menuClick)
+                                withAnimation(.easeInOut(duration: 0.15)) { showPartyJoinInput = true }
+                            }) {
+                                VStack(spacing: 6 * s) {
+                                    Image("party-join-btn")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(height: 64 * s)
+                                    Text("Join")
+                                        .font(.custom("OpenSans-Bold", size: 14 * s))
+                                        .foregroundColor(.white)
+                                        .shadow(color: Color.black.opacity(0.45), radius: 0, x: 0, y: 1.5)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 32 * s)
+                                        .background(MCFSFrame(name: "mcfs-light-blue"))
+                                }
+                                .padding(8 * s)
+                                .frame(maxWidth: .infinity)
+                                .background(MCFSFrame(name: "mcfs-light-grey"))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } else {
+                        // ContentPartyJoin.ccbi: Enter 6-char party code + Paste + Join
+                        Image("party-bigicon")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(height: 36 * s)
+
+                        Text("Enter your friend's 6-character Party Code:")
+                            .font(.custom("Lato-Regular", size: 11.5 * s))
+                            .foregroundColor(Color(hex: 0x6E767E))
+                            .multilineTextAlignment(.center)
+
+                        TextField("ABC123", text: $partyJoinCode)
+                            .textInputAutocapitalization(.characters)
+                            .autocorrectionDisabled()
+                            .font(.custom("OpenSans-Bold", size: 18 * s))
+                            .foregroundColor(Color(hex: 0x3D4347))
+                            .multilineTextAlignment(.center)
+                            .frame(height: 42 * s)
+                            .padding(.horizontal, 10 * s)
+                            .background(MCFSFrame(name: "mcfs-white"))
+
+                        HStack(spacing: 10 * s) {
+                            Button(action: {
+                                SoundManager.shared.play(.menuClick)
+                                if let pasted = UIPasteboard.general.string {
+                                    partyJoinCode = sanitizedPartyCode(pasted)
+                                }
+                            }) {
+                                menuStrokedText("Paste", size: 13.5 * s)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 36 * s)
+                            }
+                            .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-light-blue"))
 
                             Button(action: {
                                 SoundManager.shared.play(.menuClick)
                                 let cleaned = sanitizedPartyCode(partyJoinCode)
-                                if !cleaned.isEmpty { partyCode = cleaned; partyJoinCode = "" }
-                            }) {
-                                HStack(spacing: 5 * s) {
-                                    Image("party-join-btn")
-                                        .resizable()
-                                        .scaledToFit()
-                                        .frame(width: 16 * s, height: 16 * s)
-                                    menuStrokedText("Join", size: 14 * s)
+                                if !cleaned.isEmpty {
+                                    partyCode = cleaned
+                                    partyJoinCode = ""
+                                    showPartyJoinInput = false
                                 }
-                                .padding(.horizontal, 12 * s)
-                                .frame(height: 38 * s)
+                            }) {
+                                menuStrokedText("Join Party", size: 13.5 * s)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 36 * s)
                             }
-                            .buttonStyle(MCFSBevelStyle(frameAsset: sanitizedPartyCode(partyJoinCode).isEmpty ? "mcfs-dark-grey" : "mcfs-light-blue"))
+                            .buttonStyle(MCFSBevelStyle(frameAsset: sanitizedPartyCode(partyJoinCode).isEmpty ? "mcfs-dark-grey" : "mcfs-green"))
                             .disabled(sanitizedPartyCode(partyJoinCode).isEmpty)
                         }
                     }
                 } else {
+                    // ContentPartyCreatedOrJoined.ccbi
                     HStack(spacing: 8 * s) {
                         Image("party-buddy-icon")
                             .resizable()
@@ -13109,12 +13134,25 @@ struct MainMenu: View {
                             .foregroundColor(Color(hex: 0x5A5F66))
                     }
 
-                    Text(partyCode.map { String($0) }.joined(separator: " "))
-                        .font(.custom("OpenSans-Bold", size: 28 * s))
-                        .foregroundColor(Color(hex: 0x3D4347))
-                        .padding(.vertical, 8 * s)
-                        .frame(maxWidth: .infinity)
-                        .background(MCFSFrame(name: "mcfs-light-grey"))
+                    HStack(spacing: 8 * s) {
+                        Text(partyCode.map { String($0) }.joined(separator: " "))
+                            .font(.custom("OpenSans-Bold", size: 26 * s))
+                            .foregroundColor(Color(hex: 0x3D4347))
+                            .frame(maxWidth: .infinity)
+
+                        Button(action: {
+                            SoundManager.shared.play(.menuClick)
+                            UIPasteboard.general.string = partyCode
+                        }) {
+                            menuStrokedText("Copy", size: 11.5 * s)
+                                .padding(.horizontal, 10 * s)
+                                .frame(height: 30 * s)
+                        }
+                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-light-blue"))
+                    }
+                    .padding(.horizontal, 10 * s)
+                    .padding(.vertical, 8 * s)
+                    .background(MCFSFrame(name: "mcfs-light-grey"))
 
                     Text("Share this code. Everyone in the party joins the same online room.")
                         .font(.custom("Lato-Regular", size: 11 * s))
@@ -13125,6 +13163,7 @@ struct MainMenu: View {
                         Button(action: {
                             SoundManager.shared.play(.menuClick)
                             partyCode = ""
+                            showPartyJoinInput = false
                         }) {
                             HStack(spacing: 6 * s) {
                                 Image("party-leave-icon")
@@ -13983,21 +14022,21 @@ struct JoystickView: View {
 }
 
 private func spawnSingleFood() -> Food {
-    let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
+    let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
     let randomX = CGFloat.random(in: 0...worldSize)
     let randomY = CGFloat.random(in: 0...worldSize)
     return Food(position: CGPoint(x: randomX, y: randomY))
 }
 
 private func spawnSingleVirus() -> Virus {
-    let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
+    let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
     let randomX = CGFloat.random(in: 100...worldSize - 100)
     let randomY = CGFloat.random(in: 100...worldSize - 100)
     return Virus(position: CGPoint(x: randomX, y: randomY))
 }
 
 private func spawnSingleToken(existing:[Token] = []) -> Token {
-    let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
+    let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
     for _ in 0..<5 {
         let randomX = CGFloat.random(in: 100...worldSize - 100)
         let randomY = CGFloat.random(in: 100...worldSize - 100)
