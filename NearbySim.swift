@@ -54,20 +54,20 @@ struct SrvGridKey: Hashable { let x: Int; let y: Int }
 // MARK: - Constants (client parity)
 
 enum SrvRules {
-    static let worldSize: Double = 11180
+    static let worldSize: Double = 11000
     static let foodCount = 4500
     static let virusCount = 80
     static let tokenCount = 200
     static let maxPlayerMass: Double = 22500
     static let maxCellsPerOwner = 16
-    static let radiusFactor: Double = 10.0            // sqrt(mass) * this
-    static let minSplitMass: Double = 36
+    static let radiusFactor: Double = 6.3245          // sqrt(mass) * this
+    static let minSplitMass: Double = 40
     static let minEjectMass: Double = 32
     static let ejectPelletMass: Double = 16
-    static let splitEjectionForce: Double = 100
-    static let eatMassRatio: Double = 4.0 / 3.0
-    static let virusBaseMass: Double = 100
-    static let virusSplitThreshold: Double = 100 + 7 * 14
+    static let splitEjectionForce: Double = 26
+    static let eatMassRatio: Double = 1.25
+    static let virusBaseMass: Double = 220
+    static let virusSplitThreshold: Double = 220 + 7 * 14
     static let virusPopMinMass: Double = 133
     static let decayRate: Double = 0.002              // 0.2%/s above mass 10
     static let baseAnimationFactor: Double = 0.15
@@ -80,7 +80,7 @@ enum SrvRules {
     (max(m, 0)).squareRoot() * SrvRules.radiusFactor
 }
 @inline(__always) func speedForMass(_ m: Double) -> Double {
-    1028 / pow(max(m, 1), 0.225)
+    650 / pow(max(m, 1), 0.23)
 }
 
 // MARK: - Entities
@@ -343,7 +343,7 @@ struct SrvVirus {
     var velocity: SrvVec2 = .zero
     /// v4.2: owner who fed the 7th pellet on a launched virus (kill credit).
     var shooterID: UInt32? = nil
-    var radius: Double { mass.squareRoot() * 10.0 }
+    var radius: Double { mass.squareRoot() * 5.3 }
 }
 
 struct SrvToken {
@@ -752,7 +752,7 @@ final class SrvWorld {
     }
 
     func spawnVirus() -> SrvVirus {
-        let margin = SrvRules.virusBaseMass.squareRoot() * 10.0
+        let margin = SrvRules.virusBaseMass.squareRoot() * 5.3
         return SrvVirus(id: newID(), position: SrvVec2(x: .random(in: margin...(SrvRules.worldSize - margin)),
                                                  y: .random(in: margin...(SrvRules.worldSize - margin))))
     }
@@ -1206,7 +1206,7 @@ final class SrvWorld {
 
     // MARK: - SrvEjected helpers
 
-    private let ejectedRenderedRadius: Double = 40.0
+    private let ejectedRenderedRadius: Double = 4.0 * 6.3245
     private let ejectedStrokeHalf: Double = 4.0
 
     @inline(__always)
@@ -1754,7 +1754,7 @@ final class SrvWorld {
                 if let immune = cells[eater.index].immuneToCellID, immune == victim.id,
                    cells[eater.index].splitImmunityTimer > 0 { return }
 
-                let overlapFactor: Double = 0.5
+                let overlapFactor: Double = (eater.isBot && victim.isBot) ? 0.5 : 0.3
                 let threshold = eater.solidRadius - victim.solidRadius * overlapFactor
                 if threshold <= 0 { return }
                 let dx = eater.x - victim.x
@@ -2472,9 +2472,7 @@ final class SrvWorld {
         let decayFactor = 1.0 - srvLerpFactor(base: 0.1, dt: dt)
         for i in cells.indices {
             if cells[i].targetMass > 10 {
-                let adaptedScale = cells[i].targetMass > 400 ? sqrt(cells[i].targetMass / 400.0) : 1.0
-                let effectiveRate = min(0.0457, SrvRules.decayRate * adaptedScale)
-                cells[i].targetMass *= max(0, 1.0 - effectiveRate * dt)
+                cells[i].targetMass *= (1.0 - SrvRules.decayRate * dt)
             }
             if cells[i].mergeTimer > 0 {
                 cells[i].mergeTimer -= dt

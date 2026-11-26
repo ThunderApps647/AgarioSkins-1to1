@@ -357,10 +357,6 @@ struct OnlineGameView: View {
     @State private var spawnFeedBots = false
     @State private var feedBotName = "Feeder"
     @State private var feedBotSkinID = ""
-    @State private var showEmotePicker = false
-    @State private var activeEmoteAsset: String? = nil
-    @State private var activeEmoteExpiresAt: TimeInterval = 0
-    @State private var emoteCooldownUntil: TimeInterval = 0
 
     // dual-skin swap (same phases as offline)
     @State private var dualSkinSwapPhase: DualSkinSwapPhase = .idle
@@ -474,41 +470,8 @@ struct OnlineGameView: View {
                     topHUD
                         .opacity(isLeavePopupPresented ? 0 : 1)
                         .allowsHitTesting(!isLeavePopupPresented)
-                    if showEmotePicker && !isLeavePopupPresented {
-                        EmotePickerBar(
-                            isOnCooldown: CACurrentMediaTime() < emoteCooldownUntil,
-                            onSelect: { asset in
-                                let now = CACurrentMediaTime()
-                                guard now >= emoteCooldownUntil else { return }
-                                SoundManager.shared.play(.menuClick)
-                                activeEmoteAsset = asset
-                                activeEmoteExpiresAt = now + 3.0
-                                emoteCooldownUntil = now + 3.0
-                                withAnimation(.easeInOut(duration: 0.15)) { showEmotePicker = false }
-                            }
-                        )
-                        .zIndex(2)
-                    }
-                    if let emote = activeEmoteAsset, CACurrentMediaTime() < activeEmoteExpiresAt, !isLeavePopupPresented {
-                        ActiveEmoteBubble(assetName: emote)
-                            .zIndex(1)
-                    }
                 }
                 if connectionPhase == .playing && !isLeavePopupPresented {
-                    MinimapHUD(
-                        playerPosition: playerCenter,
-                        teammatePositions: world.teammateUUIDs.compactMap { tid in
-                            let tCells = botCells.filter { $0.ownerID == tid }
-                            guard !tCells.isEmpty else { return nil }
-                            let total = tCells.reduce(CGFloat(0)) { $0 + $1.mass }
-                            guard total > 0 else { return nil }
-                            let x = tCells.reduce(CGFloat(0)) { $0 + $1.position.x * $1.mass } / total
-                            let y = tCells.reduce(CGFloat(0)) { $0 + $1.position.y * $1.mass } / total
-                            return CGPoint(x: x, y: y)
-                        },
-                        worldSize: 11180
-                    )
-                    .zIndex(1)
                     actionButtons
                     modMenuIcon(geometry: geometry)
                     if showModMenu { modMenuPanel(geometry: geometry) }
@@ -645,11 +608,7 @@ struct OnlineGameView: View {
                   friendCount: world.teammateUUIDs.count,
                   inParty: !world.localPartyCode.isEmpty,
                   leaderboardRows: computeLeaderboardRows(),
-                  onPause: { pause() },
-                  onEmotes: {
-                      SoundManager.shared.play(.menuClick)
-                      withAnimation(.easeInOut(duration: 0.15)) { showEmotePicker.toggle() }
-                  })
+                  onPause: { pause() })
         .equatable()
         .zIndex(1)
     }
@@ -661,12 +620,7 @@ struct OnlineGameView: View {
                          feedButtonScale: feedButtonScale,
                          macroButtonScale: macroButtonScale,
                          feedHoldThreshold: feedHoldThreshold,
-                         onSplit: {
-                             if canSplit() {
-                                 SoundManager.shared.play(.split, minInterval: 0.005)
-                                 net.sendSplit()
-                             }
-                         },
+                         onSplit: { if canSplit() { net.sendSplit() } },
                          onMacroDown: handleMacroDown,
                          onMacroUp: handleMacroUp,
                          onFeedDown: handleFeedDown,
@@ -961,7 +915,6 @@ struct OnlineGameView: View {
         if world.eatTriggeredSwap {
             world.eatTriggeredSwap = false
             triggerDualSkinSwap(now: currentTime)
-            SoundManager.shared.play(.eatCell)
         }
         if !world.remoteEatSwapOwners.isEmpty {
             for owner in world.remoteEatSwapOwners { triggerRemoteSwap(owner: owner, now: currentTime) }
@@ -1006,10 +959,10 @@ struct OnlineGameView: View {
         cameraJumpOffset.height *= (1.0 - jumpDecay)
         if abs(cameraJumpOffset.width) < 0.05 { cameraJumpOffset.width = 0 }
         if abs(cameraJumpOffset.height) < 0.05 { cameraJumpOffset.height = 0 }
-        let camSmooth = getLerpFactor(base: 0.315, dt: deltaTime)
+        let camSmooth = getLerpFactor(base: 1.0, dt: deltaTime)
         smoothedPlayerPosition.x += (targetPos.x + cameraJumpOffset.width - smoothedPlayerPosition.x) * camSmooth
         smoothedPlayerPosition.y += (targetPos.y + cameraJumpOffset.height - smoothedPlayerPosition.y) * camSmooth
-        updateCameraZoom(dt: deltaTime, screenSize: screenSize)
+        updateCameraZoom(dt: deltaTime)
 
         // 4. feed / macro cadence → network
         if !canFeed() {
@@ -1063,11 +1016,10 @@ struct OnlineGameView: View {
         return 1.0 - pow(1.0 - base, dt * 60.0)
     }
 
-    private func updateCameraZoom(dt: CGFloat, screenSize: CGSize) {
+    private func updateCameraZoom(dt: CGFloat) {
         let smoothFactor = getLerpFactor(base: 0.15, dt: dt)
         smoothedTotalMass += (totalPlayerMass - smoothedTotalMass) * smoothFactor
-        let viewportDim = max(1, min(screenSize.width, screenSize.height))
-        let baseZoom = 0.63245 * pow(max(0.05, (viewportDim * 0.37) / (42.0 * sqrt(max(1, smoothedTotalMass)))), 0.4)
+        let baseZoom = 2.2 / pow(max(1, smoothedTotalMass), 0.2)
         let center = playerCenter
         // v5.8: satellites are weighted by their mass ratio to the LARGEST
         // cell — one giant with a few crumbs keeps a tight camera (the crumbs
@@ -1093,7 +1045,7 @@ struct OnlineGameView: View {
         let cellCountFactor = 1.0 + weightedExtraCells * 0.01
         let customZoomMultiplier = 1.0 - ((CGFloat(zoomSliderValue) - 1.0) / 49.0) * 0.9
         let targetZoom = ((baseZoom / spreadFactor) / cellCountFactor) * customZoomMultiplier
-        let zoomSmooth = getLerpFactor(base: 0.07, dt: dt)
+        let zoomSmooth = getLerpFactor(base: 0.06, dt: dt)
         zoomLevel += (targetZoom - zoomLevel) * zoomSmooth
     }
 
@@ -1222,7 +1174,7 @@ struct OnlineGameView: View {
     /// Exact copy of the offline deformation pass, applied to the interpolated
     /// remote cells (squish against pellets and arena walls — visual only).
     private func updateCellDeformation(dt: CGFloat) {
-        let worldSize: CGFloat = 11180
+        let worldSize: CGFloat = 11000
         let visRect = visibleWorldRect
         let relax = 1.0 - pow(0.05, dt)
 
@@ -1301,7 +1253,7 @@ struct OnlineGameView: View {
                         let uncompressedX = pos.x + trig[v].cos * visualRadius
                         let uncompressedY = pos.y + trig[v].sin * visualRadius
                         for mass in nearbyMass {
-                            let massRad: CGFloat = 40.0
+                            let massRad: CGFloat = 4.0 * 6.3245
                             let dx = uncompressedX - mass.position.x
                             let dy = uncompressedY - mass.position.y
                             let distSq = dx * dx + dy * dy

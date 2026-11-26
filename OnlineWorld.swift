@@ -21,18 +21,15 @@
 import SwiftUI
 import QuartzCore
 
-// Palette derived from Default Settings - Cell Color in GameConfiguration.json.
+// Palette identical to the offline build.
 private let onlineBotColors: [Color] = [
-    Color(hex: 0xFF07AD), Color(hex: 0xBC07FF), Color(hex: 0x62FF07), Color(hex: 0x070BFF),
-    Color(hex: 0xFF3107), Color(hex: 0xFF07C5), Color(hex: 0x075CFF), Color(hex: 0x07FFFC),
-    Color(hex: 0x07FF71), Color(hex: 0x0711FF), Color(hex: 0x07B3FF), Color(hex: 0xF607FF),
-    Color(hex: 0x0762FF), Color(hex: 0x45FF07), Color(hex: 0xFF4807), Color(hex: 0x07A8FF)
+    Color(hex: 0xFF0820), Color(hex: 0x0851FF), Color(hex: 0xFF6D08),
+    Color(hex: 0x01FFBD), Color(hex: 0xFFCC00), Color(hex: 0x07FF63),
+    Color(hex: 0x7B08FF), Color(hex: 0xFF2001), Color(hex: 0xFF08E7)
 ]
 private let onlinePlayerColors: [Color] = [
-    Color(hex: 0x7607FF), Color(hex: 0xFF07B9), Color(hex: 0x07FFC2), Color(hex: 0xFF077F),
-    Color(hex: 0xAB07FF), Color(hex: 0x8E07FF), Color(hex: 0xFF5A07), Color(hex: 0xDF07FF),
-    Color(hex: 0xFF4207), Color(hex: 0x17FF07), Color(hex: 0x2EFF07), Color(hex: 0x07FF7C),
-    Color(hex: 0x079CFF), Color(hex: 0x0734FF), Color(hex: 0xFF1407), Color(hex: 0xFF07B3)
+    Color(hex: 0x67DD00), Color(hex: 0xFFCC00), Color(hex: 0xFF7E00), Color(hex: 0xFF3C3C),
+    Color(hex: 0xB608FF), Color(hex: 0xFF3ED3), Color(hex: 0x0078FE), Color(hex: 0x01DDFE)
 ]
 
 extension Food {
@@ -516,7 +513,7 @@ final class RemoteWorldModel {
         var best: UInt32? = nil
         var bestDistSq = CGFloat.greatestFiniteMagnitude
         for wc in snap.cells {
-            let r = sqrt(CGFloat(max(wc.mass, 0))) * 10.0
+            let r = sqrt(CGFloat(max(wc.mass, 0))) * 6.3245
             let dx = CGFloat(wc.x) - point.x, dy = CGFloat(wc.y) - point.y
             let d = dx * dx + dy * dy
             if d < r * r && d < bestDistSq { bestDistSq = d; best = wc.ownerID }
@@ -539,7 +536,7 @@ final class RemoteWorldModel {
             var best: UUID? = nil
             var bestDistSq = CGFloat.greatestFiniteMagnitude
             for wc in snap.cells {
-                let r = sqrt(CGFloat(max(wc.mass, 0))) * 10.0 + slack
+                let r = sqrt(CGFloat(max(wc.mass, 0))) * 6.3245 + slack
                 let dx = CGFloat(wc.x) - point.x, dy = CGFloat(wc.y) - point.y
                 let d = dx * dx + dy * dy
                 if d < r * r && d < bestDistSq, let mirror = cellMirrors[wc.id] {
@@ -730,7 +727,7 @@ final class RemoteWorldModel {
         botCells = others
 
         // pellet flight — identical physics to offline, run locally
-        massManager.update(dt: dt, worldSize: 11180)
+        massManager.update(dt: dt, worldSize: 11000)
         // virus flight between snapshots (launched viruses)
         let timeScale = dt * 60.0
         for i in viruses.indices where viruses[i].velocity != .zero {
@@ -743,8 +740,8 @@ final class RemoteWorldModel {
                 viruses[i].velocity = .zero
             }
             let r = viruses[i].radius
-            viruses[i].position.x = max(r, min(11180 - r, viruses[i].position.x))
-            viruses[i].position.y = max(r, min(11180 - r, viruses[i].position.y))
+            viruses[i].position.x = max(r, min(11000 - r, viruses[i].position.x))
+            viruses[i].position.y = max(r, min(11000 - r, viruses[i].position.y))
         }
     }
 

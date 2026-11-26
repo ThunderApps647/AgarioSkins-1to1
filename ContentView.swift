@@ -1686,7 +1686,7 @@ struct Food {
         Color(hex: 0x01FFBD), Color(hex: 0xFFCC00), Color(hex: 0x07FF63),
         Color(hex: 0x7B08FF), Color(hex: 0xFF2001), Color(hex: 0xFF08E7)
     ]
-    static let radius: CGFloat = 10.0
+    static let radius: CGFloat = 31 / 1.9 / 2.0
     
     var position: CGPoint
     let colorIndex: Int
@@ -1707,7 +1707,7 @@ class FoodManager: ObservableObject {
     // over and dragged the whole SwiftUI graph through a diff each time.
     var grid: [GridKey: [Food]] = [:]
     let gridSize: CGFloat = 300
-    let worldSize: CGFloat = 11180
+    let worldSize: CGFloat = 11000
     
     func spawn(count: Int) {
         for _ in 0..<count {
@@ -2005,14 +2005,14 @@ func updateConsumedPickupAnimations(_ animations: inout [ConsumedPickupAnimation
 struct Virus: Identifiable {
     let id = UUID()
     var position: CGPoint
-    var mass: CGFloat = 100
-    var targetMass: CGFloat = 100
+    var mass: CGFloat = 220
+    var targetMass: CGFloat = 220
     var fedMass: CGFloat = 0
-    let splitThreshold: CGFloat = 100 + (7 * 14)
+    let splitThreshold: CGFloat = 220 + (7 * 14)
     var velocity: CGSize = .zero
     
     var radius: CGFloat {
-        return sqrt(mass) * 10.0
+        return sqrt(mass) * 5.3
     }
 }
 
@@ -2383,10 +2383,10 @@ struct PlayerCell: Identifiable {
         self.mass = mass
         self.targetMass = targetMass
         self.lagMass = mass
-        self.cachedSolidRadius = sqrt(mass) * 10.0
+        self.cachedSolidRadius = sqrt(mass) * 6.3245
         self.cachedLagRadius = self.cachedSolidRadius
         self.cachedVisualRadius = self.cachedSolidRadius
-        self.cachedMovementSpeed = 1028 / pow(max(mass, 1), 0.225)
+        self.cachedMovementSpeed = 650 / pow(max(mass, 1), 0.23)
         self.cachedMovementMass = mass
         self.velocity = velocity
         self.aiMovementDirection = .zero
@@ -2425,12 +2425,12 @@ struct PlayerCell: Identifiable {
     
     @inline(__always)
     mutating func refreshCachedRadii() {
-        cachedSolidRadius = sqrt(max(mass, 0)) * 10.0
-        cachedLagRadius = sqrt(max(lagMass, 0)) * 10.0
+        cachedSolidRadius = sqrt(max(mass, 0)) * 6.3245
+        cachedLagRadius = sqrt(max(lagMass, 0)) * 6.3245
         cachedVisualRadius = max(cachedSolidRadius, cachedLagRadius)
         let speedRefreshThreshold = max(0.5, cachedMovementMass * 0.004)
         if abs(mass - cachedMovementMass) >= speedRefreshThreshold {
-            cachedMovementSpeed = 1028 / pow(max(mass, 1), 0.225)
+            cachedMovementSpeed = 650 / pow(max(mass, 1), 0.23)
             cachedMovementMass = mass
         }
     }
@@ -2492,10 +2492,10 @@ class EjectedMassManager: ObservableObject {
     let gridSize: CGFloat = 500
     let friction: CGFloat = 0.96
     let stopThreshold: CGFloat = 10.0
-    private let worldSize: CGFloat = 11180
+    private let worldSize: CGFloat = 11000
     // Renderer geometry is intentionally asymmetric (1.8r rect beginning at centre-r).
     // Include half of the 8pt stroke so no pixel can cross the world plate.
-    private let renderedRadius: CGFloat = 40.0
+    private let renderedRadius: CGFloat = 4.0 * 6.3245
     private let renderedStrokeHalfWidth: CGFloat = 4.0
     
     @inline(__always)
@@ -2842,7 +2842,7 @@ enum LeagueBadge {
 }
 
 struct GameWorldView: View {
-    let worldSize: CGFloat = 11180
+    let worldSize: CGFloat = 11000
     let cellSize: CGFloat = 31
     let gridLineWidth: CGFloat = 1
     let screenSize: CGSize
@@ -2999,7 +2999,7 @@ struct GameWorldView: View {
             }
             visibleMasses.sort { $0.zIndex < $1.zIndex }
             
-            let massRadius = 40.0 * zoom   // shotMassBaseRadius = 40
+            let massRadius = 4.0 * 6.3245 * zoom   // sqrt(16) * 6.3245, mass is always 16
             let massStroke = 8 * zoom
             for mass in visibleMasses {
                 guard let style = massManager.renderStyle(for: mass.styleID) else { continue }
@@ -3040,7 +3040,7 @@ struct GameWorldView: View {
                     }
                 case .ejected(let styleID):
                     guard let style = massManager.renderStyle(for: styleID) else { continue }
-                    let r = 40.0 * animation.scale * zoom
+                    let r = 4.0 * 6.3245 * animation.scale * zoom
                     let rect = CGRect(x: animScreenX - r, y: animScreenY - r, width: r * 1.8, height: r * 1.8)
                     if screenBounds.intersects(rect) {
                         let path = Path(ellipseIn: rect)
@@ -3121,7 +3121,7 @@ struct GameWorldView: View {
                 var cellCursor = 0
                 for virusIdx in virusOrder {
                     let virus = viruses[virusIdx]
-                    let onTopThreshold = virus.mass * 1.0
+                    let onTopThreshold = virus.mass * (100.0 / 220.0)
                     while cellCursor < cellRefs.count, cellRefs[cellCursor].mass < onTopThreshold {
                         draw(cellRefs[cellCursor])
                         cellCursor += 1
@@ -4771,13 +4771,6 @@ struct ContentView: View {
     
     @State private var highScore: Int = 0
     @State private var tokenCount: Int = 0
-    @State private var isGameOverPresented: Bool = false
-    @State private var matchStartTime: TimeInterval = 0
-    @State private var matchSurvivalSeconds: Int = 0
-    @State private var showEmotePicker: Bool = false
-    @State private var activeEmoteAsset: String? = nil
-    @State private var activeEmoteExpiresAt: TimeInterval = 0
-    @State private var emoteCooldownUntil: TimeInterval = 0
     
     // DUAL-WIDTH SKIN eat-triggered swap. Triggers are accepted only in .idle, so anything
     // eaten while the alternate art is showing (or during the return delay) is ignored -
@@ -4963,53 +4956,14 @@ struct ContentView: View {
                               friendCount: playerTeammateOwnerID != nil ? 1 : 0,
                               inParty: playerTeammateOwnerID != nil,
                               leaderboardRows: computeLeaderboardRows(),
-                              onPause: { pause() },
-                              onEmotes: {
-                        SoundManager.shared.play(.menuClick)
-                        withAnimation(.easeInOut(duration: 0.15)) { showEmotePicker.toggle() }
-                    })
+                              onPause: { pause() })
                     .equatable()
                     .zIndex(1)
                     .opacity(isLeavePopupPresented ? 0 : 1)
                     .allowsHitTesting(!isLeavePopupPresented)
-
-                    if showEmotePicker && !isLeavePopupPresented {
-                        EmotePickerBar(
-                            isOnCooldown: CACurrentMediaTime() < emoteCooldownUntil,
-                            onSelect: { asset in
-                                let now = CACurrentMediaTime()
-                                guard now >= emoteCooldownUntil else { return }
-                                SoundManager.shared.play(.menuClick)
-                                activeEmoteAsset = asset
-                                activeEmoteExpiresAt = now + 3.0 // emojiDisplayDuration = 3
-                                emoteCooldownUntil = now + 3.0   // emojiDisplayCooldownDuration = 3
-                                withAnimation(.easeInOut(duration: 0.15)) { showEmotePicker = false }
-                            }
-                        )
-                        .zIndex(2)
-                    }
-
-                    if let emote = activeEmoteAsset, CACurrentMediaTime() < activeEmoteExpiresAt, !isLeavePopupPresented {
-                        ActiveEmoteBubble(assetName: emote)
-                            .zIndex(1)
-                    }
                 }
                 
                 if isPlaying && !isLeavePopupPresented {
-                    MinimapHUD(
-                        playerPosition: playerCenter,
-                        teammatePositions: playerTeammateOwnerID.map { tid in
-                            let tCells = botCells.filter { $0.ownerID == tid }
-                            guard !tCells.isEmpty else { return [] }
-                            let total = tCells.reduce(CGFloat(0)) { $0 + $1.mass }
-                            guard total > 0 else { return [] }
-                            let x = tCells.reduce(CGFloat(0)) { $0 + $1.position.x * $1.mass } / total
-                            let y = tCells.reduce(CGFloat(0)) { $0 + $1.position.y * $1.mass } / total
-                            return [CGPoint(x: x, y: y)]
-                        } ?? [],
-                        worldSize: 11000
-                    )
-                    .zIndex(1)
                     ActionButtonsHUD(canSplit: canSplit(),
                                      canFeed: canFeed(),
                                      isFeedingHeld: isFeedingHeld,
@@ -5123,23 +5077,6 @@ struct ContentView: View {
                         .zIndex(100)
                         .transition(.opacity)
                     }
-                }
-                
-                if isPlaying && isGameOverPresented {
-                    MatchResultsModalView(
-                        highScore: highScore,
-                        tokensCollected: tokenCount,
-                        survivalSeconds: matchSurvivalSeconds,
-                        onPlayAgain: {
-                            isGameOverPresented = false
-                            spawnInitialObjects()
-                        },
-                        onMainMenu: {
-                            isGameOverPresented = false
-                            exitMatchToMainMenu()
-                        }
-                    )
-                    .zIndex(1000)
                 }
                 
                 if isPlaying && leavePopupMounted {
@@ -5362,11 +5299,11 @@ struct ContentView: View {
                 if abs(cameraJumpOffset.width) < 0.05 { cameraJumpOffset.width = 0 }
                 if abs(cameraJumpOffset.height) < 0.05 { cameraJumpOffset.height = 0 }
                 
-                let camSmooth = getLerpFactor(base: 0.315, dt: deltaTime)
+                let camSmooth = getLerpFactor(base: 1.0, dt: deltaTime)
                 smoothedPlayerPosition.x += (targetPos.x + cameraJumpOffset.width - smoothedPlayerPosition.x) * camSmooth
                 smoothedPlayerPosition.y += (targetPos.y + cameraJumpOffset.height - smoothedPlayerPosition.y) * camSmooth
                 
-                updateCameraZoom(dt: deltaTime, screenSize: geometry.size)
+                updateCameraZoom(dt: deltaTime)
                 
                 if !canFeed() {
                     if isFeedingHeld { isFeedingHeld = false }
@@ -5799,7 +5736,7 @@ struct ContentView: View {
     
     @inline(__always)
     private func clampToWorld(_ point: CGPoint, margin: CGFloat = 120) -> CGPoint {
-        let worldSize: CGFloat = 11180
+        let worldSize: CGFloat = 11000
         return CGPoint(x: min(worldSize - margin, max(margin, point.x)),
                        y: min(worldSize - margin, max(margin, point.y)))
     }
@@ -5847,7 +5784,7 @@ struct ContentView: View {
     }
     
     private func spawnSingleBot() {
-        let worldSize: CGFloat = 11180
+        let worldSize: CGFloat = 11000
         let spawnMass: CGFloat
         if randomizeBotStartMass {
             if initialBotFillActive {
@@ -5863,7 +5800,7 @@ struct ContentView: View {
         } else {
             spawnMass = botStartMass
         }
-        let botRadius = sqrt(spawnMass) * 10.0
+        let botRadius = sqrt(spawnMass) * 6.3245
         var safePos: CGPoint = .zero
         var found = false
         let pCenter = playerCenter
@@ -5943,8 +5880,8 @@ struct ContentView: View {
     }
     
     private func spawnSingleFeedBot() {
-        let worldSize: CGFloat = 11180
-        let botRadius = sqrt(100.0) * 10.0
+        let worldSize: CGFloat = 11000
+        let botRadius = sqrt(100.0) * 6.3245
         var safePos: CGPoint = .zero
         var found = false
         let pCenter = playerCenter
@@ -6040,7 +5977,7 @@ struct ContentView: View {
         // - equally long trails. Spread also follows the targetMass rim. When the cell
         // is growing (targetMass > mass) the drawn rim stays authoritative for both.
         let solidRadius = min(cell.cachedSolidRadius,
-                              sqrt(max(cell.targetMass, 0)) * 10.0)
+                              sqrt(max(cell.targetMass, 0)) * 6.3245)
         let sizeRatio = referenceRadius
         / max(referenceRadius, Double(solidRadius))
         let dynamicSpread = baseSpread * sqrt(sizeRatio)
@@ -9473,7 +9410,7 @@ struct ContentView: View {
 
     private func updateBotAI(dt: CGFloat, index: CellIndex) {
         guard !botCells.isEmpty else { return }
-        let worldSize: CGFloat = 11180
+        let worldSize: CGFloat = 11000
         let globalSkill = CGFloat(max(0.3, min(2.0, botSkill)))
         
         // ---- 1. Group bookkeeping (single pass, one UUID dictionary) ----
@@ -9787,7 +9724,7 @@ struct ContentView: View {
     }
     
     private func moveBots(dt: CGFloat) {
-        let worldSize: CGFloat = 11180
+        let worldSize: CGFloat = 11000
         let timeScale = dt * 60.0
         // Mutate one uniquely owned local array, then publish one State write. Directly
         // subscript-mutating @State dozens of times per cell repeatedly entered its modify
@@ -9826,8 +9763,8 @@ struct ContentView: View {
             cells[i].position.x += cells[i].velocity.width * timeScale
             cells[i].position.y += cells[i].velocity.height * timeScale
             
-            let decayFactor = pow(0.87965, timeScale)
-            let splitDecayFactor = pow(0.87965, timeScale)
+            let decayFactor = pow(0.92, timeScale)
+            let splitDecayFactor = pow(0.96, timeScale)
             
             if cells[i].splitTimer > 0 {
                 cells[i].velocity.width *= splitDecayFactor
@@ -9880,14 +9817,15 @@ struct ContentView: View {
                 if !teamFriendlyFireEnabled && areOwnersAllied(eater.ownerID, victim.ownerID) {
                     return
                 }
-                if eater.mass <= victim.mass * (4.0 / 3.0) { return }
+                if eater.mass <= victim.mass * 1.25 { return }
                 if victim.isPlayer {
                     if playersToRemove.contains(victim.index) { return }
                 } else if botsToRemove.contains(victim.index) {
                     return
                 }
                 
-                let overlapFactor: CGFloat = 0.5
+                // Original overlap rules preserved: 0.5 for bot-vs-bot, 0.3 when a player is involved.
+                let overlapFactor: CGFloat = (eater.isBot && victim.isBot) ? 0.5 : 0.3
                 let threshold = eater.solidRadius - victim.solidRadius * overlapFactor
                 if threshold <= 0 { return }
                 
@@ -9946,7 +9884,6 @@ struct ContentView: View {
             // cell this frame arms the artwork swap (accepted only while the swap is idle).
             for eaterID in eaterByVictimID.values where snapshotsByID[eaterID]?.isPlayer == true {
                 triggerDualSkinSwap(now: CACurrentMediaTime())
-                SoundManager.shared.play(.eatCell)
                 break
             }
             
@@ -9988,15 +9925,8 @@ struct ContentView: View {
                 // The old teammate pact and handshake never carry into the next match.
                 resetPlayerTeammateState()
             }
-            if playerCells.isEmpty && !isGameOverPresented {
-                SoundManager.shared.play(.gameOver)
-                matchSurvivalSeconds = max(0, Int(CACurrentMediaTime() - matchStartTime))
-                isGameOverPresented = true
-                joystickIsDragging = false
-                joystickOffset = .zero
-                joystickBasePosition = nil
-                isFeedingHeld = false
-                isMacroHeld = false
+            if playerCells.isEmpty {
+                exitMatchToMainMenu()
             }
         }
         
@@ -10099,8 +10029,8 @@ struct ContentView: View {
         guard viruses[virusIndex].targetMass
                 >= viruses[virusIndex].splitThreshold else { return }
         
-        viruses[virusIndex].mass = 100
-        viruses[virusIndex].targetMass = 100
+        viruses[virusIndex].mass = 220
+        viruses[virusIndex].targetMass = 220
         viruses[virusIndex].fedMass = 0
         
         let normalizedMassDirection = mass.direction.normalized()
@@ -10117,8 +10047,8 @@ struct ContentView: View {
             y: viruses[virusIndex].position.y
             + shootDirection.height * offsetDistance
         )
-        var newVirus = Virus(position: startPosition, mass: 100)
-        newVirus.targetMass = 100
+        var newVirus = Virus(position: startPosition, mass: 220)
+        newVirus.targetMass = 220
         newVirus.velocity = CGSize(
             width: shootDirection.width * 1200,
             height: shootDirection.height * 1200
@@ -10329,7 +10259,7 @@ struct ContentView: View {
     
     @discardableResult
     private func moveViruses(dt: CGFloat) -> Bool {
-        let worldSize: CGFloat = 11180
+        let worldSize: CGFloat = 11000
         let timeScale = dt * 60.0
         var movedAny = false
         for i in viruses.indices {
@@ -10443,12 +10373,11 @@ struct ContentView: View {
         return 1.0 - pow(1.0 - base, dt * 60.0)
     }
     
-    private func updateCameraZoom(dt: CGFloat, screenSize: CGSize) {
+    private func updateCameraZoom(dt: CGFloat) {
         let smoothFactor = getLerpFactor(base: 0.15, dt: dt)
         smoothedTotalMass += (totalPlayerMass - smoothedTotalMass) * smoothFactor
         
-                let viewportDim = max(1, min(screenSize.width, screenSize.height))
-        let baseZoom = 0.63245 * pow(max(0.05, (viewportDim * 0.37) / (42.0 * sqrt(max(1, smoothedTotalMass)))), 0.4)
+        let baseZoom = 2.2 / pow(max(1, smoothedTotalMass), 0.2)
         let center = playerCenter
         // v5.8: satellites are weighted by their mass ratio to the LARGEST
         // cell — one giant with a few crumbs keeps a tight camera (the crumbs
@@ -10476,7 +10405,7 @@ struct ContentView: View {
         let customZoomMultiplier = 1.0 - ((CGFloat(zoomSliderValue) - 1.0) / 49.0) * 0.9
         let targetZoom = ((baseZoom / spreadFactor) / cellCountFactor) * customZoomMultiplier
         
-        let zoomSmooth = getLerpFactor(base: 0.07, dt: dt)
+        let zoomSmooth = getLerpFactor(base: 0.06, dt: dt)
         zoomLevel += (targetZoom - zoomLevel) * zoomSmooth
     }
     
@@ -10494,7 +10423,7 @@ struct ContentView: View {
     }
     
     private func movePlayer(dt: CGFloat) {
-        let worldSize: CGFloat = 11180
+        let worldSize: CGFloat = 11000
         let timeScale = dt * 60.0
         
         var joystickTargetPoint: CGPoint? = nil
@@ -10568,8 +10497,8 @@ struct ContentView: View {
             playerCells[i].position.x += playerCells[i].velocity.width * timeScale
             playerCells[i].position.y += playerCells[i].velocity.height * timeScale
             
-            let decayFactor = pow(0.87965, timeScale)
-            let splitDecayFactor = pow(0.87965, timeScale)
+            let decayFactor = pow(0.92, timeScale)
+            let splitDecayFactor = pow(0.96, timeScale)
             
             if playerCells[i].splitTimer > 0 {
                 playerCells[i].velocity.width *= splitDecayFactor
@@ -10596,7 +10525,7 @@ struct ContentView: View {
                               for ownerID: UUID,
                               direction: CGSize,
                               toward targetPoint: CGPoint? = nil) {
-        let worldSize: CGFloat = 11180
+        let worldSize: CGFloat = 11000
         var splitDirection = direction.normalized()
         if splitDirection == .zero { splitDirection = CGSize(width: 0, height: 1) }
         var newCells:[PlayerCell] = []
@@ -10611,12 +10540,12 @@ struct ContentView: View {
         let currentCount = eligible.count
         
         for item in eligible {
-            if currentCount + newCells.count < 16 && cells[item.index].targetMass >= 36 {
+            if currentCount + newCells.count < 16 && cells[item.index].targetMass >= 40 {
                 let index = item.index
                 let newMass = cells[index].targetMass / 2
                 let dynamicMergeTime = 30.0 + (Double(newMass) * 0.02)
-                let visualRadius = sqrt(newMass) * 10.0
-                let ejectionForce: CGFloat = 100.0
+                let visualRadius = sqrt(newMass) * 6.3245
+                let ejectionForce: CGFloat = 26
                 var launchDirection = splitDirection
                 if let targetPoint = targetPoint {
                     let targetVector = CGSize(
@@ -10651,7 +10580,7 @@ struct ContentView: View {
                     name: cells[index].name, skinName: cells[index].skinName, isBot: cells[index].isBot,
                     isFeedBot: cells[index].isFeedBot, aiSkillTier: cells[index].aiSkillTier
                 )
-                newCell.splitImmunityTimer = 0.03
+                newCell.splitImmunityTimer = 0.2
                 newCell.immuneToCellID = cells[index].id
                 // Font lineage: ONLY the new piece coming out of an at/above-threshold
                 // cell is born at the half ratio. The splitting cell itself keeps
@@ -10687,7 +10616,6 @@ struct ContentView: View {
             // in place, so no old/default heading leaks through the pause transition.
             playerLastSplitDirection = .zero
             playerSplitTargetID = nil
-            SoundManager.shared.play(.split, minInterval: 0.005)
             executeSplit(
                 on: &playerCells,
                 for: pCell.ownerID,
@@ -10709,13 +10637,12 @@ struct ContentView: View {
                 splitDirection = directionToCenter.normalized()
             }
         }
-        SoundManager.shared.play(.split, minInterval: 0.005)
         recordPlayerSplitIntent(direction: splitDirection, now: CACurrentMediaTime())
         executeSplit(on: &playerCells, for: pCell.ownerID, direction: splitDirection)
     }
     
     private func updateCellDeformation(dt: CGFloat) {
-        let worldSize: CGFloat = 11180
+        let worldSize: CGFloat = 11000
         let visRect = visibleWorldRect
         let relax = 1.0 - pow(0.05, dt)
         
@@ -10804,7 +10731,7 @@ struct ContentView: View {
                         let uncompressedX = pos.x + trig[v].cos * visualRadius
                         let uncompressedY = pos.y + trig[v].sin * visualRadius
                         for mass in nearbyMass {
-                            let massRad: CGFloat = 40.0
+                            let massRad: CGFloat = 4.0 * 6.3245
                             let dx = uncompressedX - mass.position.x
                             let dy = uncompressedY - mass.position.y
                             let distSq = dx * dx + dy * dy
@@ -10946,8 +10873,8 @@ struct ContentView: View {
         for (virusIdx, virus) in viruses.enumerated() {
             var popped = false
             // A fed virus is a bigger virus, so the mass needed to eat (pop on) it
-            // grows with it: 133 at the base 100 mass, scaled by the fed size.
-            let popThreshold = 133 * (virus.targetMass / 100)
+            // grows with it: 133 at the base 220 mass, scaled by the fed size.
+            let popThreshold = 133 * (virus.targetMass / 220)
             index.forEach(near: virus.position, radius: 1) { c in
                 if popped { return }
                 if c.mass < popThreshold { return }
@@ -11038,7 +10965,7 @@ struct ContentView: View {
                             isFeedBot: botCells[cellIdx].isFeedBot,
                             aiSkillTier: botCells[cellIdx].aiSkillTier
                         )
-                        newCell.splitImmunityTimer = 0.03
+                        newCell.splitImmunityTimer = 0.2
                         newCell.immuneToCellID = botCells[cellIdx].id
                         newCell.massFontHalved = poppedHalvesFont
                         newCell.massFontScale = poppedHalvesFont ? 0.5 : 1.0
@@ -11074,7 +11001,7 @@ struct ContentView: View {
                             mergeTimer: dynamicMergeTime, canMerge: false, splitTimer: 1.0,
                             color: playerCells[cellIdx].color, name: playerCells[cellIdx].name, skinName: playerCells[cellIdx].skinName
                         )
-                        newCell.splitImmunityTimer = 0.03
+                        newCell.splitImmunityTimer = 0.2
                         newCell.immuneToCellID = playerCells[cellIdx].id
                         newCell.massFontHalved = poppedHalvesFont
                         newCell.massFontScale = poppedHalvesFont ? 0.5 : 1.0
@@ -11114,18 +11041,17 @@ struct ContentView: View {
         let lagFactor = getLerpFactor(base: 0.15, dt: dt)
         let decayFactor = 1.0 - getLerpFactor(base: 0.1, dt: dt)
         
-        // --- DECAY CONFIGURATION (IPA parity: baseRadiusForAdaptedDecay = 200 -> mass 400, maxDecayRateForPlayer = 0.99922) ---
-        let baseDecayRate: CGFloat = 0.002
-        let maxPlayerDecayRate: CGFloat = 0.0457
+        // --- DECAY CONFIGURATION ---
+        // 0.002 is the standard Ogar/MultiOgar rate (0.2% per second)
+        let globalDecayRate: CGFloat = 0.002 
         let minDecayThreshold: CGFloat = 10 // Mass below this doesn't decay
         // ---------------------------
         
         for i in cells.indices {
-            // 1. Apply Adapted Mass Decay
+            // 1. Apply Global Mass Decay
             if cells[i].targetMass > minDecayThreshold {
-                let adaptedScale = cells[i].targetMass > 400 ? sqrt(cells[i].targetMass / 400.0) : 1.0
-                let effectiveRate = min(maxPlayerDecayRate, baseDecayRate * adaptedScale)
-                cells[i].targetMass *= max(0, 1.0 - (effectiveRate * dt))
+                // mass = mass * (1 - (rate * deltaTime))
+                cells[i].targetMass *= (1.0 - (globalDecayRate * dt))
             }
             
             // 2. Handle Merge Timers
@@ -11350,19 +11276,14 @@ struct ContentView: View {
             aim = .converge(targetPoint)
         }
         
-        var didEject = false
         for _ in 0..<times {
             for i in playerCells.indices {
                 guard playerCells[i].targetMass >= 32 else { continue }
                 let source = playerCells[i]
                 if emitEjectedMass(from: source, aim: aim, now: nowTS) {
                     playerCells[i].targetMass -= 16
-                    didEject = true
                 }
             }
-        }
-        if didEject {
-            SoundManager.shared.play(.shoot, minInterval: 0.060)
         }
     }
     
@@ -11370,7 +11291,7 @@ struct ContentView: View {
     
     private func canSplit() -> Bool {
         guard playerCells.count < 16 else { return false }
-        return playerCells.contains(where: { $0.targetMass >= 36 })
+        return playerCells.contains(where: { $0.targetMass >= 40 })
     }
     
     private func canFeed() -> Bool {
@@ -11386,9 +11307,6 @@ struct ContentView: View {
     private func spawnInitialObjects() {
         isLeavePopupPresented = false
         leavePopupMounted = false
-        isGameOverPresented = false
-        matchStartTime = CACurrentMediaTime()
-        matchSurvivalSeconds = 0
         // Start every match in explicit centre-aim mode (the same proven mode the pause popup
         // resumes into). canFeed() treats it as a valid heading, so feed/macro are live from
         // the very first frame instead of greying out until the cursor first moves; pellets
@@ -11433,25 +11351,17 @@ struct ContentView: View {
     }
     
     private func spawnPlayerSafely() {
-        let worldSize: CGFloat = 11180
-        let boost = CGFloat(UserDefaults.standard.integer(forKey: "macro.activeStartBoost"))
-        if boost > 0 { UserDefaults.standard.set(0, forKey: "macro.activeStartBoost") }
-        let startMass: CGFloat = playerStartMass + boost
-        let playerRadius = sqrt(startMass) * 10.0
+        let worldSize: CGFloat = 11000
+        let startMass: CGFloat = playerStartMass
+        let playerRadius = sqrt(startMass) * 6.3245
         let safetyBuffer: CGFloat = 400
         var safePosition: CGPoint = .zero
         var foundSafeSpot = false
         var attempts = 0
         
-        let availableColors: [Color] = [
-            Color(hex: 0xFF07AD), Color(hex: 0xBC07FF), Color(hex: 0x62FF07), Color(hex: 0x070BFF),
-            Color(hex: 0xFF3107), Color(hex: 0xFF07C5), Color(hex: 0x075CFF), Color(hex: 0x07FFFC),
-            Color(hex: 0x07FF71), Color(hex: 0x0711FF), Color(hex: 0x07B3FF), Color(hex: 0xF607FF),
-            Color(hex: 0x0762FF), Color(hex: 0x45FF07), Color(hex: 0xFF4807), Color(hex: 0x07A8FF),
-            Color(hex: 0x7607FF), Color(hex: 0xFF07B9), Color(hex: 0x07FFC2), Color(hex: 0xFF077F),
-            Color(hex: 0xAB07FF), Color(hex: 0x8E07FF), Color(hex: 0xFF5A07), Color(hex: 0xDF07FF),
-            Color(hex: 0xFF4207), Color(hex: 0x17FF07), Color(hex: 0x2EFF07), Color(hex: 0x07FF7C),
-            Color(hex: 0x079CFF), Color(hex: 0x0734FF), Color(hex: 0xFF1407), Color(hex: 0xFF07B3)
+        let availableColors = [
+            Color(hex: 0x67DD00), Color(hex: 0xFFCC00), Color(hex: 0xFF7E00), Color(hex: 0xFF3C3C),
+            Color(hex: 0xB608FF), Color(hex: 0xFF3ED3), Color(hex: 0x0078FE), Color(hex: 0x01DDFE)
         ]
         let chosenColor = availableColors.randomElement() ?? .red
         
@@ -11960,7 +11870,6 @@ struct TopBarHUD: View, Equatable {
     let inParty: Bool
     let leaderboardRows: [LeaderboardHUDRow]
     let onPause: () -> Void
-    var onEmotes: () -> Void = {}
     
     static func == (lhs: TopBarHUD, rhs: TopBarHUD) -> Bool {
         return lhs.score == rhs.score
@@ -11986,8 +11895,10 @@ struct TopBarHUD: View, Equatable {
                             .padding(6)
                     }
                     
-                    // 2. Emotes button
-                    Button(action: onEmotes) {
+                    // 2. Add the new emotes button here
+                    Button(action: {
+                        // Emotes action here
+                    }) {
                         Image("emotes")
                             .resizable()
                             .aspectRatio(contentMode: .fit)
@@ -12474,103 +12385,6 @@ struct ActionButtonsHUD: View, Equatable {
     }
 }
 
-/// Minimap widget matching Visual - Minimap from GameConfiguration.json:
-/// minimapFillColor = 0x00000040, minimapOutlineColor = 0xffffff40,
-/// playerDotRadius = 5, playerDotColor = 0xffffffff.
-struct MinimapHUD: View {
-    let playerPosition: CGPoint
-    let teammatePositions: [CGPoint]
-    let worldSize: CGFloat
-
-    private let mapSide: CGFloat = 110
-
-    var body: some View {
-        VStack {
-            Spacer()
-            HStack {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.black.opacity(0.25))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(Color.white.opacity(0.25), lineWidth: 1.5)
-                        )
-                    Canvas { context, size in
-                        let w = max(1, worldSize)
-                        for tp in teammatePositions {
-                            let tx = min(max(tp.x / w, 0), 1) * size.width
-                            let ty = min(max(tp.y / w, 0), 1) * size.height
-                            let rect = CGRect(x: tx - 3.5, y: ty - 3.5, width: 7, height: 7)
-                            context.fill(Path(ellipseIn: rect), with: .color(Color(hex: 0xFFC300)))
-                        }
-                        let px = min(max(playerPosition.x / w, 0), 1) * size.width
-                        let py = min(max(playerPosition.y / w, 0), 1) * size.height
-                        let dotRect = CGRect(x: px - 5, y: py - 5, width: 10, height: 10)
-                        context.fill(Path(ellipseIn: dotRect), with: .color(.white))
-                    }
-                }
-                .frame(width: mapSide, height: mapSide)
-                .padding(.leading, 16)
-                .padding(.bottom, 16)
-                Spacer()
-            }
-        }
-        .allowsHitTesting(false)
-    }
-}
-
-/// Emote selector bar matching Default Settings - Gameplay (emojiDisplayDuration = 3,
-/// emojiDisplayCooldownDuration = 3, maxPriorityEmojisInSelector = 3).
-struct EmotePickerBar: View {
-    let isOnCooldown: Bool
-    let onSelect: (String) -> Void
-
-    private let emotes = ["emoji-tongue", "emoji-scared"]
-
-    var body: some View {
-        VStack {
-            HStack {
-                HStack(spacing: 12) {
-                    ForEach(emotes, id: \.self) { asset in
-                        Button(action: { onSelect(asset) }) {
-                            Image(asset)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 48, height: 48)
-                                .opacity(isOnCooldown ? 0.45 : 1.0)
-                        }
-                        .disabled(isOnCooldown)
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(
-                    Image("ui-btn-darkblue")
-                        .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
-                )
-                .padding(.leading, 108)
-                .padding(.top, 98)
-                Spacer()
-            }
-            Spacer()
-        }
-    }
-}
-
-struct ActiveEmoteBubble: View {
-    let assetName: String
-
-    var body: some View {
-        Image(assetName)
-            .resizable()
-            .scaledToFit()
-            .frame(width: 68, height: 68)
-            .shadow(color: .black.opacity(0.35), radius: 4, y: 2)
-            .offset(y: -85)
-            .allowsHitTesting(false)
-    }
-}
-
 /// The nickname box could end up focused (blinking caret, paste menu working) with no software
 /// keyboard: the text-input session was alive, but the keyboard scene never attached, and a
 /// plain reloadInputViews() cannot revive a session in that state. This field now *verifies*
@@ -12849,14 +12663,6 @@ struct MainMenu: View {
     @AppStorage("macro.darkModeGrid") private var darkModeGrid: Bool = false
     /// Show Mass: shows/hides the mass counter on cells (shared with the renderer).
     @AppStorage("macro.showMassText") private var showMassText: Bool = true
-    /// Sound Effects: toggles IPA .mp3 SFX playback.
-    @AppStorage("macro.soundEnabled") private var soundEnabled: Bool = true
-    @AppStorage("macro.coins") private var coinsCount: Int = 1000
-    @AppStorage("macro.dna") private var dnaCount: Int = 50
-    @AppStorage("macro.activeStartBoost") private var activeStartBoost: Int = 0
-    @State private var showSkinDrawer: Bool = false
-    @State private var showSkinsModal: Bool = false
-    @State private var activeInfoTab: String? = nil
     /// Injected by ContentView; opens the PLAY ONLINE server browser.
     var onPlayOnline: () -> Void = {}
     let availableSkins = (1...387).map { String($0) }
@@ -12938,495 +12744,145 @@ struct MainMenu: View {
             }
     }
     
-    private var topMenuBar: some View {
-        VStack {
-            HStack(alignment: .center, spacing: 8) {
-                // Top-Left: Profile & Level Pill (MCFS_blue_profile / MCFS_dark_blue)
-                HStack(spacing: 8) {
-                    ZStack {
-                        Image("ui-profile-guest")
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: 42, height: 42)
-                            .clipShape(Circle())
-                        if let skin = selectedSkinName {
-                            SkinSelectorPreview(skinName: skin)
-                                .frame(width: 42, height: 42)
-                                .clipShape(Circle())
-                        }
+    var body: some View {
+        ZStack {
+            Image("background-ipadpro-hd").resizable().scaledToFill().scaleEffect(1).edgesIgnoringSafeArea(.all)
+            
+            // Settings Button in Top Right
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: { withAnimation { showSettings = true } }) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.system(size: 30))
+                            .foregroundColor(.white)
+                            .padding(20)
+                            .background(Color.black.opacity(0.4).clipShape(Circle()))
                     }
-                    .overlay(Circle().stroke(Color.white.opacity(0.65), lineWidth: 2))
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 5) {
-                            Text(playerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Guest" : playerName)
-                                .font(.custom("UbuntuSans-Bold", size: 14))
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                            Toggle("", isOn: $showPlayerLevel)
-                                .labelsHidden()
-                                .tint(.green)
-                                .scaleEffect(0.72)
-                                .frame(width: 38, height: 22)
-                        }
-                        HStack(spacing: 5) {
-                            Image("ui-star-icon")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 15, height: 15)
-                            ReliableLevelField(level: $playerLevel)
-                                .frame(width: 42, height: 22)
-                                .background(Color.white.opacity(0.9))
-                                .cornerRadius(5)
-                                .opacity(showPlayerLevel ? 1 : 0.45)
-                                .disabled(!showPlayerLevel)
-                            ZStack(alignment: .leading) {
-                                Image("ui-xp-frame")
-                                    .resizable(capInsets: EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10), resizingMode: .stretch)
-                                    .frame(width: 56, height: 14)
-                                Image("ui-xp-fill")
-                                    .resizable(capInsets: EdgeInsets(top: 6, leading: 6, bottom: 6, trailing: 6), resizingMode: .stretch)
-                                    .frame(width: 38, height: 10)
-                                    .padding(.leading, 2)
-                            }
-                        }
-                    }
-
+                    .padding(.top, 40)
+                    .padding(.trailing, 20)
+                }
+                Spacer()
+            }
+            .zIndex(1)
+            
+            VStack {
+                Image("title").resizable().scaledToFit().frame(width: 300).padding(.top, 100)
+                Spacer()
+                
+                ReliableNicknameField(text: $playerName, placeholder: "Nickname")
+                    .frame(width: 300, height: 58)
+                    .background(Color.white.opacity(0.8))
+                    .cornerRadius(10)
+                    .multilineTextAlignment(.center)
+                    .padding(.bottom, 10)
+                
+                // League level: toggle it on and type any level 1-150; the badge preview
+                // re-resolves its league image live as the number changes.
+                HStack(spacing: 12) {
+                    Toggle("", isOn: $showPlayerLevel)
+                        .labelsHidden()
+                        .tint(.blue)
+                    Text("Level")
+                        .font(.custom("UbuntuSans-Bold", size: 18))
+                        .foregroundColor(.white)
+                    ReliableLevelField(level: $playerLevel)
+                        .frame(width: 64, height: 38)
+                        .background(Color.white.opacity(0.8))
+                        .cornerRadius(8)
+                        .opacity(showPlayerLevel ? 1 : 0.45)
+                        .disabled(!showPlayerLevel)
                     ZStack {
                         Image(LeagueBadge.assetName(forLevel: playerLevel))
                             .resizable()
                             .scaledToFit()
                         Text("\(LeagueBadge.clamp(playerLevel))")
-                            .font(.custom("UbuntuSans-Bold", size: playerLevel >= 100 ? 11 : 14))
+                            .font(.custom("UbuntuSans-Bold", size: playerLevel >= 100 ? 13 : 16))
                             .foregroundColor(.white)
                             .shadow(color: Color(LeagueBadge.strokeColor(forLevel: playerLevel)), radius: 1)
+                            .shadow(color: Color(LeagueBadge.strokeColor(forLevel: playerLevel)), radius: 1)
+                            .shadow(color: Color(LeagueBadge.strokeColor(forLevel: playerLevel)), radius: 1)
                     }
-                    .frame(width: 38, height: 36)
+                    .frame(width: 47, height: 44)
                     .opacity(showPlayerLevel ? 1 : 0.45)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(
-                    Image("ui-btn-darkblue")
-                        .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
-                )
-
-                Spacer()
-
-                // Currency Bars (CoinsBar + DNABar)
-                HStack(spacing: 6) {
-                    Button(action: { SoundManager.shared.play(.menuClick); activeInfoTab = "Shop" }) {
-                        HStack(spacing: 5) {
-                            Image("ui-coin-icon").resizable().scaledToFit().frame(width: 22, height: 22)
-                            Text("\(coinsCount)")
-                                .font(.custom("UbuntuSans-Bold", size: 13))
-                                .foregroundColor(.white)
-                            Image("ui-plus-box").resizable().scaledToFit().frame(width: 18, height: 18)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(
-                            Image("ui-bar-darkcyan")
-                                .resizable(capInsets: EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10), resizingMode: .stretch)
-                        )
-                    }
-
-                    Button(action: { SoundManager.shared.play(.menuClick); activeInfoTab = "Shop" }) {
-                        HStack(spacing: 5) {
-                            Image("ui-dna-icon").resizable().scaledToFit().frame(width: 22, height: 22)
-                            Text("\(dnaCount)")
-                                .font(.custom("UbuntuSans-Bold", size: 13))
-                                .foregroundColor(.white)
-                            Image("ui-plus-box").resizable().scaledToFit().frame(width: 18, height: 18)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(
-                            Image("ui-bar-darkcyan")
-                                .resizable(capInsets: EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10), resizingMode: .stretch)
-                        )
-                    }
-                }
-
-                // Gift, News, Settings
-                HStack(spacing: 6) {
-                    Button(action: { SoundManager.shared.play(.menuClick); activeInfoTab = "Gifts" }) {
-                        Image("ui-gift-icon").resizable().scaledToFit().frame(width: 28, height: 28)
-                            .padding(8)
-                            .background(
-                                Image("ui-btn-darkblue")
-                                    .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
-                            )
-                    }
-                    Button(action: { SoundManager.shared.play(.menuClick); activeInfoTab = "News" }) {
-                        Image("ui-news-icon").resizable().scaledToFit().frame(width: 28, height: 28)
-                            .padding(8)
-                            .background(
-                                Image("ui-btn-darkblue")
-                                    .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
-                            )
-                    }
-                    Button(action: {
-                        SoundManager.shared.play(.menuClick)
-                        withAnimation { showSettings = true }
-                    }) {
-                        Image("ui-settings-icon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 28, height: 28)
-                            .padding(8)
-                            .background(
-                                Image("ui-btn-darkblue")
-                                    .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
-                            )
-                    }
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 42)
-            Spacer()
-        }
-    }
-
-    private var bottomFeatureDock: some View {
-        VStack {
-            Spacer()
-            HStack(spacing: 10) {
-                featureDockButton(icon: "ui-shop-icon", label: "Shop") { activeInfoTab = "Shop" }
-                featureDockButton(icon: "ui-skins-icon", label: "Skins") { showSkinsModal = true }
-                featureDockButton(icon: "ui-mystery-potion", label: "Potions") { activeInfoTab = "Potions" }
-                featureDockButton(icon: "ui-leagues-icon", label: "Leagues") { activeInfoTab = "Leagues" }
-                featureDockButton(icon: "ui-quests-icon", label: "Quests") { activeInfoTab = "Quests" }
-            }
-            .padding(.horizontal, 14)
-            .padding(.bottom, 18)
-        }
-    }
-
-    private func featureDockButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: {
-            SoundManager.shared.play(.menuClick)
-            withAnimation { action() }
-        }) {
-            VStack(spacing: 3) {
-                Image(icon)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 28, height: 26)
-                Text(label)
-                    .font(.custom("UbuntuSans-Bold", size: 11))
-                    .foregroundColor(.white)
-            }
-            .frame(width: 62, height: 54)
-            .background(
-                Image("ui-btn-darkblue")
-                    .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
-            )
-        }
-    }
-
-    private var skinsModalOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.72).edgesIgnoringSafeArea(.all).onTapGesture { withAnimation { showSkinsModal = false } }
-            VStack(spacing: 14) {
-                HStack {
-                    Spacer()
-                    Text("Skins").font(.custom("UbuntuSans-Bold", size: 26)).foregroundColor(.white)
-                    Spacer()
-                    Button(action: { SoundManager.shared.play(.menuClick); withAnimation { showSkinsModal = false } }) {
-                        Image("ui-close-btn").resizable().scaledToFit().frame(width: 28, height: 28)
-                    }
-                }
-                ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 68), spacing: 12)], spacing: 12) {
-                        Button(action: { SoundManager.shared.play(.menuClick); selectedSkinName = nil; showSkinsModal = false }) {
-                            ZStack {
-                                Circle().fill(LinearGradient(gradient: Gradient(colors: [.red, .orange, .yellow, .green, .blue, .purple]), startPoint: .topLeading, endPoint: .bottomTrailing)).frame(width: 60, height: 60)
-                                Image(systemName: "xmark").font(.title3.bold()).foregroundColor(.white)
-                                if selectedSkinName == nil { Circle().stroke(Color.white, lineWidth: 4).frame(width: 66, height: 66) }
-                            }
-                        }
-                        Button(action: { SoundManager.shared.play(.menuClick); selectedSkinName = "Dragon"; showSkinsModal = false }) {
-                            ZStack {
-                                SkinSelectorPreview(skinName: "Dragon").frame(width: 60, height: 60)
-                                if selectedSkinName == "Dragon" { Circle().stroke(Color.white, lineWidth: 4).frame(width: 66, height: 66) }
-                            }
-                        }
-                        ForEach(availableSkins, id: \.self) { skin in
-                            Button(action: { SoundManager.shared.play(.menuClick); selectedSkinName = skin; showSkinsModal = false }) {
-                                ZStack {
-                                    SkinSelectorPreview(skinName: skin).frame(width: 60, height: 60)
-                                    if selectedSkinName == skin { Circle().stroke(Color.white, lineWidth: 4).frame(width: 66, height: 66) }
-                                }
-                            }
-                        }
-                    }
-                    .padding(8)
-                }
-                .frame(maxHeight: 360)
-            }
-            .padding(20)
-            .frame(width: 360)
-            .background(
-                Image("ui-btn-darkblue")
-                    .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
-            )
-            .shadow(radius: 20)
-        }
-    }
-
-    private func infoModalOverlay(title: String) -> some View {
-        ZStack {
-            Color.black.opacity(0.72).edgesIgnoringSafeArea(.all).onTapGesture { withAnimation { activeInfoTab = nil } }
-            VStack(spacing: 16) {
-                HStack {
-                    Spacer()
-                    Text(title).font(.custom("UbuntuSans-Bold", size: 26)).foregroundColor(.white)
-                    Spacer()
-                    Button(action: { SoundManager.shared.play(.menuClick); withAnimation { activeInfoTab = nil } }) {
-                        Image("ui-close-btn").resizable().scaledToFit().frame(width: 28, height: 28)
-                    }
-                }
-                if title == "Leagues" {
-                    HStack(spacing: 12) {
-                        Image(LeagueBadge.assetName(forLevel: playerLevel)).resizable().scaledToFit().frame(width: 64, height: 60)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Current Level: \(LeagueBadge.clamp(playerLevel))")
-                                .font(.custom("UbuntuSans-Bold", size: 18)).foregroundColor(.white)
-                            Text("Adjust your level in the top-left profile bar (1-150).")
-                                .font(.custom("UbuntuSans-Bold", size: 13)).foregroundColor(.white.opacity(0.75))
-                        }
-                    }
-                } else {
-                    Text("\(title) uses local offline state in this build — Coins (\(coinsCount)) and DNA (\(dnaCount)) are synced locally.")
-                        .font(.custom("UbuntuSans-Bold", size: 14))
-                        .foregroundColor(.white.opacity(0.8))
-                        .multilineTextAlignment(.center)
-                }
-                Button(action: { SoundManager.shared.play(.menuClick); withAnimation { activeInfoTab = nil } }) {
-                    Text("Close").font(.custom("UbuntuSans-Bold", size: 18)).foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 46)
-                        .background(
-                            Image("ui-btn-blue")
-                                .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
-                        )
-                }
-            }
-            .padding(20)
-            .frame(width: 340)
-            .background(
-                Image("ui-btn-darkblue")
-                    .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
-            )
-            .shadow(radius: 20)
-        }
-    }
-
-    var body: some View {
-        ZStack {
-            Image("background-ipadpro-hd").resizable().scaledToFill().scaleEffect(1).edgesIgnoringSafeArea(.all)
-            
-            topMenuBar.zIndex(1)
-            bottomFeatureDock.zIndex(1)
-            
-            VStack(spacing: 14) {
-                Spacer()
-                Image("ui-logo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxWidth: 320)
-                    .shadow(color: .black.opacity(0.35), radius: 8, y: 4)
-                    .padding(.bottom, 6)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 7)
+                .background(Color.black.opacity(0.3))
+                .cornerRadius(10)
+                .padding(.bottom, 20)
                 
-                // Nickname + Skins Row (MenuMain.ccbi)
-                HStack(spacing: 12) {
-                    ReliableNicknameField(text: $playerName, placeholder: "Nickname")
-                        .frame(width: 246, height: 52)
-                        .padding(.horizontal, 8)
-                        .background(
-                            Image("ui-frame-white")
-                                .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
-                        )
-                        .multilineTextAlignment(.center)
-
-                    Button(action: {
-                        SoundManager.shared.play(.menuClick)
-                        withAnimation(.easeInOut(duration: 0.2)) { showSkinDrawer.toggle() }
-                    }) {
-                        ZStack {
-                            Image("ui-skins-icon")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 56, height: 56)
-                            if let skin = selectedSkinName {
-                                SkinSelectorPreview(skinName: skin)
-                                    .frame(width: 46, height: 46)
-                                    .clipShape(Circle())
-                                    .overlay(Circle().stroke(Color.white, lineWidth: 2.5))
-                            }
-                        }
-                    }
-                }
-                
-                if showSkinDrawer {
+                VStack(spacing: 15) {
+                    Text("Select Skin").font(.custom("UbuntuSans-Bold", size: 24)).foregroundColor(.white).shadow(radius: 5)
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 14) {
-                            Button(action: { SoundManager.shared.play(.menuClick); selectedSkinName = "Dragon" }) {
+                        HStack(spacing: 15) {
+                            // "Dragon" stays pinned to the very start of the selector. Its
+                            // preview (like every skin's) upgrades itself automatically when
+                            // the bundled image is a dual-width sheet: base half + live shine.
+                            Button(action: { selectedSkinName = "Dragon" }) {
                                 ZStack {
-                                    SkinSelectorPreview(skinName: "Dragon").frame(width: 56, height: 56)
-                                    if selectedSkinName == "Dragon" { Circle().stroke(Color.white, lineWidth: 4).frame(width: 62, height: 62) }
+                                    SkinSelectorPreview(skinName: "Dragon").frame(width: 60, height: 60)
+                                    if selectedSkinName == "Dragon" { Circle().stroke(Color.white, lineWidth: 4).frame(width: 66, height: 66) }
                                 }
                             }
-                            Button(action: { SoundManager.shared.play(.menuClick); selectedSkinName = nil }) {
+                            Button(action: { selectedSkinName = nil }) {
                                 ZStack {
-                                    Circle().fill(LinearGradient(gradient: Gradient(colors:[.red, .orange, .yellow, .green, .blue, .purple]), startPoint: .topLeading, endPoint: .bottomTrailing)).frame(width: 56, height: 56)
-                                    Image(systemName: "xmark").font(.title3.bold()).foregroundColor(.white)
-                                    if selectedSkinName == nil { Circle().stroke(Color.white, lineWidth: 4).frame(width: 62, height: 62) }
+                                    Circle().fill(LinearGradient(gradient: Gradient(colors:[.red, .orange, .yellow, .green, .blue, .purple]), startPoint: .topLeading, endPoint: .bottomTrailing)).frame(width: 60, height: 60)
+                                    Image(systemName: "xmark").font(.title2.bold()).foregroundColor(.white)
+                                    if selectedSkinName == nil { Circle().stroke(Color.white, lineWidth: 4).frame(width: 66, height: 66) }
                                 }
                             }
                             ForEach(availableSkins, id: \.self) { skin in
-                                Button(action: { SoundManager.shared.play(.menuClick); selectedSkinName = skin }) {
+                                Button(action: { selectedSkinName = skin }) {
                                     ZStack {
-                                        SkinSelectorPreview(skinName: skin).frame(width: 56, height: 56)
-                                        if selectedSkinName == skin { Circle().stroke(Color.white, lineWidth: 4).frame(width: 62, height: 62) }
+                                        SkinSelectorPreview(skinName: skin).frame(width: 60, height: 60)
+                                        if selectedSkinName == skin { Circle().stroke(Color.white, lineWidth: 4).frame(width: 66, height: 66) }
                                     }
                                 }
                             }
                         }
-                        .padding(.horizontal, 18).padding(.vertical, 10)
+                        .padding(.horizontal, 20).padding(.vertical, 10)
                     }
-                    .frame(maxWidth: 360)
-                    .background(
-                        Image("ui-btn-darkblue")
-                            .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
-                    )
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                    .background(Color.black.opacity(0.3))
                 }
+                .padding(.bottom, 20)
                 
-                // Primary Classic Play Button (ClassicButton.ccbi / MCFS_mode_darkorange)
                 Button(action: {
-                    SoundManager.shared.play(.menuClick)
                     withAnimation(.easeOut(duration: 0.4)) { zoomLevel = 0.8; isPlaying = true }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { withAnimation(.spring(duration: 1)) { zoomLevel = 1.0 } }
                 }) {
-                    HStack(spacing: 12) {
-                        Image("ui-play-icon")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 28, height: 32)
-                        Text("Play")
-                            .font(.custom("UbuntuSans-Bold", size: 30))
-                            .foregroundColor(.white)
-                            .shadow(color: .black.opacity(0.45), radius: 2, y: 2)
-                    }
-                    .frame(width: 260, height: 64)
-                    .background(
-                        Image("ui-btn-classic")
-                            .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
-                    )
+                    Text("Play").font(.largeTitle).fontWeight(.bold).foregroundColor(.white).padding(.horizontal, 40).padding(.vertical, 20).background(Color.blue).cornerRadius(25)
                 }
-                .padding(.top, 6)
+                .padding(.bottom, 14)
                 
-                HStack(spacing: 12) {
-                    // Play Online (MCFS_green)
-                    Button(action: {
-                        SoundManager.shared.play(.menuClick)
-                        onPlayOnline()
-                    }) {
-                        Text("Play Online")
-                            .font(.custom("UbuntuSans-Bold", size: 20))
-                            .foregroundColor(.white)
-                            .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
-                            .frame(width: 158, height: 52)
-                            .background(
-                                Image("ui-btn-green")
-                                    .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
-                            )
-                    }
-
-                    // Party (MCFS_orange + partymode_icon)
-                    Button(action: {
-                        SoundManager.shared.play(.menuClick)
-                        partyJoinCode = ""
-                        withAnimation { showPartyMenu = true }
-                    }) {
-                        HStack(spacing: 6) {
-                            Image("ui-party-icon")
-                                .resizable()
-                                .scaledToFit()
-                                .frame(width: 24, height: 22)
-                            Text(partyCode.isEmpty ? "Party" : partyCode)
-                                .font(.custom("UbuntuSans-Bold", size: 19))
-                                .foregroundColor(.white)
-                                .shadow(color: .black.opacity(0.4), radius: 1, y: 1)
-                        }
-                        .frame(width: 130, height: 52)
-                        .background(
-                            Image("ui-btn-orange")
-                                .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
-                        )
-                    }
+                Button(action: { onPlayOnline() }) {
+                    Text("Play Online").font(.title2).fontWeight(.bold).foregroundColor(.white).padding(.horizontal, 34).padding(.vertical, 14).background(Color.green).cornerRadius(20)
                 }
-                Spacer()
+                .padding(.bottom, 12)
+                
+                Button(action: { partyJoinCode = ""; withAnimation { showPartyMenu = true } }) {
+                    Text(partyCode.isEmpty ? "Party" : "Party · \(partyCode)")
+                        .font(.custom("UbuntuSans-Bold", size: 19))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 28).padding(.vertical, 11)
+                        .background(Color.orange).cornerRadius(17)
+                }
+                .padding(.bottom, 66)
             }
             
             // Party Overlay Window (extracted helper: keeps this body type-checkable)
             if showPartyMenu { partyOverlay.zIndex(2) }
-            if showSkinsModal { skinsModalOverlay.zIndex(2) }
-            if let tab = activeInfoTab {
-                switch tab {
-                case "Shop", "Boosts":
-                    ShopModalView(coins: $coinsCount, dna: $dnaCount, activeStartBoost: $activeStartBoost) {
-                        withAnimation { activeInfoTab = nil }
-                    }
-                    .zIndex(2)
-                case "Quests":
-                    QuestsModalView(coins: $coinsCount, dna: $dnaCount) {
-                        withAnimation { activeInfoTab = nil }
-                    }
-                    .zIndex(2)
-                case "Potions":
-                    PotionsModalView(coins: $coinsCount, dna: $dnaCount) {
-                        withAnimation { activeInfoTab = nil }
-                    }
-                    .zIndex(2)
-                case "Gifts", "News":
-                    GiftsNewsModalView(title: tab, coins: $coinsCount, dna: $dnaCount) {
-                        withAnimation { activeInfoTab = nil }
-                    }
-                    .zIndex(2)
-                default:
-                    infoModalOverlay(title: tab).zIndex(2)
-                }
-            }
             
             // Settings Overlay Window
             if showSettings {
                 ZStack {
                     Color.black.opacity(0.7).edgesIgnoringSafeArea(.all).onTapGesture { withAnimation { showSettings = false } }
                     
-                    VStack(spacing: 16) {
-                        HStack {
-                            Spacer()
-                            Text("Settings").font(.custom("UbuntuSans-Bold", size: 26)).foregroundColor(.white)
-                            Spacer()
-                            Button(action: { SoundManager.shared.play(.menuClick); withAnimation { showSettings = false } }) {
-                                Image("ui-close-btn").resizable().scaledToFit().frame(width: 28, height: 28)
-                            }
-                        }
+                    VStack(spacing: 20) {
+                        Text("Game Settings").font(.custom("UbuntuSans-Bold", size: 28)).foregroundColor(.white)
                         
                         ScrollView {
                             VStack(alignment: .leading, spacing: 15) {
-                                Toggle(isOn: $soundEnabled) {
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text("Sound Effects").foregroundColor(.white).bold()
-                                        Text("Plays original Agar.io SFX for split, eject, eat, and menus.")
-                                            .font(.caption).foregroundColor(.white.opacity(0.7))
-                                    }
-                                }
-                                .toggleStyle(SwitchToggleStyle(tint: .green))
-
                                 Text("Player Start Mass: \(Int(playerStartMass))").foregroundColor(.white).bold()
                                 Slider(value: $playerStartMass, in: 10...5000, step: 10).accentColor(.blue)
                                 
@@ -13439,7 +12895,7 @@ struct MainMenu: View {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Randomize Bot Start Mass").foregroundColor(.white).bold()
                                         Text("Bots spawn at 40-10000 like a running game; respawns re-enter at 40-140.")
-                                            .font(.caption).foregroundColor(.white.opacity(0.7))
+                                            .font(.caption).foregroundColor(.gray)
                                     }
                                 }
                                 .toggleStyle(SwitchToggleStyle(tint: .green))
@@ -13453,13 +12909,13 @@ struct MainMenu: View {
                                 Text("Bot Skill: \(menuBotSkillLabel)").foregroundColor(.white).bold()
                                 Slider(value: $botSkill, in: 0.4...1.6, step: 0.1).accentColor(.red)
                                 Text("Scales reaction time, prediction, tricks and how eagerly bots split on you. Individual bots still vary around this level.")
-                                    .font(.caption).foregroundColor(.white.opacity(0.7))
+                                    .font(.caption).foregroundColor(.gray)
                                 
                                 Toggle(isOn: $darkModeGrid) {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Dark Mode").foregroundColor(.white).bold()
                                         Text("Inverts the grid colors (background + lines) in matches.")
-                                            .font(.caption).foregroundColor(.white.opacity(0.7))
+                                            .font(.caption).foregroundColor(.gray)
                                     }
                                 }
                                 .toggleStyle(SwitchToggleStyle(tint: .purple))
@@ -13468,7 +12924,7 @@ struct MainMenu: View {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("Show Mass").foregroundColor(.white).bold()
                                         Text("Shows the mass number on cells. Works offline and online.")
-                                            .font(.caption).foregroundColor(.white.opacity(0.7))
+                                            .font(.caption).foregroundColor(.gray)
                                     }
                                 }
                                 .toggleStyle(SwitchToggleStyle(tint: .blue))
@@ -13477,22 +12933,14 @@ struct MainMenu: View {
                         }
                         .frame(maxHeight: 320)
                         
-                        Button(action: { SoundManager.shared.play(.menuClick); withAnimation { showSettings = false } }) {
-                            Text("Done").font(.custom("UbuntuSans-Bold", size: 20)).foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 48)
-                                .background(
-                                    Image("ui-btn-blue")
-                                        .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
-                                )
+                        Button(action: { withAnimation { showSettings = false } }) {
+                            Text("Done").font(.headline).foregroundColor(.white).padding().frame(maxWidth: .infinity).background(Color.blue).cornerRadius(10)
                         }
                     }
-                    .padding(20)
-                    .frame(width: 350)
-                    .background(
-                        Image("ui-btn-darkblue")
-                            .resizable(capInsets: EdgeInsets(top: 24, leading: 23, bottom: 24, trailing: 23), resizingMode: .stretch)
-                    )
+                    .padding()
+                    .frame(width: 340)
+                    .background(Color(white: 0.15))
+                    .cornerRadius(20)
                     .shadow(radius: 20)
                 }
                 .zIndex(2)
