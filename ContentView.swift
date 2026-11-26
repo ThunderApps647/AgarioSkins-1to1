@@ -2865,6 +2865,10 @@ struct GameWorldView: View {
     var ownerLevels: [UUID: Int] = [:]
     /// Pickups (food/ejected mass/tokens) mid magnet-suck into their eater.
     var consumeAnimations: [ConsumedPickupAnimation] = []
+    /// Active player emote drawn inside every player split cell (clipped to cell boundary).
+    var activeEmoteAsset: String? = nil
+    var activeEmoteStartedAt: TimeInterval = 0
+    var activeEmoteExpiresAt: TimeInterval = 0
     
     /// Dark mode: inverts the grid colours (background plate + grid lines are the
     /// exact RGB inverse of the light values). Stored so both the offline and the
@@ -2939,14 +2943,22 @@ struct GameWorldView: View {
                 context.stroke(gridPathY, with: .color(gridColor), lineWidth: lineWidth)
             }
 
-            // 2b. Arena Boundary (ArenaBoundaryShaderEffect): crisp border around 0...worldSize
+            // 2b. Arena Boundary (ArenaBoundaryShaderEffect): dim out-of-bounds space outside
+            // 0...worldSize with smooth shading + subtle inner guide line.
             let boundaryRect = CGRect(x: cameraOffsetX,
                                       y: cameraOffsetY,
                                       width: worldSize * zoom,
                                       height: worldSize * zoom)
+            let outOfBoundsPath = Path { p in
+                p.addRect(screenBounds)
+                p.addRect(boundaryRect)
+            }
+            context.fill(outOfBoundsPath,
+                         with: .color(Color.black.opacity(darkModeGrid ? 0.38 : 0.10)),
+                         style: FillStyle(eoFill: true))
             if boundaryRect.intersects(screenBounds) {
-                let borderColor = darkModeGrid ? Color.white.opacity(0.28) : Color(hex: 0xC6CED2)
-                context.stroke(Path(boundaryRect), with: .color(borderColor), lineWidth: max(1.5, min(4.0, 2.5 * zoom)))
+                let guideColor = Color(hex: darkModeGrid ? 0x33373D : 0xD2D8DC).opacity(0.65)
+                context.stroke(Path(boundaryRect), with: .color(guideColor), lineWidth: max(1.0, 1.5 * zoom))
             }
             
             // 3. Food - same pellets, same 0.5px cutoff as before. The win is that the
@@ -3880,6 +3892,27 @@ struct GameWorldView: View {
                 imageContext.draw(image, in: rect)
             }
         }
+        // Emote overlay: drawn INSIDE EVERY split cell owned by the local player,
+        // clipped to the cell's circular/organic path, with 3.0s fade-in/fade-out.
+        if !cell.isBot && !cell.isFeedBot && !cell.isRemoteHuman,
+           let emote = activeEmoteAsset {
+            let now = CACurrentMediaTime()
+            if now < activeEmoteExpiresAt {
+                let elapsed = max(0, now - activeEmoteStartedAt)
+                let remaining = max(0, activeEmoteExpiresAt - now)
+                let fadeIn = min(1.0, elapsed / 0.18)
+                let fadeOut = min(1.0, remaining / 0.30)
+                let alpha = min(fadeIn, fadeOut)
+                if alpha > 0.01,
+                   let emoteImage = resolver.resolve("emote:" + emote, context: context, make: { Image(emote).resizable() }) {
+                    var emoteContext = context
+                    emoteContext.clip(to: path)
+                    emoteContext.opacity = alpha
+                    let rect = CGRect(x: screenX - radius, y: screenY - radius, width: radius * 2, height: radius * 2)
+                    emoteContext.draw(emoteImage, in: rect)
+                }
+            }
+        }
     }
     
     func createOrganicPath(center: CGPoint, baseRadius: CGFloat, deformations: [CGFloat], hasDeformation: Bool, zoom: CGFloat, minRadius: CGFloat) -> Path {
@@ -4782,6 +4815,7 @@ struct ContentView: View {
     @State private var matchSurvivalSeconds: Int = 0
     @State private var showEmotePicker: Bool = false
     @State private var activeEmoteAsset: String? = nil
+    @State private var activeEmoteStartedAt: TimeInterval = 0
     @State private var activeEmoteExpiresAt: TimeInterval = 0
     @State private var emoteCooldownUntil: TimeInterval = 0
     
@@ -4882,7 +4916,10 @@ struct ContentView: View {
                         teammateOwnerID: playerTeammateOwnerID,
                         dualSkinSwapShowingSince: dualSkinSwapPhase == .showing ? dualSkinSwapStartedAt : nil,
                         ownerLevels: renderedOwnerLevels,
-                        consumeAnimations: consumeAnimations
+                        consumeAnimations: consumeAnimations,
+                        activeEmoteAsset: activeEmoteAsset,
+                        activeEmoteStartedAt: activeEmoteStartedAt,
+                        activeEmoteExpiresAt: activeEmoteExpiresAt
                     )
                     .offset(y: -(geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom) / 2)
                     .onAppear(perform: spawnInitialObjects)
@@ -5001,24 +5038,13 @@ struct ContentView: View {
                                 guard now >= emoteCooldownUntil else { return }
                                 SoundManager.shared.play(.menuClick)
                                 activeEmoteAsset = asset
+                                activeEmoteStartedAt = now
                                 activeEmoteExpiresAt = now + 3.0
                                 emoteCooldownUntil = now + 3.0
                                 withAnimation(.easeInOut(duration: 0.15)) { showEmotePicker = false }
                             }
                         )
                         .zIndex(2)
-                    }
-
-                    if let emote = activeEmoteAsset, CACurrentMediaTime() < activeEmoteExpiresAt, !isLeavePopupPresented {
-                        ActiveEmoteBubble(
-                            assetName: emote,
-                            cellPosition: playerCells.max(by: { $0.mass < $1.mass })?.position ?? playerCenter,
-                            cellRadius: playerCells.max(by: { $0.mass < $1.mass })?.cachedSolidRadius ?? 30,
-                            smoothedCamera: smoothedPlayerPosition,
-                            zoomLevel: zoomLevel,
-                            screenSize: geometry.size
-                        )
-                        .zIndex(1)
                     }
                 }
                 
@@ -10170,6 +10196,7 @@ struct ContentView: View {
         
         let launchRadius = viruses[virusIndex].radius
         viruses[virusIndex].targetMass += mass.mass
+        viruses[virusIndex].mass += mass.mass * 0.35 // Tactile hit-pulse expansion before settling
         viruses[virusIndex].fedMass += mass.mass
         guard viruses[virusIndex].targetMass
                 >= viruses[virusIndex].splitThreshold else { return }
@@ -10548,7 +10575,29 @@ struct ContentView: View {
         let cellCountFactor = 1.0 + weightedExtraCells * 0.01
         
         let customZoomMultiplier = 1.0 - ((CGFloat(zoomSliderValue) - 1.0) / 49.0) * 0.9
-        let targetZoom = ((baseZoom / spreadFactor) / cellCountFactor) * customZoomMultiplier
+        var targetZoom = ((baseZoom / spreadFactor) / cellCountFactor) * customZoomMultiplier
+
+        // Multi-cell bounding box framing: ensure wide splits stay framed with padding.
+        if playerCells.count > 1 {
+            var minX = CGFloat.greatestFiniteMagnitude
+            var maxX = -CGFloat.greatestFiniteMagnitude
+            var minY = CGFloat.greatestFiniteMagnitude
+            var maxY = -CGFloat.greatestFiniteMagnitude
+            for cell in playerCells {
+                let r = cell.cachedSolidRadius
+                minX = min(minX, cell.position.x - r)
+                maxX = max(maxX, cell.position.x + r)
+                minY = min(minY, cell.position.y - r)
+                maxY = max(maxY, cell.position.y + r)
+            }
+            let bboxW = max(1, maxX - minX)
+            let bboxH = max(1, maxY - minY)
+            let screen = UIScreen.main.bounds.size
+            let fitZoom = min(screen.width / (bboxW * 1.25), screen.height / (bboxH * 1.25)) * customZoomMultiplier
+            if fitZoom < targetZoom {
+                targetZoom = max(0.18 * customZoomMultiplier, fitZoom)
+            }
+        }
         
         let zoomSmooth = getLerpFactor(base: 0.07, dt: dt)
         zoomLevel += (targetZoom - zoomLevel) * zoomSmooth
