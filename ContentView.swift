@@ -13544,6 +13544,12 @@ struct MainMenu: View {
                                 }
                                 .padding(14)
                                 .background(Image("mcfs-white").resizable())
+
+                                Text(buildStamp)
+                                    .font(.custom("Lato-Regular", size: 11))
+                                    .foregroundColor(Color(hex: 0x9A9A9A))
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                                    .padding(.top, 4)
                             }
                             .padding(.horizontal, 18)
                             .padding(.bottom, 24)
@@ -13553,6 +13559,14 @@ struct MainMenu: View {
                 .zIndex(3)
             }
         }
+    }
+
+    /// CI stamps the short commit SHA and build time into Info.plist so an
+    /// installed build can be identified without guessing.
+    private var buildStamp: String {
+        let sha = Bundle.main.object(forInfoDictionaryKey: "AgarBuildSHA") as? String ?? "dev"
+        let date = Bundle.main.object(forInfoDictionaryKey: "AgarBuildDate") as? String ?? ""
+        return date.isEmpty ? "Build \(sha)" : "Build \(sha) · \(date)"
     }
 
     private func lightSettingRowSwitch(_ title: String, isOn: Binding<Bool>) -> some View {

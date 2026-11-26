@@ -39,6 +39,13 @@ jobs:
           echo "Found app: $APP_PATH"
           test -n "$APP_PATH"
           cp -R "$APP_PATH" Payload/
+          APP_NAME=$(basename "$APP_PATH")
+          PLIST="Payload/$APP_NAME/Info.plist"
+          /usr/libexec/PlistBuddy -c "Add :AgarBuildSHA string ${GITHUB_SHA:0:7}" "$PLIST" 2>/dev/null \
+            || /usr/libexec/PlistBuddy -c "Set :AgarBuildSHA ${GITHUB_SHA:0:7}" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Add :AgarBuildDate string $(date -u +%Y-%m-%dT%H:%MZ)" "$PLIST" 2>/dev/null \
+            || /usr/libexec/PlistBuddy -c "Set :AgarBuildDate $(date -u +%Y-%m-%dT%H:%MZ)" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Print :AgarBuildSHA" "$PLIST"
           zip -r -y AgarioSkins-unsigned.ipa Payload
 
       - name: Upload IPA Artifact
