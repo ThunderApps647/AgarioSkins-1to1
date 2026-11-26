@@ -9,6 +9,7 @@ struct AgarBevelButtonStyle: View {
     let fill: Color
     let bevel: Color
     var cornerRadius: CGFloat = 12
+    var isPressed: Bool = false
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -16,7 +17,57 @@ struct AgarBevelButtonStyle: View {
                 .fill(bevel)
             RoundedRectangle(cornerRadius: cornerRadius)
                 .fill(fill)
-                .padding(.bottom, 4)
+                .padding(.bottom, isPressed ? 1 : 4)
+                .offset(y: isPressed ? 3 : 0)
+        }
+    }
+}
+
+struct AgarBevelPressStyle: ButtonStyle {
+    let fill: Color
+    let bevel: Color
+    var cornerRadius: CGFloat = 12
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .offset(y: configuration.isPressed ? 2.5 : 0)
+            .background(AgarBevelButtonStyle(fill: fill, bevel: bevel, cornerRadius: cornerRadius, isPressed: configuration.isPressed))
+            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
+            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+    }
+}
+
+struct AgarModalContainer<Content: View>: View {
+    let dismissOnBackdrop: Bool
+    let onClose: () -> Void
+    @ViewBuilder let content: (_ triggerClose: @escaping () -> Void) -> Content
+
+    @State private var appeared = false
+
+    private func triggerClose() {
+        withAnimation(.easeIn(duration: 0.15)) {
+            appeared = false
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            onClose()
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(appeared ? 0.65 : 0.0)
+                .edgesIgnoringSafeArea(.all)
+                .onTapGesture {
+                    if dismissOnBackdrop { triggerClose() }
+                }
+            content(triggerClose)
+                .scaleEffect(appeared ? 1.0 : 0.85)
+                .opacity(appeared ? 1.0 : 0.0)
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.78)) {
+                appeared = true
+            }
         }
     }
 }
@@ -30,10 +81,9 @@ struct ShopModalView: View {
     @State private var statusMessage: String = ""
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.65).edgesIgnoringSafeArea(.all).onTapGesture(perform: onClose)
+        AgarModalContainer(dismissOnBackdrop: true, onClose: onClose) { triggerClose in
             VStack(spacing: 14) {
-                modalHeader(title: "Shop", onClose: onClose)
+                modalHeader(title: "Shop", onClose: triggerClose)
 
                 HStack(spacing: 12) {
                     currencyPill(icon: "ui-coin-icon", value: coins)
@@ -129,10 +179,9 @@ struct QuestsModalView: View {
     @AppStorage("macro.quest3Claimed") private var q3Claimed: Bool = false
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.65).edgesIgnoringSafeArea(.all).onTapGesture(perform: onClose)
+        AgarModalContainer(dismissOnBackdrop: true, onClose: onClose) { triggerClose in
             VStack(spacing: 14) {
-                modalHeader(title: "Daily Quests", onClose: onClose)
+                modalHeader(title: "Daily Quests", onClose: triggerClose)
                 Image("ui-quest-chest").resizable().scaledToFit().frame(height: 64)
 
                 VStack(spacing: 10) {
@@ -191,10 +240,9 @@ struct PotionsModalView: View {
     @State private var lastReward: String = "Tap any potion to brew & open"
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.65).edgesIgnoringSafeArea(.all).onTapGesture(perform: onClose)
+        AgarModalContainer(dismissOnBackdrop: true, onClose: onClose) { triggerClose in
             VStack(spacing: 14) {
-                modalHeader(title: "Potions", onClose: onClose)
+                modalHeader(title: "Potions", onClose: triggerClose)
                 Text(lastReward)
                     .font(.custom("UbuntuSans-Bold", size: 13))
                     .foregroundColor(Color(hex: 0xFFE38A))
@@ -246,10 +294,9 @@ struct GiftsNewsModalView: View {
     @State private var giftClaimed = false
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.65).edgesIgnoringSafeArea(.all).onTapGesture(perform: onClose)
+        AgarModalContainer(dismissOnBackdrop: true, onClose: onClose) { triggerClose in
             VStack(spacing: 14) {
-                modalHeader(title: title, onClose: onClose)
+                modalHeader(title: title, onClose: triggerClose)
                 if title == "Gifts" {
                     Image("ui-gift-icon").resizable().scaledToFit().frame(width: 64, height: 64)
                     Text(giftClaimed ? "Daily gift claimed!" : "Daily Login Gift: +500 Coins & +15 DNA")
@@ -297,8 +344,7 @@ struct MatchResultsModalView: View {
     let onMainMenu: () -> Void
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.65).edgesIgnoringSafeArea(.all)
+        AgarModalContainer(dismissOnBackdrop: false, onClose: onMainMenu) { _ in
             VStack(spacing: 16) {
                 Text("Game Over")
                     .font(.custom("UbuntuSans-Bold", size: 32))
@@ -374,7 +420,11 @@ private func modalHeader(title: String, onClose: @escaping () -> Void) -> some V
 private func currencyPill(icon: String, value: Int) -> some View {
     HStack(spacing: 6) {
         Image(icon).resizable().scaledToFit().frame(width: 20, height: 20)
-        Text("\(value)").font(.custom("UbuntuSans-Bold", size: 14)).foregroundColor(.white)
+        Text("\(value)")
+            .font(.custom("UbuntuSans-Bold", size: 14))
+            .foregroundColor(.white)
+            .contentTransition(.numericText())
+            .animation(.easeOut(duration: 0.25), value: value)
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 6)

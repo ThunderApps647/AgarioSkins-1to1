@@ -2370,7 +2370,8 @@ struct PlayerCell: Identifiable {
         self.cachedSolidRadius = sqrt(mass) * 6.3245
         self.cachedLagRadius = self.cachedSolidRadius
         self.cachedVisualRadius = self.cachedSolidRadius
-        self.cachedMovementSpeed = 650 / pow(max(mass, 1), 0.23)
+        // IPA inputFactorPow = -0.45 on radius -> -0.225 on mass (agar.io 0x100047408)
+        self.cachedMovementSpeed = 650 / pow(max(mass, 1), 0.225)
         self.cachedMovementMass = mass
         self.velocity = velocity
         self.aiMovementDirection = .zero
@@ -2414,7 +2415,8 @@ struct PlayerCell: Identifiable {
         cachedVisualRadius = max(cachedSolidRadius, cachedLagRadius)
         let speedRefreshThreshold = max(0.5, cachedMovementMass * 0.004)
         if abs(mass - cachedMovementMass) >= speedRefreshThreshold {
-            cachedMovementSpeed = 650 / pow(max(mass, 1), 0.23)
+            // IPA inputFactorPow = -0.45 on radius -> -0.225 on mass (agar.io 0x100047408)
+        cachedMovementSpeed = 650 / pow(max(mass, 1), 0.225)
             cachedMovementMass = mass
         }
     }
@@ -4774,6 +4776,7 @@ struct ContentView: View {
     @State private var highScore: Int = 0
     @State private var tokenCount: Int = 0
     @State private var isGameOverPresented: Bool = false
+    @State private var isDeathSequencePending: Bool = false
     @State private var matchStartTime: TimeInterval = 0
     @State private var matchSurvivalSeconds: Int = 0
     @State private var showEmotePicker: Bool = false
@@ -5179,10 +5182,12 @@ struct ContentView: View {
                         survivalSeconds: matchSurvivalSeconds,
                         onPlayAgain: {
                             isGameOverPresented = false
+        isDeathSequencePending = false
                             spawnInitialObjects()
                         },
                         onMainMenu: {
                             isGameOverPresented = false
+        isDeathSequencePending = false
                             exitMatchToMainMenu()
                         }
                     )
@@ -10035,15 +10040,26 @@ struct ContentView: View {
                 // The old teammate pact and handshake never carry into the next match.
                 resetPlayerTeammateState()
             }
-            if playerCells.isEmpty && !isGameOverPresented {
+            if playerCells.isEmpty && !isGameOverPresented && !isDeathSequencePending {
+                isDeathSequencePending = true
                 SoundManager.shared.play(.gameOver)
                 matchSurvivalSeconds = max(0, Int(CACurrentMediaTime() - matchStartTime))
-                isGameOverPresented = true
                 joystickIsDragging = false
                 joystickOffset = .zero
                 joystickBasePosition = nil
                 isFeedingHeld = false
                 isMacroHeld = false
+                withAnimation(.easeOut(duration: 0.5)) {
+                    zoomLevel = max(0.35, zoomLevel * 0.72)
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    guard isPlaying, playerCells.isEmpty else {
+                        isDeathSequencePending = false
+                        return
+                    }
+                    isDeathSequencePending = false
+                    isGameOverPresented = true
+                }
             }
         }
         
@@ -11109,6 +11125,7 @@ struct ContentView: View {
                 }
             } else {
                 if cellIdx < playerCells.count {
+                    SoundManager.shared.play(.virusPop, minInterval: 0.06)
                     // Same font lineage rule as executeSplit, using the pre-pop mass:
                     // only the NEW pieces go half - the popped cell keeps its own ratio.
                     let poppedHalvesFont = playerCells[cellIdx].targetMass + 100 >= massFontHalfThreshold
@@ -11336,6 +11353,9 @@ struct ContentView: View {
                         let dy = targetPos.y - cells[i].position.y
                         let distSq = dx * dx + dy * dy
                         if distSq < 25.0 {
+                            if !cells[i].isBot && !cells[i].isFeedBot {
+                                SoundManager.shared.play(.eatOwnCell, minInterval: 0.06)
+                            }
                             cells.swapAt(i, cells.count - 1)
                             cells.removeLast()
                         } else {
@@ -11443,6 +11463,7 @@ struct ContentView: View {
         isLeavePopupPresented = false
         leavePopupMounted = false
         isGameOverPresented = false
+        isDeathSequencePending = false
         matchStartTime = CACurrentMediaTime()
         matchSurvivalSeconds = 0
         // Start every match in explicit centre-aim mode (the same proven mode the pause popup
@@ -13052,6 +13073,8 @@ struct MainMenu: View {
                                 Text("\(dnaCount)")
                                     .font(.custom("UbuntuSans-Bold", size: 15))
                                     .foregroundColor(Color(hex: 0x4A4A4A))
+                                    .contentTransition(.numericText())
+                                    .animation(.easeOut(duration: 0.25), value: dnaCount)
                                 Image("ui-plus-box").resizable().scaledToFit().frame(width: 20, height: 20)
                             }
                             .padding(.horizontal, 8)
@@ -13069,6 +13092,8 @@ struct MainMenu: View {
                                 Text("\(coinsCount)")
                                     .font(.custom("UbuntuSans-Bold", size: 15))
                                     .foregroundColor(Color(hex: 0x4A4A4A))
+                                    .contentTransition(.numericText())
+                                    .animation(.easeOut(duration: 0.25), value: coinsCount)
                                 Image("ui-plus-box").resizable().scaledToFit().frame(width: 20, height: 20)
                             }
                             .padding(.horizontal, 8)

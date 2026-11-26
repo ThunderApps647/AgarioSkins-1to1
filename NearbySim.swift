@@ -80,7 +80,8 @@ enum SrvRules {
     (max(m, 0)).squareRoot() * SrvRules.radiusFactor
 }
 @inline(__always) func speedForMass(_ m: Double) -> Double {
-    650 / pow(max(m, 1), 0.23)
+    // IPA inputFactorPow = -0.45 on radius -> -0.225 on mass (agar.io 0x100047408)
+    650 / pow(max(m, 1), 0.225)
 }
 
 // MARK: - Entities
