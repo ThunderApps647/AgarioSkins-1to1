@@ -1175,24 +1175,18 @@ struct OnlineGameView: View {
                                        glideSpeedFactor: getLerpFactor(base: 0.18, dt: dt),
                                        dt: dt)
         guard !animatingEatenCells.isEmpty else { return }
-        let glideSpeedFactor = getLerpFactor(base: 0.20, dt: dt)
         var allPositions = [UUID: CGPoint]()
-        var allRadii = [UUID: CGFloat]()
         for c in playerCells {
             allPositions[c.id] = c.position
-            allRadii[c.id] = c.cachedVisualRadius
         }
         for c in botCells {
             allPositions[c.id] = c.position
-            allRadii[c.id] = c.cachedVisualRadius
         }
         var i = animatingEatenCells.count - 1
         while i >= 0 {
             var targetPos: CGPoint? = nil
-            var targetRad: CGFloat = 0
             if let eID = animatingEatenCells[i].eaterID {
                 targetPos = allPositions[eID]
-                targetRad = allRadii[eID] ?? 20
             }
             if let tPos = targetPos {
                 let eatDuration: CGFloat = 0.12

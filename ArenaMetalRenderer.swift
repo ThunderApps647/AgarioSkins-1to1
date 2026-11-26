@@ -742,7 +742,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                     drawTexturedFan(enc: enc, texture: skinTex, cx: sx, cy: sy,
                                     verts: c.deformedVertices, zoomPx: zoomPx,
                                     radiusOffsetWorld: innerOff, fallbackRadiusPx: rFallback,
-                                    baseRadiusWorld: c.cachedVisualRadius, alpha: skinAlpha, viewportSize: vpPx)
+                                    baseRadiusWorld: Float(c.cachedVisualRadius), alpha: skinAlpha, viewportSize: vpPx)
 
                     let altSince: TimeInterval? = isLocal
                         ? box.dualSkinSwapShowingSince
@@ -754,7 +754,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                         drawTexturedFan(enc: enc, texture: altTex, cx: sx, cy: sy,
                                         verts: c.deformedVertices, zoomPx: zoomPx,
                                         radiusOffsetWorld: innerOff, fallbackRadiusPx: rFallback,
-                                        baseRadiusWorld: c.cachedVisualRadius, alpha: min(1.0, max(0.0, fade)), viewportSize: vpPx)
+                                        baseRadiusWorld: Float(c.cachedVisualRadius), alpha: min(1.0, max(0.0, fade)), viewportSize: vpPx)
                     }
                 }
 

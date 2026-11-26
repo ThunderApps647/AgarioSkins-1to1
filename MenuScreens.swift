@@ -729,7 +729,7 @@ private struct PotionsHelpOverlayView: View {
                         ),
                         "_tableContainer": AnyView(
                             VStack(spacing: 4 * s) {
-                                ForEach([PotionTier.common, .rare, .epic, .exotic, .mythical, .legendary], id: \.rawValue) { t in
+                                ForEach([PotionTier.common, .rare, .exotic, .epic, .legendary], id: \.rawValue) { t in
                                     HStack {
                                         Text(t.rawValue).font(.custom("OpenSans-Bold", size: 10.5 * s)).foregroundColor(t.badgeColor)
                                         Spacer()
