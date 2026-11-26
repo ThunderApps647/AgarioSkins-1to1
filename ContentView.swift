@@ -2905,11 +2905,14 @@ struct GameWorldView: View {
             // Dark mode swaps in the exact RGB inverse of the light palette.
             context.fill(Path(screenBounds), with: .color(Color(hex: darkModeGrid ? 0x000000 : 0xFFFFFF)))
             
-            // 2. Grid - identical geometry to before (31pt spacing, lineWidth 1 * zoom),
-            // still batched into one Path per axis.
+            // 2. Grid - IPA OptimizedArenaBackground::draw (0x10030e108):
+            // v = clamp((50 * zoom)^2 / 5000 + 0.10, 0.10, 0.85)
+            // Light mode gray = 1 - v; Dark mode gray = v; lineWidth = darkMode ? 2 : 1.
             if showGrid {
-                let gridColor = Color(hex: darkModeGrid ? 0x474946 : 0xD3DCE0)
-                let lineWidth = gridLineWidth * zoom
+                let gridIntensity = min(0.85, max(0.10, (50.0 * 50.0 * zoom * zoom) / 5000.0 + 0.10))
+                let gridGray = darkModeGrid ? gridIntensity : (1.0 - gridIntensity)
+                let gridColor = Color(red: gridGray, green: gridGray, blue: gridGray)
+                let lineWidth: CGFloat = darkModeGrid ? 2.0 : 1.0
                 
                 let startX = floor(visibleRect.minX / cellSize) * cellSize
                 let endX = ceil(visibleRect.maxX / cellSize) * cellSize
@@ -2932,6 +2935,16 @@ struct GameWorldView: View {
                     }
                 }
                 context.stroke(gridPathY, with: .color(gridColor), lineWidth: lineWidth)
+            }
+
+            // 2b. Arena Boundary (ArenaBoundaryShaderEffect): crisp border around 0...worldSize
+            let boundaryRect = CGRect(x: cameraOffsetX,
+                                      y: cameraOffsetY,
+                                      width: worldSize * zoom,
+                                      height: worldSize * zoom)
+            if boundaryRect.intersects(screenBounds) {
+                let borderColor = darkModeGrid ? Color.white.opacity(0.28) : Color(hex: 0xC6CED2)
+                context.stroke(Path(boundaryRect), with: .color(borderColor), lineWidth: max(1.5, min(4.0, 2.5 * zoom)))
             }
             
             // 3. Food - same pellets, same 0.5px cutoff as before. The win is that the
@@ -4619,7 +4632,11 @@ struct ContentView: View {
     // Zoom Value: 1 (normal) to 50 (far away)
     @State private var zoomSliderValue: Double = 1.0 
     @State private var showGrid: Bool = true
-    @State private var showSkins: Bool = true
+    @AppStorage("macro.showSkins") private var showSkins: Bool = true
+    @AppStorage("macro.showArrow") private var showArrow: Bool = true
+    @AppStorage("macro.showEmojiWidget") private var showEmojiWidget: Bool = true
+    @AppStorage("macro.offlineQuestStage") private var offlineQuestStage: Int = 0
+    @AppStorage("macro.offlineQuestProgress") private var offlineQuestProgress: Int = 0
     @State private var allowPlayerTeaming: Bool = true
     @State private var spawnFeedBots: Bool = false
     @State private var feedBotName: String = "Feeder"
@@ -4937,7 +4954,7 @@ struct ContentView: View {
                             }
                         )
                     
-                    if lastJoystickDirection != .zero {
+                    if showArrow && lastJoystickDirection != .zero {
                         PlayerArrow(geometry: geometry, joystickIsDragging: joystickIsDragging, joystickOffset: joystickOffset, lastJoystickDirection: lastJoystickDirection, playerCells: playerCells, playerCenter: playerCenter, zoomLevel: $zoomLevel)
                     }
                     if joystickIsDragging {
@@ -4961,6 +4978,7 @@ struct ContentView: View {
                               friendCount: playerTeammateOwnerID != nil ? 1 : 0,
                               inParty: playerTeammateOwnerID != nil,
                               leaderboardRows: computeLeaderboardRows(),
+                              showEmojiWidget: showEmojiWidget,
                               onPause: { pause() },
                               onEmotes: {
                         SoundManager.shared.play(.menuClick)
@@ -5017,6 +5035,28 @@ struct ContentView: View {
                         )
                         .zIndex(1)
                     }
+
+                    // Bottom-center Offline Quest Tracker pill (Hud::setupOfflineHud -> addQuestTrackerWidget)
+                    VStack {
+                        Spacer()
+                        let questTarget = offlineQuestStage == 0 ? 70 : (offlineQuestStage == 1 ? 150 : 300)
+                        let shownProgress = min(offlineQuestProgress, questTarget)
+                        Text("Eat pellets \(shownProgress)/\(questTarget)")
+                            .font(.custom("UbuntuSans-Bold", size: 15))
+                            .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.45), radius: 1, x: 0, y: 1)
+                            .padding(.horizontal, 26)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule()
+                                    .fill(Color(white: 0.78, opacity: 0.52))
+                                    .overlay(Capsule().stroke(Color(white: 0.62, opacity: 0.55), lineWidth: 1.5))
+                            )
+                            .padding(.bottom, 12)
+                    }
+                    .allowsHitTesting(false)
+                    .zIndex(1)
+
                     ActionButtonsHUD(canSplit: canSplit(),
                                      canFeed: canFeed(),
                                      isFeedingHeld: isFeedingHeld,
@@ -10027,6 +10067,16 @@ struct ContentView: View {
             kind: .food(colorIndex: food.colorIndex),
             position: food.position,
             eaterCellID: eaterCellID))
+        if playerCells.contains(where: { $0.id == eaterCellID }) {
+            let target = offlineQuestStage == 0 ? 70 : (offlineQuestStage == 1 ? 150 : 300)
+            offlineQuestProgress += 1
+            if offlineQuestProgress >= target {
+                offlineQuestProgress = 0
+                offlineQuestStage = (offlineQuestStage + 1) % 3
+                let prevCoins = UserDefaults.standard.integer(forKey: "macro.coins")
+                UserDefaults.standard.set(prevCoins + 50, forKey: "macro.coins")
+            }
+        }
     }
     
     private func updateEatenCellsAnimation(dt: CGFloat) {
@@ -10483,7 +10533,7 @@ struct ContentView: View {
         let customZoomMultiplier = 1.0 - ((CGFloat(zoomSliderValue) - 1.0) / 49.0) * 0.9
         let targetZoom = ((baseZoom / spreadFactor) / cellCountFactor) * customZoomMultiplier
         
-        let zoomSmooth = getLerpFactor(base: 0.06, dt: dt)
+        let zoomSmooth = getLerpFactor(base: 0.07, dt: dt)
         zoomLevel += (targetZoom - zoomLevel) * zoomSmooth
     }
     
@@ -11959,6 +12009,7 @@ struct TopBarHUD: View, Equatable {
     /// top bar shows no counter at all, even "0 friends".
     let inParty: Bool
     let leaderboardRows: [LeaderboardHUDRow]
+    var showEmojiWidget: Bool = true
     let onPause: () -> Void
     var onEmotes: () -> Void = {}
     
@@ -11968,6 +12019,7 @@ struct TopBarHUD: View, Equatable {
         && lhs.showFPS == rhs.showFPS
         && lhs.friendCount == rhs.friendCount
         && lhs.inParty == rhs.inParty
+        && lhs.showEmojiWidget == rhs.showEmojiWidget
         && lhs.leaderboardRows == rhs.leaderboardRows
         && (lhs.showFPS ? lhs.fps == rhs.fps : true)
     }
@@ -11987,12 +12039,14 @@ struct TopBarHUD: View, Equatable {
                     }
                     
                     // 2. Emotes button
-                    Button(action: onEmotes) {
-                        Image("emotes")
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(width: 85, height: 85)
-                            .padding(6)
+                    if showEmojiWidget {
+                        Button(action: onEmotes) {
+                            Image("emotes")
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 85, height: 85)
+                                .padding(6)
+                        }
                     }
                 }
                 
@@ -12861,6 +12915,9 @@ struct MainMenu: View {
     /// Show Mass: shows/hides the mass counter on cells (shared with the renderer).
     @AppStorage("macro.showMassText") private var showMassText: Bool = true
     @AppStorage("macro.showMinimap") private var showMinimap: Bool = false
+    @AppStorage("macro.showArrow") private var showArrow: Bool = true
+    @AppStorage("macro.showSkins") private var showSkins: Bool = true
+    @AppStorage("macro.showEmojiWidget") private var showEmojiWidget: Bool = true
     @AppStorage("macro.soundEnabled") private var soundEnabled: Bool = true
     @AppStorage("macro.coins") private var coinsCount: Int = 1000
     @AppStorage("macro.dna") private var dnaCount: Int = 50
@@ -12966,6 +13023,9 @@ struct MainMenu: View {
                         }
                         topSquareButton(icon: "ui-mystery-potion", label: "Potions", fill: Color(hex: 0x00C8F8), bevel: Color(hex: 0x0095BA)) {
                             activeInfoTab = "Potions"
+                        }
+                        topSquareButton(icon: "ui-star-icon", label: "VIP", fill: Color(hex: 0x22262E), bevel: Color(hex: 0x111318)) {
+                            activeInfoTab = "Shop"
                         }
                     }
 
@@ -13408,6 +13468,9 @@ struct MainMenu: View {
                                 lightSettingToggle("Show Level Badge", isOn: $showPlayerLevel)
                                 lightSettingToggle("Dark Mode Grid", isOn: $darkModeGrid)
                                 lightSettingToggle("Show Mass", isOn: $showMassText)
+                                lightSettingToggle("Show Arrow", isOn: $showArrow)
+                                lightSettingToggle("Show Skins", isOn: $showSkins)
+                                lightSettingToggle("Show Emoji Widget", isOn: $showEmojiWidget)
                                 lightSettingToggle("Show Minimap", isOn: $showMinimap)
 
                                 Text("Offline Match")

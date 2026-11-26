@@ -1112,7 +1112,7 @@ struct OnlineGameView: View {
         let cellCountFactor = 1.0 + weightedExtraCells * 0.01
         let customZoomMultiplier = 1.0 - ((CGFloat(zoomSliderValue) - 1.0) / 49.0) * 0.9
         let targetZoom = ((baseZoom / spreadFactor) / cellCountFactor) * customZoomMultiplier
-        let zoomSmooth = getLerpFactor(base: 0.06, dt: dt)
+        let zoomSmooth = getLerpFactor(base: 0.07, dt: dt)
         zoomLevel += (targetZoom - zoomLevel) * zoomSmooth
     }
 
