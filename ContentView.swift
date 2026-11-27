@@ -4636,6 +4636,7 @@ struct ContentView: View {
     @State private var lastFpsCheckTime: TimeInterval = 0
     @State private var showFPS: Bool = false
     @AppStorage("macro.stopOnRelease") private var stopOnRelease: Bool = false
+    @AppStorage("macro.controlLayout") private var controlLayout: Int = 2
     /// 0.4 (dumb) ... 1.6 (ruthless). Scales bot reaction speed, prediction and split appetite.
     @State private var botSkill: Double = 1.0
     
@@ -4677,7 +4678,13 @@ struct ContentView: View {
     @State private var isDeathSequencePending: Bool = false
     @State private var matchStartTime: TimeInterval = 0
     @State private var matchSurvivalSeconds: Int = 0
+    @State private var matchFoodEaten: Int = 0
+    @State private var matchCellsEaten: Int = 0
+    @State private var matchLeaderboardSeconds: Double = 0
+    @State private var matchBestRank: Int = 99
+    @State private var lastMatchStats: MatchSummaryStats? = nil
     @State private var showEmotePicker: Bool = false
+    @State private var emojiToggleCount: Int = 0
     @State private var activeEmoteAsset: String? = nil
     @State private var activeEmoteStartedAt: TimeInterval = 0
     @State private var activeEmoteExpiresAt: TimeInterval = 0
@@ -4802,6 +4809,7 @@ struct ContentView: View {
                         targetBotCount: $targetBotCount,
                         feedBotCount: $targetFeedBotCount,
                         botSkill: $botSkill,
+                        lastMatchStats: lastMatchStats,
                         onPlayOnline: { showOnlinePlay = true }
                     )
                 }
@@ -4897,20 +4905,22 @@ struct ContentView: View {
                               friendCount: playerTeammateOwnerID != nil ? 1 : 0,
                               inParty: playerTeammateOwnerID != nil,
                               leaderboardRows: computeLeaderboardRows(),
-                              showEmojiWidget: showEmojiWidget,
-                              onPause: { pause() },
-                              onEmotes: {
-                        SoundManager.shared.play(.menuClick)
-                        withAnimation(.easeInOut(duration: 0.15)) { showEmotePicker.toggle() }
-                    })
+                              onPause: { pause() })
                     .equatable()
                     .zIndex(1)
                     .opacity(isLeavePopupPresented ? 0 : 1)
                     .allowsHitTesting(!isLeavePopupPresented)
 
-                    if showEmotePicker && !isLeavePopupPresented {
-                        EmotePickerBar(
+                    if showEmojiWidget {
+                        EmojiWidgetHUD(
+                            isOpen: showEmotePicker,
+                            toggleSeqID: emojiToggleCount,
                             isOnCooldown: CACurrentMediaTime() < emoteCooldownUntil,
+                            onToggle: {
+                                SoundManager.shared.play(.menuClick)
+                                showEmotePicker.toggle()
+                                emojiToggleCount += 1
+                            },
                             onSelect: { asset in
                                 let now = CACurrentMediaTime()
                                 guard now >= emoteCooldownUntil else { return }
@@ -4919,10 +4929,13 @@ struct ContentView: View {
                                 activeEmoteStartedAt = now
                                 activeEmoteExpiresAt = now + 3.0
                                 emoteCooldownUntil = now + 3.0
-                                withAnimation(.easeInOut(duration: 0.15)) { showEmotePicker = false }
+                                showEmotePicker = false
+                                emojiToggleCount += 1
                             }
                         )
                         .zIndex(2)
+                        .opacity(isLeavePopupPresented ? 0 : 1)
+                        .allowsHitTesting(!isLeavePopupPresented)
                     }
                 }
                 
@@ -4977,6 +4990,7 @@ struct ContentView: View {
                                      feedButtonScale: feedButtonScale,
                                      macroButtonScale: macroButtonScale,
                                      feedHoldThreshold: feedHoldThreshold,
+                                     controlLayout: controlLayout,
                                      onSplit: { split() },
                                      onMacroDown: {
                         if !isMacroHeld {
@@ -5309,7 +5323,19 @@ struct ContentView: View {
                 handleCellSelfCollisions(cells: &playerCells)
                 handleCellSelfCollisions(cells: &botCells)
                 updateCellDeformation(dt: deltaTime)
-                
+
+                if !playerCells.isEmpty {
+                    let myMass = totalPlayerMass
+                    var botMassByOwner: [UUID: CGFloat] = [:]
+                    for bc in botCells where !bc.isFeedBot {
+                        botMassByOwner[bc.ownerID, default: 0] += bc.targetMass
+                    }
+                    let ahead = botMassByOwner.values.filter { $0 > myMass }.count
+                    let rank = ahead + 1
+                    if rank < matchBestRank { matchBestRank = rank }
+                    if rank <= 5 { matchLeaderboardSeconds += Double(deltaTime) }
+                }
+
                 let targetPos = playerCenter
                 cameraJumpOffset = .zero
                 lastCameraCellCount = playerCells.count
@@ -9873,6 +9899,7 @@ struct ContentView: View {
                 }
             }
             if playerEatsCount > 0 {
+                matchCellsEaten += playerEatsCount
                 let prevEats = UserDefaults.standard.integer(forKey: "macro.totalCellsEaten")
                 UserDefaults.standard.set(prevEats + playerEatsCount, forKey: "macro.totalCellsEaten")
             }
@@ -9968,6 +9995,7 @@ struct ContentView: View {
             position: food.position,
             eaterCellID: eaterCellID))
         if playerCells.contains(where: { $0.id == eaterCellID }) {
+            matchFoodEaten += 1
             let target = offlineQuestStage == 0 ? 70 : (offlineQuestStage == 1 ? 150 : 300)
             offlineQuestProgress += 1
             if offlineQuestProgress >= target {
@@ -11195,6 +11223,12 @@ struct ContentView: View {
         isDeathSequencePending = false
         matchStartTime = CACurrentMediaTime()
         matchSurvivalSeconds = 0
+        matchFoodEaten = 0
+        matchCellsEaten = 0
+        matchLeaderboardSeconds = 0
+        matchBestRank = 99
+        emojiToggleCount = 0
+        showEmotePicker = false
         // Start every match in explicit centre-aim mode (the same proven mode the pause popup
         // resumes into). canFeed() treats it as a valid heading, so feed/macro are live from
         // the very first frame instead of greying out until the cursor first moves; pellets
@@ -11438,6 +11472,17 @@ struct ContentView: View {
     /// current display-link callback detect `isPlaying == false` and return before any remaining
     /// gameplay systems touch the now-empty player array.
     private func exitMatchToMainMenu() {
+        let elapsedSec = matchStartTime > 0 ? max(matchSurvivalSeconds, Int(CACurrentMediaTime() - matchStartTime)) : matchSurvivalSeconds
+        if highScore > 0 || elapsedSec >= 2 {
+            lastMatchStats = MatchSummaryStats(
+                highestMass: max(Int(playerStartMass), highScore),
+                foodEaten: matchFoodEaten,
+                cellsEaten: matchCellsEaten,
+                timeAliveSec: elapsedSec,
+                leaderboardTimeSec: Int(matchLeaderboardSeconds.rounded()),
+                topPosition: matchBestRank
+            )
+        }
         isLeavePopupPresented = false
         leavePopupMounted = false
         centerAimUntilCursorMoves = false
@@ -11672,6 +11717,15 @@ private struct HudSquareIconButtonStyle: ButtonStyle {
     }
 }
 
+struct MatchSummaryStats: Equatable {
+    let highestMass: Int
+    let foodEaten: Int
+    let cellsEaten: Int
+    let timeAliveSec: Int
+    let leaderboardTimeSec: Int
+    let topPosition: Int
+}
+
 struct TopBarHUD: View, Equatable {
     let score: Int
     let tokenCount: Int
@@ -11683,9 +11737,7 @@ struct TopBarHUD: View, Equatable {
     /// top bar shows no counter at all, even "0 friends".
     let inParty: Bool
     let leaderboardRows: [LeaderboardHUDRow]
-    var showEmojiWidget: Bool = true
     let onPause: () -> Void
-    var onEmotes: () -> Void = {}
     
     static func == (lhs: TopBarHUD, rhs: TopBarHUD) -> Bool {
         return lhs.score == rhs.score
@@ -11693,7 +11745,6 @@ struct TopBarHUD: View, Equatable {
         && lhs.showFPS == rhs.showFPS
         && lhs.friendCount == rhs.friendCount
         && lhs.inParty == rhs.inParty
-        && lhs.showEmojiWidget == rhs.showEmojiWidget
         && lhs.leaderboardRows == rhs.leaderboardRows
         && (lhs.showFPS ? lhs.fps == rhs.fps : true)
     }
@@ -11707,7 +11758,7 @@ struct TopBarHUD: View, Equatable {
             let trailPad = max(0, geometry.safeAreaInsets.trailing)
             let topPad = max(0, geometry.safeAreaInsets.top)
             ZStack(alignment: .topLeading) {
-                // Top-left: PauseButton.ccbi + Score.ccbi + EmojiSelectorButton.ccbi + Token/FPS badge
+                // Top-left: PauseButton.ccbi + Score.ccbi + Token/FPS badge
                 ZStack(alignment: .topLeading) {
                     CCBISceneView(
                         ccbFile: "PauseButton.ccbi",
@@ -11742,27 +11793,6 @@ struct TopBarHUD: View, Equatable {
                     }
                     .offset(x: 50 * s, y: 27 * s)
                     .allowsHitTesting(false)
-
-                    if showEmojiWidget {
-                        CCBISceneView(
-                            ccbFile: "EmojiSelectorButton.ccbi",
-                            centerRoot: true,
-                            context: CCBIBindingContext(
-                                actions: ["emojiSelectorButtonCallback": onEmotes],
-                                replacingSlotViews: [
-                                    "_emojiCellHolder": AnyView(
-                                        Image("hud-emoji-icon")
-                                            .resizable()
-                                            .scaledToFit()
-                                            .frame(width: 22 * s, height: 22 * s)
-                                    )
-                                ],
-                                designScaleModifier: { _ in s }
-                            )
-                        )
-                        .frame(width: 40 * s, height: 40 * s)
-                        .offset(x: pad, y: pad + btnSide + 5.1 * s)
-                    }
                 }
                 .padding(.leading, leadPad)
                 .padding(.top, topPad)
@@ -12107,6 +12137,7 @@ struct ActionButtonsHUD: View, Equatable {
     let feedButtonScale: CGFloat
     let macroButtonScale: CGFloat
     let feedHoldThreshold: TimeInterval
+    var controlLayout: Int = 2
     let onSplit: () -> Void
     let onMacroDown: () -> Void
     let onMacroUp: () -> Void
@@ -12122,17 +12153,28 @@ struct ActionButtonsHUD: View, Equatable {
         && lhs.isFeedingHeld == rhs.isFeedingHeld
         && lhs.feedButtonScale == rhs.feedButtonScale
         && lhs.macroButtonScale == rhs.macroButtonScale
+        && lhs.controlLayout == rhs.controlLayout
     }
     
     var body: some View {
-        // Controls-Right.ccbi: _splitButton=(0.08, 0.33 BR), _shootButton=(0.137, 0.125 BR), size=(65, 65) * uiScale
+        // Controls-Left.ccbi / Controls-Sides.ccbi / Controls-Right.ccbi (65x65 * uiScale slots)
         GeometryReader { geometry in
             let s = OriginalGameplay.uiScale(for: geometry.size)
             let buttonSide = 65.0 * s
             let macroSide = 54.0 * s
+            let leadInset = max(0, geometry.safeAreaInsets.leading - 6)
             let trailInset = max(0, geometry.safeAreaInsets.trailing - 6)
-            let sceneW = max(1, geometry.size.width - trailInset)
-            let shootX = sceneW * 0.863
+            let sceneW = max(1, geometry.size.width - leadInset - trailInset)
+            let ccbName: String = controlLayout == 0 ? "Controls-Left.ccbi" : (controlLayout == 1 ? "Controls-Sides.ccbi" : "Controls-Right.ccbi")
+            let macroX: CGFloat = {
+                if controlLayout == 0 {
+                    return leadInset + sceneW * 0.137 + buttonSide * 1.15
+                } else if controlLayout == 1 {
+                    return leadInset + sceneW * 0.92 - buttonSide * 1.15
+                } else {
+                    return leadInset + sceneW * 0.863 - buttonSide * 1.15
+                }
+            }()
             let shootCenterY = geometry.size.height * 0.875
 
             let bgSprite = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/spritesheets/Bundle/All/ingameUI/splitshot_bg.png")?.image
@@ -12210,21 +12252,26 @@ struct ActionButtonsHUD: View, Equatable {
             let controlsCtx = CCBIBindingContext(
                 opacityOverrides: [
                     "_splitButton": canSplit ? 1.0 : 0.45,
-                    "_shootButton": canFeed ? (feedPressed ? 0.55 : 1.0) : 0.45
+                    "_alternativeSplitButton": canSplit ? 1.0 : 0.45,
+                    "_shootButton": canFeed ? (feedPressed ? 0.55 : 1.0) : 0.45,
+                    "_alternativeShootButton": canFeed ? (feedPressed ? 0.55 : 1.0) : 0.45
                 ],
                 replacingSlotViews: [
                     "_splitButton": splitSlot,
-                    "_shootButton": ejectSlot
+                    "_alternativeSplitButton": splitSlot,
+                    "_shootButton": ejectSlot,
+                    "_alternativeShootButton": ejectSlot
                 ],
                 designScaleModifier: { _ in s }
             )
 
             ZStack(alignment: .topLeading) {
                 CCBISceneView(
-                    ccbFile: "Controls-Right.ccbi",
+                    ccbFile: ccbName,
                     context: controlsCtx
                 )
                 .frame(width: sceneW, height: geometry.size.height)
+                .padding(.leading, leadInset)
 
                 Image("macro")
                     .resizable()
@@ -12238,7 +12285,7 @@ struct ActionButtonsHUD: View, Equatable {
                     )
                     .opacity(canFeed ? (macroPressed ? 0.55 : 1.0) : 0.45)
                     .allowsHitTesting(canFeed)
-                    .position(x: shootX - buttonSide * 1.15, y: shootCenterY)
+                    .position(x: macroX, y: shootCenterY)
                     .accessibilityLabel("Fast eject")
                     .accessibilityAddTraits(.isButton)
             }
@@ -12302,8 +12349,11 @@ struct MinimapHUD: View {
     }
 }
 
-struct EmotePickerBar: View {
+struct EmojiWidgetHUD: View {
+    let isOpen: Bool
+    let toggleSeqID: Int
     let isOnCooldown: Bool
+    let onToggle: () -> Void
     let onSelect: (String) -> Void
 
     private let emotes = ["emoji-tongue", "emoji-scared"]
@@ -12311,32 +12361,42 @@ struct EmotePickerBar: View {
     var body: some View {
         GeometryReader { geometry in
             let s = OriginalGameplay.uiScale(for: geometry.size)
-            let btnSide = 39.17 * s
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    VStack(spacing: 5 * s) {
-                        ForEach(emotes, id: \.self) { asset in
-                            Button(action: { onSelect(asset) }) {
-                                Image(asset)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: btnSide * 0.82, height: btnSide * 0.82)
-                                    .clipShape(Circle())
-                                    .frame(width: btnSide, height: btnSide)
-                                    .background(MCFSFrame(name: "mcfs-hud-button"))
-                                    .opacity(isOnCooldown ? 0.45 : 1.0)
-                            }
-                            .disabled(isOnCooldown)
+            let btnSide = 39.1724 * s
+            let leadPad = max(0, geometry.safeAreaInsets.leading)
+            let topPad = max(0, geometry.safeAreaInsets.top)
+            let seqName: String? = toggleSeqID == 0 ? nil : (isOpen ? "enter" : "leave")
+
+            let selectorContent = AnyView(
+                VStack(spacing: 4 * s) {
+                    ForEach(emotes, id: \.self) { asset in
+                        Button(action: { onSelect(asset) }) {
+                            Image(asset)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: btnSide * 0.72, height: btnSide * 0.72)
+                                .clipShape(Circle())
+                                .opacity(isOnCooldown ? 0.45 : 1.0)
                         }
+                        .buttonStyle(CCBIMenuItemButtonStyle())
+                        .disabled(isOnCooldown || !isOpen)
                     }
-                    .padding(4 * s)
-                    .background(MCFSFrame(name: "mcfs-leaderboard-content-float"))
-                    .padding(.leading, max(5.11 * s, geometry.safeAreaInsets.leading + 4))
-                    .padding(.top, max(94 * s, geometry.safeAreaInsets.top + 90 * s))
-                    Spacer()
                 }
-                Spacer()
-            }
+                .padding(.top, 2 * s)
+            )
+
+            CCBISceneView(
+                ccbFile: "EmojiWidget.ccbi",
+                context: CCBIBindingContext(
+                    actions: ["onToggle": onToggle],
+                    activeSequenceName: seqName,
+                    sequencePlayID: toggleSeqID,
+                    heightOverrides: ["_selectorArea": 70],
+                    slotViews: ["_selector": selectorContent],
+                    designScaleModifier: { _ in s }
+                )
+            )
+            .padding(.leading, leadPad)
+            .padding(.top, topPad)
         }
     }
 }
@@ -12627,6 +12687,7 @@ struct MainMenu: View {
     @Binding var targetBotCount: Int
     @Binding var feedBotCount: Int
     @Binding var botSkill: Double
+    var lastMatchStats: MatchSummaryStats? = nil
     
     private var menuBotSkillLabel: String {
         let name = botSkill < 0.65 ? "Chill" : botSkill < 0.95 ? "Normal"
@@ -12651,6 +12712,7 @@ struct MainMenu: View {
     @AppStorage("macro.showEmojiWidget") private var showEmojiWidget: Bool = true
     @AppStorage("macro.soundEnabled") private var soundEnabled: Bool = true
     @AppStorage("macro.stopOnRelease") private var stopOnRelease: Bool = false
+    @AppStorage("macro.controlLayout") private var controlLayout: Int = 2
     @AppStorage("macro.coins") private var coinsCount: Int = 1000
     @AppStorage("macro.dna") private var dnaCount: Int = 50
     @AppStorage("macro.activeStartBoost") private var activeStartBoost: Int = 0
@@ -12666,8 +12728,28 @@ struct MainMenu: View {
     @State private var selectedSkinsTab: Int = 0
     @State private var activeInfoTab: String? = nil
     @State private var requestedShopSection: ShopTab? = nil
+    @State private var matchStatsExpanded: Bool = true
+    @State private var matchStatsSeqID: Int = 0
+    @State private var mainMenuEnterID: Int = 0
     /// Injected by ContentView; opens the PLAY ONLINE server browser.
     var onPlayOnline: () -> Void = {}
+
+    private func formattedMatchDuration(_ totalSec: Int) -> String {
+        let s = max(0, totalSec)
+        return String(format: "%dm %02ds", s / 60, s % 60)
+    }
+
+    private func formattedOrdinal(_ rank: Int) -> String {
+        guard rank < 99 else { return "--" }
+        let mod100 = rank % 100
+        if mod100 >= 11 && mod100 <= 13 { return "\(rank)th" }
+        switch rank % 10 {
+        case 1: return "\(rank)st"
+        case 2: return "\(rank)nd"
+        case 3: return "\(rank)rd"
+        default: return "\(rank)th"
+        }
+    }
     let availableSkins = (1...387).map { String($0) }
 
     /// ContentPartyMode.ccbi / ContentPartyJoin.ccbi / ContentPartyCreatedOrJoined.ccbi (Native CCBI Runtime)
@@ -13342,18 +13424,33 @@ struct MainMenu: View {
                             },
                             "profileButtonCallback": { activeInfoTab = "Profile" },
                             "coinBarCallback": { requestedShopSection = .coins; activeInfoTab = "Shop" },
-                            "DNABarCallback": { requestedShopSection = .dna; activeInfoTab = "Shop" }
+                            "DNABarCallback": { requestedShopSection = .dna; activeInfoTab = "Shop" },
+                            "toggleHideTab": {
+                                matchStatsExpanded.toggle()
+                                matchStatsSeqID += 1
+                            }
                         ],
                         labelOverrides: [
                             "_coinBar._barCurrencyValue": "\(coinsCount)",
                             "_dnaBar._barCurrencyValue": "\(dnaCount)",
-                            "_profileNameLabel": playerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Guest" : playerName
+                            "_profileNameLabel": playerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Guest" : playerName,
+                            "_highestMassValue": "\(lastMatchStats?.highestMass ?? 0)",
+                            "_foodEatenValue": "\(lastMatchStats?.foodEaten ?? 0)",
+                            "_cellsEatenValue": "\(lastMatchStats?.cellsEaten ?? 0)",
+                            "_timeAliveValue": formattedMatchDuration(lastMatchStats?.timeAliveSec ?? 0),
+                            "_leaderboardTimeValue": formattedMatchDuration(lastMatchStats?.leaderboardTimeSec ?? 0),
+                            "_topPositionValue": formattedOrdinal(lastMatchStats?.topPosition ?? 99)
                         ],
                         visibilityOverrides: [
                             "_background": false,
                             "_promoMenu": false,
                             "_featureMenu": false,
-                            "_matchStatsView": false,
+                            "_matchStatsView": lastMatchStats != nil,
+                            "_classicMatchStats": true,
+                            "_rushMatchStats": false,
+                            "_googleFbMenuItemStatic": false,
+                            "_twitterMenuItemStatic": false,
+                            "_playerReportButton": false,
                             "_adventureEntryPoint": false,
                             "_seasonEntryPoint": false,
                             "_vipSubscriptionButton": false,
@@ -13382,6 +13479,10 @@ struct MainMenu: View {
                             "_partyModeBadge": !partyCode.isEmpty,
                             "_mysteryPotionsButtonNode._badgeNode": potionStore.readyCount(now: Date().timeIntervalSince1970) > 0
                         ],
+                        activeSequenceName: "enter",
+                        sequencePlayID: mainMenuEnterID,
+                        subSceneSequenceNames: ["_matchStatsView": matchStatsExpanded ? "SlideOut" : "SlideIn"],
+                        subSceneSequenceIDs: ["_matchStatsView": matchStatsSeqID],
                         slotViews: {
                             var slots: [String: AnyView] = [
                                 "_inputBox": AnyView(
@@ -13466,7 +13567,7 @@ struct MainMenu: View {
                                             }
                                             .frame(width: 120 * s, height: 80 * s)
                                         }
-                                        .buttonStyle(.plain)
+                                        .buttonStyle(CCBIMenuItemButtonStyle())
                                     }
                                 )
                             ]
@@ -13582,6 +13683,7 @@ struct MainMenu: View {
                                 lightSettingToggle("Show Emoji Widget", isOn: $showEmojiWidget, scale: s)
                                 lightSettingToggle("Show Minimap", isOn: $showMinimap, scale: s)
                                 lightSettingToggle("Stop Movement on Release", isOn: $stopOnRelease, scale: s)
+                                lightSettingControlLayout(scale: s)
 
                                 Text("Offline Match")
                                     .font(.custom("OpenSans-Bold", size: 14 * s))
@@ -13723,6 +13825,47 @@ struct MainMenu: View {
         .frame(height: 46 * s)
         .contentShape(Rectangle())
         .onTapGesture { toggleAction() }
+    }
+
+    private func lightSettingControlLayout(scale s: CGFloat) -> some View {
+        CCBISceneView(
+            ccbFile: "MenuSettingsNode_26.2.0.ccbi",
+            centerRoot: true,
+            context: CCBIBindingContext(
+                actions: [
+                    "leftButtonCallback:": { controlLayout = 0 },
+                    "centerButtonCallback:": { controlLayout = 1 },
+                    "rightButtonCallback:": { controlLayout = 2 }
+                ],
+                labelOverrides: [
+                    "_leftLabel": "Button Position"
+                ],
+                visibilityOverrides: [
+                    "_leftSmallLabel": false,
+                    "_rightLabel": false,
+                    "_titleLabel": false,
+                    "_firstTitleLabel": false,
+                    "_hint": false,
+                    "_toggleSwipe": false,
+                    "_greenButton": false,
+                    "_facebookLoginButton": false,
+                    "_googleButton": false,
+                    "_appleButton": false,
+                    "_orangeButton": false,
+                    "_instagramButton": false,
+                    "_facebookButton": false,
+                    "_youtubeButton": false,
+                    "_blueButton": false
+                ],
+                selectedVarStates: [
+                    "_leftToggle": controlLayout == 0,
+                    "_centerToggle": controlLayout == 1,
+                    "_rightToggle": controlLayout == 2
+                ],
+                designScaleModifier: { _ in s }
+            )
+        )
+        .frame(height: 46 * s)
     }
 }
 

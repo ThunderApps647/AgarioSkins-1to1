@@ -4,6 +4,36 @@ import UIKit
 
 // MARK: - CCBI Binary Scene Graph Model
 
+struct CCBISequence {
+    let seqId: Int
+    let name: String
+    let duration: Double
+    let chainedSeqId: Int
+}
+
+enum CCBIKeyframeValue {
+    case point(CGFloat, CGFloat)
+    case float(CGFloat)
+    case byte(UInt8)
+    case bool(Bool)
+    case rgba(Double, Double, Double, Double)
+    case str(String)
+    case none
+}
+
+struct CCBIKeyframe {
+    let time: Double
+    let easingType: Int
+    let easingOpt: Double
+    let value: CCBIKeyframeValue
+}
+
+struct CCBIPropTrack {
+    let propName: String
+    let propType: Int
+    let keyframes: [CCBIKeyframe]
+}
+
 enum CCBIPropValue {
     case pos(x: CGFloat, y: CGFloat, refCorner: Int, xUnit: Int, yUnit: Int, c: Int)
     case size(w: CGFloat, h: CGFloat, wUnit: Int, hUnit: Int, c: Int)
@@ -32,18 +62,40 @@ final class CCBINode: Identifiable {
     let base: String
     let varName: String
     var props: [String: CCBIPropValue]
+    var animTracks: [Int: [CCBIPropTrack]]
+    var sequences: [CCBISequence] = []
+    var autoPlaySeqId: Int = -1
     var children: [CCBINode]
 
-    init(cls: String, base: String, varName: String, props: [String: CCBIPropValue], children: [CCBINode]) {
+    init(cls: String,
+         base: String,
+         varName: String,
+         props: [String: CCBIPropValue],
+         animTracks: [Int: [CCBIPropTrack]] = [:],
+         sequences: [CCBISequence] = [],
+         autoPlaySeqId: Int = -1,
+         children: [CCBINode]) {
         self.cls = cls
         self.base = base
         self.varName = varName
         self.props = props
+        self.animTracks = animTracks
+        self.sequences = sequences
+        self.autoPlaySeqId = autoPlaySeqId
         self.children = children
     }
 
     func clone() -> CCBINode {
-        CCBINode(cls: cls, base: base, varName: varName, props: props, children: children.map { $0.clone() })
+        CCBINode(
+            cls: cls,
+            base: base,
+            varName: varName,
+            props: props,
+            animTracks: animTracks,
+            sequences: sequences,
+            autoPlaySeqId: autoPlaySeqId,
+            children: children.map { $0.clone() }
+        )
     }
 }
 
@@ -221,20 +273,32 @@ final class CCBIBinaryReader {
         }
     }
 
-    private func skipKeyframe(_ pt: Int) {
-        _ = readFloat()
+    private func readKeyframe(_ pt: Int) -> CCBIKeyframe {
+        let t = Double(readFloat())
         let e = readInt(signed: false)
+        var opt: Double = 0
         if e <= 19 && (((1 << e) & 0xe00fc) != 0) {
-            _ = readFloat()
+            opt = Double(readFloat())
         }
+        let val: CCBIKeyframeValue
         switch pt {
-        case 13: for _ in 0..<4 { _ = readFloat() }
-        case 12, 9: _ = readU8()
-        case 5, 7: _ = readFloat()
-        case 0, 1, 4, 27: _ = readFloat(); _ = readFloat()
-        case 10, 18, 38: _ = readStr()
-        default: break
+        case 13:
+            let r = Double(readFloat()), g = Double(readFloat()), b = Double(readFloat()), a = Double(readFloat())
+            val = .rgba(r, g, b, a)
+        case 12:
+            val = .byte(readU8())
+        case 9:
+            val = .bool(readU8() != 0)
+        case 5, 7:
+            val = .float(readFloat())
+        case 0, 1, 4, 27:
+            val = .point(readFloat(), readFloat())
+        case 10, 18, 38:
+            val = .str(readStr())
+        default:
+            val = .none
         }
+        return CCBIKeyframe(time: t, easingType: e, easingOpt: opt, value: val)
     }
 
     private func skipChannel(hasThree: Bool) {
@@ -253,14 +317,23 @@ final class CCBIBinaryReader {
         let an = at != 0 ? readStr() : ""
 
         let nsp = readInt(signed: false)
+        var animTracks: [Int: [CCBIPropTrack]] = [:]
         for _ in 0..<nsp {
-            _ = readInt(signed: false)
+            let seqId = readInt(signed: false)
             let np = readInt(signed: false)
+            var tracks: [CCBIPropTrack] = []
+            tracks.reserveCapacity(np)
             for _ in 0..<np {
-                _ = readStr()
+                let propName = readStr()
                 let pt = readInt(signed: false)
                 let nk = readInt(signed: false)
-                for _ in 0..<nk { skipKeyframe(pt) }
+                var kfs: [CCBIKeyframe] = []
+                kfs.reserveCapacity(nk)
+                for _ in 0..<nk { kfs.append(readKeyframe(pt)) }
+                tracks.append(CCBIPropTrack(propName: propName, propType: pt, keyframes: kfs))
+            }
+            if !tracks.isEmpty {
+                animTracks[seqId] = tracks
             }
         }
         if ver >= 13 {
@@ -302,7 +375,7 @@ final class CCBIBinaryReader {
         if ver <= 17 { _ = readU8() }
         let nch = readInt(signed: false)
         let children = (0..<nch).map { _ in readNode() }
-        return CCBINode(cls: cls, base: base, varName: an, props: props, children: children)
+        return CCBINode(cls: cls, base: base, varName: an, props: props, animTracks: animTracks, children: children)
     }
 
     func parseRoot() -> CCBINode? {
@@ -316,12 +389,18 @@ final class CCBIBinaryReader {
         strs = (0..<strCount).map { _ in readUTF8() }
         let nSeq = readInt(signed: false)
         if ver <= 17 { pos += 2 }
+        var sequences: [CCBISequence] = []
+        sequences.reserveCapacity(nSeq)
         for _ in 0..<nSeq {
-            _ = readFloat(); _ = readStr(); _ = readInt(signed: false); _ = readInt(signed: true)
+            let dur = Double(readFloat())
+            let nm = readStr()
+            let sid = readInt(signed: false)
+            let chid = readInt(signed: true)
             skipChannel(hasThree: false)
             skipChannel(hasThree: true)
+            sequences.append(CCBISequence(seqId: sid, name: nm, duration: dur, chainedSeqId: chid))
         }
-        _ = readInt(signed: true)
+        let autoSeq = readInt(signed: true)
         if 11 <= ver && ver <= 20 {
             _ = readInt(signed: false)
             _ = readInt(signed: false)
@@ -352,7 +431,10 @@ final class CCBIBinaryReader {
                 }
             }
         }
-        return readNode()
+        let root = readNode()
+        root.sequences = sequences
+        root.autoPlaySeqId = autoSeq
+        return root
     }
 }
 
@@ -685,6 +767,11 @@ struct CCBIBindingContext {
     var visibilityOverrides: [String: Bool] = [:]
     var opacityOverrides: [String: Double] = [:]
     var selectedVarStates: [String: Bool] = [:]
+    var activeSequenceName: String? = nil
+    var sequencePlayID: Int = 0
+    var subSceneSequenceNames: [String: String] = [:]
+    var subSceneSequenceIDs: [String: Int] = [:]
+    var heightOverrides: [String: CGFloat] = [:]
     var slotViews: [String: AnyView] = [:]
     var replacingSlotViews: [String: AnyView] = [:]
     var designScaleModifier: ((CGSize) -> CGFloat)? = nil
@@ -699,6 +786,171 @@ struct CCBIBindingContext {
     }
 }
 
+enum CCBIAnimationEvaluator {
+    static func ease(_ rawT: Double, type: Int, opt: Double) -> Double {
+        let t = min(1.0, max(0.0, rawT))
+        let p = max(1.0, opt > 0 ? opt : 2.0)
+        switch type {
+        case 0: return t >= 1.0 ? 1.0 : 0.0
+        case 1: return t
+        case 2: return pow(t, p)
+        case 3: return 1.0 - pow(1.0 - t, p)
+        case 4: return t < 0.5 ? 0.5 * pow(2.0 * t, p) : 1.0 - 0.5 * pow(2.0 - 2.0 * t, p)
+        case 6:
+            if t == 0 || t == 1 { return t }
+            let period = opt > 0 ? opt : 0.3
+            let s = period / 4.0
+            return pow(2.0, -10.0 * t) * sin((t - s) * (2.0 * .pi) / period) + 1.0
+        case 9:
+            let n1 = 7.5625, d1 = 2.75
+            if t < 1.0 / d1 { return n1 * t * t }
+            if t < 2.0 / d1 { let u = t - 1.5 / d1; return n1 * u * u + 0.75 }
+            if t < 2.5 / d1 { let u = t - 2.25 / d1; return n1 * u * u + 0.9375 }
+            let u = t - 2.625 / d1; return n1 * u * u + 0.984375
+        case 11:
+            let s = 1.70158
+            return t * t * ((s + 1.0) * t - s)
+        case 12:
+            let s = 1.70158
+            let u = t - 1.0
+            return 1.0 + u * u * ((s + 1.0) * u + s)
+        case 13:
+            let s = 1.70158 * 1.525
+            if t < 0.5 { let u = 2.0 * t; return 0.5 * (u * u * ((s + 1.0) * u - s)) }
+            let u = 2.0 * t - 2.0
+            return 0.5 * (u * u * ((s + 1.0) * u + s) + 2.0)
+        case 14: return 1.0 - cos(t * .pi * 0.5)
+        case 15: return sin(t * .pi * 0.5)
+        case 16: return -0.5 * (cos(.pi * t) - 1.0)
+        default: return t
+        }
+    }
+
+    static func sample(track: CCBIPropTrack, at time: Double) -> CCBIKeyframeValue? {
+        let kfs = track.keyframes
+        guard let first = kfs.first else { return nil }
+        if kfs.count == 1 || time <= first.time { return first.value }
+        if let last = kfs.last, time >= last.time { return last.value }
+        for i in 0..<(kfs.count - 1) {
+            let k0 = kfs[i]
+            let k1 = kfs[i + 1]
+            if time >= k0.time && time <= k1.time {
+                let span = k1.time - k0.time
+                let rawT = span > 1e-6 ? (time - k0.time) / span : 1.0
+                let a = ease(rawT, type: k0.easingType, opt: k0.easingOpt)
+                let f = CGFloat(a)
+                switch (k0.value, k1.value) {
+                case let (.point(x0, y0), .point(x1, y1)):
+                    return .point(x0 + (x1 - x0) * f, y0 + (y1 - y0) * f)
+                case let (.float(v0), .float(v1)):
+                    return .float(v0 + (v1 - v0) * f)
+                case let (.byte(b0), .byte(b1)):
+                    let v = Double(b0) + (Double(b1) - Double(b0)) * a
+                    return .byte(UInt8(max(0, min(255, Int(v.rounded())))))
+                case let (.rgba(r0, g0, b0, a0), .rgba(r1, g1, b1, a1)):
+                    return .rgba(r0 + (r1 - r0) * a, g0 + (g1 - g0) * a, b0 + (b1 - b0) * a, a0 + (a1 - a0) * a)
+                default:
+                    return rawT >= 1.0 ? k1.value : k0.value
+                }
+            }
+        }
+        return kfs.last?.value
+    }
+
+    static func hasTracks(in node: CCBINode, seqId: Int) -> Bool {
+        if let tr = node.animTracks[seqId], !tr.isEmpty { return true }
+        return node.children.contains { hasTracks(in: $0, seqId: seqId) }
+    }
+}
+
+struct CCBIMenuItemButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
+            .brightness(configuration.isPressed ? -0.05 : 0)
+            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+    }
+}
+
+private struct CCBIScenePlayerView: View {
+    let root: CCBINode
+    let designSize: CGSize
+    let scaleFactor: CGFloat
+    let centerRoot: Bool
+    let context: CCBIBindingContext
+    let seqName: String?
+    let seqPlayID: Int
+
+    @State private var animStartDate: Date = Date()
+    @State private var isTimelinePaused: Bool = true
+
+    private var activeSequence: CCBISequence? {
+        if let seqName, !seqName.isEmpty,
+           let match = root.sequences.first(where: { $0.name == seqName }) {
+            return match
+        }
+        if root.autoPlaySeqId >= 0,
+           let match = root.sequences.first(where: { $0.seqId == root.autoPlaySeqId }),
+           match.duration > 0,
+           CCBIAnimationEvaluator.hasTracks(in: root, seqId: match.seqId) {
+            return match
+        }
+        return nil
+    }
+
+    private func restartTimelineIfNeeded() {
+        animStartDate = Date()
+        if let seq = activeSequence, seq.duration > 0,
+           CCBIAnimationEvaluator.hasTracks(in: root, seqId: seq.seqId) {
+            isTimelinePaused = false
+            let dur = seq.duration
+            let startSnap = animStartDate
+            DispatchQueue.main.asyncAfter(deadline: .now() + dur + 0.04) {
+                if animStartDate == startSnap {
+                    isTimelinePaused = true
+                }
+            }
+        } else {
+            isTimelinePaused = true
+        }
+    }
+
+    var body: some View {
+        if let seq = activeSequence, seq.duration > 0,
+           CCBIAnimationEvaluator.hasTracks(in: root, seqId: seq.seqId) {
+            TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: isTimelinePaused)) { tlCtx in
+                let t = isTimelinePaused
+                    ? seq.duration
+                    : min(seq.duration, max(0, tlCtx.date.timeIntervalSince(animStartDate)))
+                CCBINodeRenderer(
+                    node: root,
+                    parentDesignSize: designSize,
+                    scaleFactor: scaleFactor,
+                    context: context,
+                    positionOverride: centerRoot ? (designSize.width * 0.5, designSize.height * 0.5) : nil,
+                    anchorOverride: centerRoot ? CGPoint(x: 0.5, y: 0.5) : nil,
+                    activeSeqId: seq.seqId,
+                    animTime: t
+                )
+            }
+            .onAppear { restartTimelineIfNeeded() }
+            .onChange(of: seqName) { _ in restartTimelineIfNeeded() }
+            .onChange(of: seqPlayID) { _ in restartTimelineIfNeeded() }
+        } else {
+            CCBINodeRenderer(
+                node: root,
+                parentDesignSize: designSize,
+                scaleFactor: scaleFactor,
+                context: context,
+                positionOverride: centerRoot ? (designSize.width * 0.5, designSize.height * 0.5) : nil,
+                anchorOverride: centerRoot ? CGPoint(x: 0.5, y: 0.5) : nil,
+                activeSeqId: activeSequence?.seqId,
+                animTime: activeSequence?.duration ?? 0
+            )
+        }
+    }
+}
+
 struct CCBISceneView: View {
     let ccbFile: String
     var centerRoot: Bool = false
@@ -709,13 +961,14 @@ struct CCBISceneView: View {
             let scale = context.designScaleModifier?(geo.size) ?? OriginalGameplay.uiScale(for: geo.size)
             let designSize = CGSize(width: geo.size.width / scale, height: geo.size.height / scale)
             if let root = CCBIAtlasStore.shared.loadCCBI(named: ccbFile) {
-                CCBINodeRenderer(
-                    node: root,
-                    parentDesignSize: designSize,
+                CCBIScenePlayerView(
+                    root: root,
+                    designSize: designSize,
                     scaleFactor: scale,
+                    centerRoot: centerRoot,
                     context: context,
-                    positionOverride: centerRoot ? (designSize.width * 0.5, designSize.height * 0.5) : nil,
-                    anchorOverride: centerRoot ? CGPoint(x: 0.5, y: 0.5) : nil
+                    seqName: context.activeSequenceName,
+                    seqPlayID: context.sequencePlayID
                 )
                 .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
             }
@@ -732,6 +985,8 @@ private struct CCBINodeRenderer: View {
     var anchorOverride: CGPoint? = nil
     var sizeOverride: CGSize? = nil
     var forceVisible: Bool = false
+    var activeSeqId: Int? = nil
+    var animTime: Double = 0
 
     private var childContext: CCBIBindingContext {
         if node.varName.isEmpty { return context }
@@ -740,19 +995,50 @@ private struct CCBINodeRenderer: View {
         return copy
     }
 
+    private func animatedValue(propName: String) -> CCBIKeyframeValue? {
+        guard let sid = activeSeqId, let tracks = node.animTracks[sid] else { return nil }
+        for tr in tracks where tr.propName == propName {
+            if let sampled = CCBIAnimationEvaluator.sample(track: tr, at: animTime) {
+                return sampled
+            }
+        }
+        return nil
+    }
+
     var body: some View {
-        let isVisible = resolveVisible()
+        let isVisible: Bool = {
+            if let ov = context.scopedLookup(context.visibilityOverrides, varName: node.varName) {
+                return ov
+            }
+            if forceVisible { return true }
+            if case let .bool(av) = animatedValue(propName: "visible") { return av }
+            return resolveVisible()
+        }()
         if isVisible {
             let subFileRoot = loadSubCCBFileIfNeeded()
             let resolvedSize = sizeOverride ?? resolveContentSize(node: node, parentSize: parentDesignSize, subRoot: subFileRoot)
             let anchor = effectiveAnchorPoint(node: node, subRoot: subFileRoot)
-            let (posSX, posSY) = positionOverride ?? resolvePosition(node: node, parentSize: parentDesignSize)
-            let (scaleX, scaleY) = resolveScale(node: node)
-            let rotationDeg = resolveFloat("rotation", default: 0)
+            let (posSX, posSY): (CGFloat, CGFloat) = {
+                if let po = positionOverride { return po }
+                if case let .point(ax, ay) = animatedValue(propName: "position") {
+                    return resolveAnimatedPosition(node: node, rawX: ax, rawY: ay, parentSize: parentDesignSize)
+                }
+                return resolvePosition(node: node, parentSize: parentDesignSize)
+            }()
+            let (scaleX, scaleY): (CGFloat, CGFloat) = {
+                if case let .point(sx, sy) = animatedValue(propName: "scale") { return (sx, sy) }
+                return resolveScale(node: node)
+            }()
+            let rotationDeg: CGFloat = {
+                if case let .float(deg) = animatedValue(propName: "rotation") { return deg }
+                return resolveFloat("rotation", default: 0)
+            }()
             let opacity: CGFloat = {
                 if let ov = context.scopedLookup(context.opacityOverrides, varName: node.varName) {
                     return CGFloat(ov)
                 }
+                if case let .float(of) = animatedValue(propName: "opacity") { return of }
+                if case let .byte(ob) = animatedValue(propName: "opacity") { return CGFloat(ob) / 255.0 }
                 return resolveFloat("opacity", default: 1)
             }()
 
@@ -769,15 +1055,23 @@ private struct CCBINodeRenderer: View {
                     node.varName == "_staticPlayButtonsContainer"
                 ))
 
-            let visual = nodeContent(designSize: resolvedSize, subFileRoot: subFileRoot)
+            let isClippingNode = node.cls == "MCClippingNode" || node.base == "MCClippingNode"
+            let rawVisual = nodeContent(designSize: resolvedSize, subFileRoot: subFileRoot)
                 .frame(width: max(0, resolvedSize.width * scaleFactor),
                        height: max(0, resolvedSize.height * scaleFactor),
                        alignment: isZeroContainer ? .center : .topLeading)
-                .scaleEffect(x: isSlotReplaced ? 1.0 : scaleX,
-                             y: isSlotReplaced ? 1.0 : scaleY,
-                             anchor: UnitPoint(x: swiftAnchorX, y: swiftAnchorY))
-                .rotationEffect(.degrees(Double(rotationDeg)), anchor: UnitPoint(x: swiftAnchorX, y: swiftAnchorY))
-                .opacity(Double(max(0, min(1, opacity))))
+            let visual = Group {
+                if isClippingNode {
+                    rawVisual.clipped()
+                } else {
+                    rawVisual
+                }
+            }
+            .scaleEffect(x: isSlotReplaced ? 1.0 : scaleX,
+                         y: isSlotReplaced ? 1.0 : scaleY,
+                         anchor: UnitPoint(x: swiftAnchorX, y: swiftAnchorY))
+            .rotationEffect(.degrees(Double(rotationDeg)), anchor: UnitPoint(x: swiftAnchorX, y: swiftAnchorY))
+            .opacity(Double(max(0, min(1, opacity))))
 
             let varTapHandler = context.scopedLookup(context.tapVarActions, varName: node.varName)
             let blockHandler: (() -> Void)? = {
@@ -795,13 +1089,14 @@ private struct CCBINodeRenderer: View {
             )
 
             if let handler = blockHandler ?? varTapHandler {
-                visual
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        SoundManager.shared.play(.menuClick)
-                        handler()
-                    }
-                    .position(targetPos)
+                Button(action: {
+                    SoundManager.shared.play(.menuClick)
+                    handler()
+                }) {
+                    visual.contentShape(Rectangle())
+                }
+                .buttonStyle(CCBIMenuItemButtonStyle())
+                .position(targetPos)
             } else {
                 visual.position(targetPos)
             }
@@ -886,6 +1181,21 @@ private struct CCBINodeRenderer: View {
         return (1.0, 1.0)
     }
 
+    private func resolveAnimatedPosition(node: CCBINode, rawX: CGFloat, rawY: CGFloat, parentSize: CGSize) -> (CGFloat, CGFloat) {
+        guard case let .pos(_, _, refCorner, xUnit, yUnit, _) = node.props["position"] else {
+            return (rawX, parentSize.height - rawY)
+        }
+        let px: CGFloat = (xUnit == 2) ? rawX * parentSize.width : (xUnit == 3 ? max(0, parentSize.width - rawX) : rawX)
+        let py: CGFloat = (yUnit == 2) ? rawY * parentSize.height : (yUnit == 3 ? max(0, parentSize.height - rawY) : rawY)
+        switch refCorner {
+        case 0: return (px, parentSize.height - py)
+        case 1: return (px, py)
+        case 2: return (parentSize.width - px, py)
+        case 3: return (parentSize.width - px, parentSize.height - py)
+        default: return (px, parentSize.height - py)
+        }
+    }
+
     private func resolvePosition(node: CCBINode, parentSize: CGSize) -> (CGFloat, CGFloat) {
         guard case let .pos(rawX, rawY, refCorner, xUnit, yUnit, _) = node.props["position"] else {
             return (0, parentSize.height)
@@ -945,6 +1255,9 @@ private struct CCBINodeRenderer: View {
             let effHU = (isSpine && hu == 2 && rh > 2.0) ? 0 : hu
             var w = evalDim(rw, unit: effWU, parent: parentSize.width)
             var h = evalDim(rh, unit: effHU, parent: parentSize.height)
+            if let hOverride = context.scopedLookup(context.heightOverrides, varName: node.varName) {
+                h = hOverride
+            }
             if w == 0 && h == 0, let entry = spriteEntryForNode(node) {
                 w = entry.designSize.width
                 h = entry.designSize.height
@@ -1150,6 +1463,11 @@ private struct CCBINodeRenderer: View {
         let isMenuItem = node.cls.contains("MenuItem") || node.base.contains("MenuItem")
         let isMenuItemToggle = node.cls.contains("MenuItemToggle") || node.base.contains("MenuItemToggle")
         if isMenuItemToggle, node.props["normalNodeTag"] == nil {
+            if let isOn = context.scopedLookup(context.selectedVarStates, varName: node.varName),
+               node.children.count >= 2 {
+                let idx = isOn ? 1 : 0
+                return [FilteredChildEntry(node: node.children[idx], posOverride: nil, anchorOverride: nil, sizeOverride: nil, forceVisible: true)]
+            }
             let cctx = childContext
             let toggleOverrideIndices: [Int] = node.children.enumerated().compactMap { idx, c in
                 subtreeMatchesVisibilityOverride(c, ctx: cctx, target: true) ? idx : nil
@@ -1235,12 +1553,28 @@ private struct CCBINodeRenderer: View {
                         subRoot.props["contentSize"] = .size(w: designSize.width, h: designSize.height, wUnit: 0, hUnit: 0, c: 0)
                     }
                 }()
-                CCBINodeRenderer(
-                    node: subRoot,
-                    parentDesignSize: designSize,
-                    scaleFactor: scaleFactor,
-                    context: childContext
-                )
+                let subSeqName = context.scopedLookup(context.subSceneSequenceNames, varName: node.varName)
+                let subSeqID = context.scopedLookup(context.subSceneSequenceIDs, varName: node.varName) ?? context.sequencePlayID
+                if subSeqName != nil || (subRoot.autoPlaySeqId >= 0 && CCBIAnimationEvaluator.hasTracks(in: subRoot, seqId: subRoot.autoPlaySeqId)) {
+                    CCBIScenePlayerView(
+                        root: subRoot,
+                        designSize: designSize,
+                        scaleFactor: scaleFactor,
+                        centerRoot: false,
+                        context: childContext,
+                        seqName: subSeqName,
+                        seqPlayID: subSeqID
+                    )
+                } else {
+                    CCBINodeRenderer(
+                        node: subRoot,
+                        parentDesignSize: designSize,
+                        scaleFactor: scaleFactor,
+                        context: childContext,
+                        activeSeqId: activeSeqId,
+                        animTime: animTime
+                    )
+                }
             } else {
                 // Background / Visual node body
                 if node.cls == "CCNodeColor" || node.base == "CCNodeColor" {
@@ -1283,7 +1617,9 @@ private struct CCBINodeRenderer: View {
                         positionOverride: entry.posOverride,
                         anchorOverride: entry.anchorOverride,
                         sizeOverride: entry.sizeOverride,
-                        forceVisible: entry.forceVisible
+                        forceVisible: entry.forceVisible,
+                        activeSeqId: activeSeqId,
+                        animTime: animTime
                     )
                 }
             }

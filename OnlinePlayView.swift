@@ -359,6 +359,9 @@ struct OnlineGameView: View {
     @State private var feedBotName = "Feeder"
     @State private var feedBotSkinID = ""
     @State private var showEmotePicker = false
+    @State private var emojiToggleCount: Int = 0
+    @AppStorage("macro.controlLayout") private var controlLayout: Int = 2
+    @AppStorage("macro.showEmojiWidget") private var showEmojiWidget: Bool = true
     @State private var activeEmoteAsset: String? = nil
     @State private var activeEmoteStartedAt: TimeInterval = 0
     @State private var activeEmoteExpiresAt: TimeInterval = 0
@@ -469,9 +472,16 @@ struct OnlineGameView: View {
                     topHUD
                         .opacity(isLeavePopupPresented ? 0 : 1)
                         .allowsHitTesting(!isLeavePopupPresented)
-                    if showEmotePicker && !isLeavePopupPresented {
-                        EmotePickerBar(
+                    if showEmojiWidget {
+                        EmojiWidgetHUD(
+                            isOpen: showEmotePicker,
+                            toggleSeqID: emojiToggleCount,
                             isOnCooldown: CACurrentMediaTime() < emoteCooldownUntil,
+                            onToggle: {
+                                SoundManager.shared.play(.menuClick)
+                                showEmotePicker.toggle()
+                                emojiToggleCount += 1
+                            },
                             onSelect: { asset in
                                 let now = CACurrentMediaTime()
                                 guard now >= emoteCooldownUntil else { return }
@@ -480,10 +490,13 @@ struct OnlineGameView: View {
                                 activeEmoteStartedAt = now
                                 activeEmoteExpiresAt = now + 3.0
                                 emoteCooldownUntil = now + 3.0
-                                withAnimation(.easeInOut(duration: 0.15)) { showEmotePicker = false }
+                                showEmotePicker = false
+                                emojiToggleCount += 1
                             }
                         )
                         .zIndex(2)
+                        .opacity(isLeavePopupPresented ? 0 : 1)
+                        .allowsHitTesting(!isLeavePopupPresented)
                     }
                 }
                 if connectionPhase == .playing && !isLeavePopupPresented {
@@ -665,11 +678,7 @@ struct OnlineGameView: View {
                   friendCount: world.teammateUUIDs.count,
                   inParty: !world.localPartyCode.isEmpty,
                   leaderboardRows: computeLeaderboardRows(),
-                  onPause: { pause() },
-                  onEmotes: {
-                      SoundManager.shared.play(.menuClick)
-                      withAnimation(.easeInOut(duration: 0.15)) { showEmotePicker.toggle() }
-                  })
+                  onPause: { pause() })
         .equatable()
         .zIndex(1)
     }
@@ -681,6 +690,7 @@ struct OnlineGameView: View {
                          feedButtonScale: feedButtonScale,
                          macroButtonScale: macroButtonScale,
                          feedHoldThreshold: feedHoldThreshold,
+                         controlLayout: controlLayout,
                          onSplit: {
                              if canSplit() {
                                  SoundManager.shared.play(.split, minInterval: 0.005)
