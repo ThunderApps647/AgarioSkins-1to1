@@ -57,9 +57,10 @@ legacy/A-B layer in the raw `.ccbi`.
 | `EmojiWidget`, `Controls-Sides`, `Score` | separate `.ccbi` | HUD controllers | rendered by app |
 
 Legacy SwiftUI fallbacks: none were found for these screens; all six are `CCBISceneView`-backed.
-The main menu's top-row labels were overflowing their 40pt buttons (visible as clipped `Free Coins`
-and a partly off-screen settings button on iPad); `topSquareButton` now constrains the label to 36pt
-with `minimumScaleFactor(0.55)`.
+The 40pt toolbar labels are inside the CCBI buttons (live iPad geometry: button x=9, w=71.5;
+label x=13.6, w=59.9), so no SwiftUI overflow fix was needed.
+Scale check: iPhone buttons render at 50.3pt for 40 design pt (1.2575, `h/320` = 1.256);
+iPad at 71.5pt (1.7875, `w/768` = 1.792). Both match `OriginalGameplay.uiScale`.
 
 ## 4. SSIM gate
 

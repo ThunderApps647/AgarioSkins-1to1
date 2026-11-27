@@ -673,14 +673,6 @@ def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: As
             bw, bh = int(round(120.0 * px_scale)), int(round(80.0 * px_scale))
             bx, by = int(round((dw * 0.5 + 6.0) * px_scale)), int(round((dh * 0.5 - 10.0) * px_scale))
             canvas.alpha_composite(gr_img.resize((bw, bh), Image.Resampling.LANCZOS), (bx, by))
-        # CoinsBar + DNABar top-right
-        for idx, bar_name in enumerate(["DNABar.ccbi", "CoinsBar.ccbi"]):
-            bp = os.path.join(CCBI_DIR, bar_name)
-            if os.path.exists(bp):
-                with open(bp, "rb") as f:
-                    b_root = CCBIReader(f.read()).parse()
-                bx = dw - 106.0 * (2 - idx) - 8.0
-                draw_node(b_root, (bx, 8.0, 100.0, 24.0))
     elif ccbi_name == "MenuMysteryPotions":
         ps_path = os.path.join(CCBI_DIR, "PotionSlot.ccbi")
         if os.path.exists(ps_path):

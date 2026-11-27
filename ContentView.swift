@@ -12969,8 +12969,6 @@ struct MainMenu: View {
                     Image(icon).resizable().scaledToFit().frame(width: 21 * s, height: 21 * s)
                     menuStrokedText(label, size: 7.5 * s)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.55)
-                        .frame(width: 36 * s)
                 }
                 .frame(width: 40 * s, height: 40 * s)
                 .background(
