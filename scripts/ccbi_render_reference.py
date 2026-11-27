@@ -336,6 +336,9 @@ class AssetLibrary:
         if not name:
             return None
         candidates = [name, os.path.basename(name)]
+        # Also strip GeneratedAssets/... prefix if present
+        if "GeneratedAssets/" in name:
+            candidates.append(name.split("/")[-1])
         for c in candidates:
             if c in self.frames:
                 png_path, meta = self.frames[c]
@@ -353,6 +356,18 @@ class AssetLibrary:
             if os.path.exists(cand):
                 return Image.open(cand).convert("RGBA")
         return None
+
+    def get_mcfs_image(self, desc_name: str):
+        if not desc_name:
+            return None
+        key = os.path.basename(desc_name)
+        if not key.endswith(".plist"):
+            key += ".plist"
+        pl = self.mcfs.get(key)
+        if not pl:
+            return None
+        img_name = pl.get("Source_Frame") or pl.get("spriteFrame") or pl.get("texture") or pl.get("image") or ""
+        return self.get_sprite(img_name)
 
     def get_font(self, font_name: str, px_size: int):
         key = (font_name, px_size)
@@ -416,19 +431,29 @@ def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: As
         base = node["base"]
 
         # Content size
+        def _extract_sf(p):
+            sf = p.get("spriteFrame") or p.get("displayFrame") or p.get("normalSpriteFrame")
+            if isinstance(sf, tuple) and sf[0] == "spriteFrame":
+                return sf[2]
+            if isinstance(sf, str):
+                return sf
+            return ""
+
         cs_prop = props.get("contentSize")
         if cs_prop and cs_prop[0] == "size":
             nw = eval_dim(cs_prop[1], cs_prop[3], pw, s)
             nh = eval_dim(cs_prop[2], cs_prop[4], ph, s)
         elif cls in ("CCSprite", "MCFramedSprite") or base in ("CCSprite", "MCFramedSprite"):
-            sf = props.get("spriteFrame")
-            spr_name = sf[2] if (isinstance(sf, tuple) and sf[0] == "spriteFrame") else ""
-            img = lib.get_sprite(spr_name)
-            if img is not None:
-                nw = img.width * 0.5 * rs * s
-                nh = img.height * 0.5 * rs * s
+            spr_name = _extract_sf(props)
+            if node["varName"] == "_background" and "background" in spr_name.lower():
+                nw, nh = w_pt, h_pt
             else:
-                nw, nh = 0.0, 0.0
+                img = lib.get_sprite(spr_name) or lib.get_mcfs_image(props.get("descriptionName", ""))
+                if img is not None:
+                    nw = img.width * 0.5 * rs * s
+                    nh = img.height * 0.5 * rs * s
+                else:
+                    nw, nh = 0.0, 0.0
         else:
             nw, nh = pw, ph
 
@@ -454,10 +479,11 @@ def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: As
         else:
             cx, cy_cc = 0.0, 0.0
 
-        # Anchor point
+        # Anchor point (root container & ignoreAnchorPointForPosition=True use 0,0)
         ap_prop = props.get("anchorPoint")
         ax, ay = (ap_prop[1], ap_prop[2]) if (isinstance(ap_prop, tuple) and ap_prop[0] == "pt") else (0.5, 0.5)
-        if props.get("ignoreAnchorPointForPosition", False):
+        is_root = (parent_rect_pt == (0.0, 0.0, w_pt, h_pt) and cls not in ("CCSprite", "MCFramedSprite"))
+        if props.get("ignoreAnchorPointForPosition", False) or is_root:
             ax, ay = 0.0, 0.0
 
         left_pt = px + cx - ax * nw_s
@@ -475,17 +501,33 @@ def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: As
             })
 
         # Render visual
-        opacity = float(props.get("opacity", 255)) / 255.0
-        if cls == "CCLayerColor" or base == "CCLayerColor":
+        raw_op = props.get("opacity", 1.0)
+        opacity = float(raw_op) / 255.0 if float(raw_op) > 1.0 else float(raw_op)
+        if cls == "CCBFile" or base == "CCBFile":
+            sub_file = props.get("ccbFile", "")
+            if isinstance(sub_file, str) and sub_file:
+                sub_path = os.path.join(CCBI_DIR, sub_file if sub_file.endswith(".ccbi") else sub_file + ".ccbi")
+                if os.path.exists(sub_path):
+                    with open(sub_path, "rb") as sf_f:
+                        sub_root = CCBIReader(sf_f.read()).parse()
+                    draw_node(sub_root, (left_pt, top_pt, max(1.0, nw_s), max(1.0, nh_s)))
+        elif cls == "CCLayerColor" or base == "CCLayerColor":
             col = props.get("color")
             if isinstance(col, tuple) and col[0] == "rgba":
                 rgba = (int(col[1] * 255), int(col[2] * 255), int(col[3] * 255), int(col[4] * 255 * opacity))
                 box = Image.new("RGBA", (max(1, int(round(nw_s * out_scale))), max(1, int(round(nh_s * out_scale)))), rgba)
                 canvas.alpha_composite(box, (int(round(left_pt * out_scale)), int(round(top_pt * out_scale))))
         elif cls in ("CCSprite", "MCFramedSprite", "CCScale9Sprite") or base in ("CCSprite", "MCFramedSprite", "CCScale9Sprite"):
-            sf = props.get("spriteFrame")
-            spr_name = sf[2] if (isinstance(sf, tuple) and sf[0] == "spriteFrame") else ""
-            img = lib.get_sprite(spr_name)
+            spr_name = _extract_sf(props)
+            if node["varName"] == "_background" and "background" in spr_name.lower():
+                aspect = w_pt / max(1.0, h_pt)
+                if aspect <= 1.48:
+                    spr_name = "background-ipadpro.png"
+                elif aspect >= 1.95:
+                    spr_name = "backgroundSuperWide.png"
+                elif aspect >= 1.65:
+                    spr_name = "backgroundWide.png"
+            img = lib.get_sprite(spr_name) or lib.get_mcfs_image(props.get("descriptionName", ""))
             if img is not None and nw_s > 1 and nh_s > 1:
                 resized = img.resize((max(1, int(round(nw_s * out_scale))), max(1, int(round(nh_s * out_scale)))), Image.Resampling.LANCZOS)
                 if opacity < 0.99:

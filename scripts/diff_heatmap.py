@@ -13,7 +13,7 @@ from PIL import Image
 
 
 def compute_ssim(img1: np.ndarray, img2: np.ndarray) -> float:
-    # Luminance channel SSIM (global + 8x8 windowed mean)
+    # 8x8 block-windowed luminance SSIM
     c1 = (0.01 * 255.0) ** 2
     c2 = (0.03 * 255.0) ** 2
     x = img1.astype(np.float64)
@@ -21,14 +21,18 @@ def compute_ssim(img1: np.ndarray, img2: np.ndarray) -> float:
     if x.ndim == 3:
         x = 0.299 * x[..., 0] + 0.587 * x[..., 1] + 0.114 * x[..., 2]
         y = 0.299 * y[..., 0] + 0.587 * y[..., 1] + 0.114 * y[..., 2]
-    mu_x = x.mean()
-    mu_y = y.mean()
-    sig_x = x.var()
-    sig_y = y.var()
-    sig_xy = ((x - mu_x) * (y - mu_y)).mean()
+    H, W = x.shape
+    bh, bw = (H // 8) * 8, (W // 8) * 8
+    xb = x[:bh, :bw].reshape(bh // 8, 8, bw // 8, 8).transpose(0, 2, 1, 3).reshape(-1, 64)
+    yb = y[:bh, :bw].reshape(bh // 8, 8, bw // 8, 8).transpose(0, 2, 1, 3).reshape(-1, 64)
+    mu_x = xb.mean(axis=1)
+    mu_y = yb.mean(axis=1)
+    sig_x = xb.var(axis=1)
+    sig_y = yb.var(axis=1)
+    sig_xy = ((xb - mu_x[:, None]) * (yb - mu_y[:, None])).mean(axis=1)
     num = (2.0 * mu_x * mu_y + c1) * (2.0 * sig_xy + c2)
     den = (mu_x ** 2 + mu_y ** 2 + c1) * (sig_x + sig_y + c2)
-    return float(num / den) if den > 0 else 1.0
+    return float(np.mean(num / np.maximum(den, 1e-12)))
 
 
 def audit_pair(sim_path: str, ref_path: str, out_heatmap: str, ssim_threshold: float = 0.70):
@@ -56,6 +60,29 @@ def audit_pair(sim_path: str, ref_path: str, out_heatmap: str, ssim_threshold: f
     return ssim, mae
 
 
+def build_sim_index(sim_dir: str) -> dict:
+    index = {}
+    for p in glob.glob(os.path.join(sim_dir, "**", "*.png"), recursive=True):
+        index[os.path.basename(p)] = p
+    for mf in glob.glob(os.path.join(sim_dir, "**", "manifest.json"), recursive=True):
+        import json
+        mf_dir = os.path.dirname(mf)
+        with open(mf, "r", encoding="utf-8") as f:
+            entries = json.load(f)
+        for entry in entries:
+            for att in entry.get("attachments", []):
+                hr = att.get("suggestedHumanReadableName", "")
+                exp = att.get("exportedFileName", "")
+                exp_path = os.path.join(mf_dir, exp)
+                if exp and os.path.exists(exp_path) and hr:
+                    for key in ("iPhone_Live_01_MainMenu", "iPhone_Live_02_Settings", "iPhone_Live_03_Skins", "iPhone_Live_02b_Potions",
+                                "iPad_Live_01_MainMenu", "iPad_Live_02_Settings", "iPad_Live_03_Skins", "iPad_Live_02b_Potions",
+                                "01_MenuMain", "02_Settings", "03_Skins"):
+                        if hr.startswith(key):
+                            index[key + ".png"] = exp_path
+    return index
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sim-dir", required=True, help="Directory with Simulator PNGs")
@@ -65,29 +92,32 @@ def main():
     args = ap.parse_args()
 
     os.makedirs(args.out_dir, exist_ok=True)
-    mapping = {
-        "Live_01_MainMenu.png": "MenuMain.png",
-        "Live_02_Settings.png": "MenuSettings.png",
-        "Live_03_Skins.png": "MenuShopSkins.png",
-        "Live_02b_Potions.png": "PotionSlot.png",
-    }
+    sim_index = build_sim_index(args.sim_dir)
+    mapping = [
+        ("iPhone_Live_01_MainMenu.png", "iPhone_MenuMain.png"),
+        ("iPhone_Live_02_Settings.png", "iPhone_MenuSettings.png"),
+        ("iPhone_Live_03_Skins.png", "iPhone_MenuShopSkins.png"),
+        ("iPhone_Live_02b_Potions.png", "iPhone_PotionSlot.png"),
+        ("iPad_Live_01_MainMenu.png", "iPad_MenuMain.png"),
+        ("iPad_Live_02_Settings.png", "iPad_MenuSettings.png"),
+        ("iPad_Live_03_Skins.png", "iPad_MenuShopSkins.png"),
+        ("iPad_Live_02b_Potions.png", "iPad_PotionSlot.png"),
+    ]
 
     failures = []
     checked = 0
-    for dev in ("iPhone", "iPad"):
-        for sim_suffix, ref_suffix in mapping.items():
-            sim_candidates = glob.glob(os.path.join(args.sim_dir, "**", f"{dev}_{sim_suffix}"), recursive=True)
-            ref_path = os.path.join(args.ref_dir, f"{dev}_{ref_suffix}")
-            if not sim_candidates or not os.path.exists(ref_path):
-                continue
-            sim_path = sim_candidates[0]
-            heat_path = os.path.join(args.out_dir, f"{dev}_{sim_suffix[:-4]}_diff_heatmap.png")
-            ssim, mae = audit_pair(sim_path, ref_path, heat_path, args.min_ssim)
-            checked += 1
-            status = "PASS" if ssim >= args.min_ssim else "FAIL"
-            print(f"[{status}] {dev}_{sim_suffix} vs {dev}_{ref_suffix}: SSIM={ssim:.4f} MAE={mae:.2f} -> {heat_path}")
-            if ssim < args.min_ssim:
-                failures.append((f"{dev}_{sim_suffix}", ssim, mae))
+    for sim_name, ref_name in mapping:
+        sim_path = sim_index.get(sim_name)
+        ref_path = os.path.join(args.ref_dir, ref_name)
+        if not sim_path or not os.path.exists(ref_path):
+            continue
+        heat_path = os.path.join(args.out_dir, f"{sim_name[:-4]}_diff_heatmap.png")
+        ssim, mae = audit_pair(sim_path, ref_path, heat_path, args.min_ssim)
+        checked += 1
+        status = "PASS" if ssim >= args.min_ssim else "FAIL"
+        print(f"[{status}] {sim_name} vs {ref_name}: SSIM={ssim:.4f} MAE={mae:.2f} -> {heat_path}")
+        if ssim < args.min_ssim:
+            failures.append((sim_name, ssim, mae))
 
     print(f"Audited {checked} screenshot pairs, {len(failures)} below SSIM {args.min_ssim}.")
     sys.exit(1 if failures else 0)
