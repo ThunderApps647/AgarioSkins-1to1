@@ -1,0 +1,524 @@
+{
+  "metadata": {
+    "generator": "scripts/unicorn_emulate_vectors.py",
+    "binary": "agar.io (Mach-O ARM64, Unicorn Engine execution)"
+  },
+  "cameraZoomVectors": [
+    {
+      "phoneRatio": 1.445292592048645,
+      "windowHeight": 221.40846252441406,
+      "scaleFactor": 1.0,
+      "cocosZoom": 0.4884026050567627,
+      "viewportName": "iPhone 15 Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "isIpad": false,
+      "totalRadius": 31.6227766,
+      "cellCount": 1,
+      "screenScale": 1.228125,
+      "expectedSwiftZoom": 0.5998194493353366
+    },
+    {
+      "phoneRatio": 1.445292592048645,
+      "windowHeight": 221.40846252441406,
+      "scaleFactor": 1.0,
+      "cocosZoom": 0.308161199092865,
+      "viewportName": "iPhone 15 Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "isIpad": false,
+      "totalRadius": 100.0,
+      "cellCount": 1,
+      "screenScale": 1.228125,
+      "expectedSwiftZoom": 0.3784604726359248
+    },
+    {
+      "phoneRatio": 1.445292592048645,
+      "windowHeight": 221.40846252441406,
+      "scaleFactor": 1.0717734098434448,
+      "cocosZoom": 0.21282978355884552,
+      "viewportName": "iPhone 15 Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "isIpad": false,
+      "totalRadius": 300.0,
+      "cellCount": 2,
+      "screenScale": 1.228125,
+      "expectedSwiftZoom": 0.26138157793320715
+    },
+    {
+      "phoneRatio": 1.445292592048645,
+      "windowHeight": 221.40846252441406,
+      "scaleFactor": 1.148698329925537,
+      "cocosZoom": 0.17287151515483856,
+      "viewportName": "iPhone 15 Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "isIpad": false,
+      "totalRadius": 600.0,
+      "cellCount": 4,
+      "screenScale": 1.228125,
+      "expectedSwiftZoom": 0.2123078295495361
+    },
+    {
+      "phoneRatio": 1.445292592048645,
+      "windowHeight": 221.40846252441406,
+      "scaleFactor": 1.2311444282531738,
+      "cocosZoom": 0.151038259267807,
+      "viewportName": "iPhone 15 Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "isIpad": false,
+      "totalRadius": 1000.0,
+      "cellCount": 8,
+      "screenScale": 1.228125,
+      "expectedSwiftZoom": 0.18549386216327546
+    },
+    {
+      "phoneRatio": 1.445292592048645,
+      "windowHeight": 221.40846252441406,
+      "scaleFactor": 1.3195079565048218,
+      "cocosZoom": 0.1406693160533905,
+      "viewportName": "iPhone 15 Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "isIpad": false,
+      "totalRadius": 1414.2135,
+      "cellCount": 16,
+      "screenScale": 1.228125,
+      "expectedSwiftZoom": 0.1727595037780702
+    },
+    {
+      "phoneRatio": 1.1833332777023315,
+      "windowHeight": 270.42254638671875,
+      "scaleFactor": 1.0,
+      "cocosZoom": 0.5290752649307251,
+      "viewportName": "iPhone SE",
+      "w": 568.0,
+      "h": 320.0,
+      "isIpad": false,
+      "totalRadius": 31.6227766,
+      "cellCount": 1,
+      "screenScale": 1.0,
+      "expectedSwiftZoom": 0.5290752649307251
+    },
+    {
+      "phoneRatio": 1.1833332777023315,
+      "windowHeight": 270.42254638671875,
+      "scaleFactor": 1.0,
+      "cocosZoom": 0.33382391929626465,
+      "viewportName": "iPhone SE",
+      "w": 568.0,
+      "h": 320.0,
+      "isIpad": false,
+      "totalRadius": 100.0,
+      "cellCount": 1,
+      "screenScale": 1.0,
+      "expectedSwiftZoom": 0.33382391929626465
+    },
+    {
+      "phoneRatio": 1.1833332777023315,
+      "windowHeight": 270.42254638671875,
+      "scaleFactor": 1.0717734098434448,
+      "cocosZoom": 0.23055361211299896,
+      "viewportName": "iPhone SE",
+      "w": 568.0,
+      "h": 320.0,
+      "isIpad": false,
+      "totalRadius": 300.0,
+      "cellCount": 2,
+      "screenScale": 1.0,
+      "expectedSwiftZoom": 0.23055361211299896
+    },
+    {
+      "phoneRatio": 1.1833332777023315,
+      "windowHeight": 270.42254638671875,
+      "scaleFactor": 1.148698329925537,
+      "cocosZoom": 0.1872677206993103,
+      "viewportName": "iPhone SE",
+      "w": 568.0,
+      "h": 320.0,
+      "isIpad": false,
+      "totalRadius": 600.0,
+      "cellCount": 4,
+      "screenScale": 1.0,
+      "expectedSwiftZoom": 0.1872677206993103
+    },
+    {
+      "phoneRatio": 1.1833332777023315,
+      "windowHeight": 270.42254638671875,
+      "scaleFactor": 1.2311444282531738,
+      "cocosZoom": 0.16361625492572784,
+      "viewportName": "iPhone SE",
+      "w": 568.0,
+      "h": 320.0,
+      "isIpad": false,
+      "totalRadius": 1000.0,
+      "cellCount": 8,
+      "screenScale": 1.0,
+      "expectedSwiftZoom": 0.16361625492572784
+    },
+    {
+      "phoneRatio": 1.1833332777023315,
+      "windowHeight": 270.42254638671875,
+      "scaleFactor": 1.3195079565048218,
+      "cocosZoom": 0.1526593565940857,
+      "viewportName": "iPhone SE",
+      "w": 568.0,
+      "h": 320.0,
+      "isIpad": false,
+      "totalRadius": 1414.2135,
+      "cellCount": 16,
+      "screenScale": 1.0,
+      "expectedSwiftZoom": 0.1526593565940857
+    },
+    {
+      "phoneRatio": 0.8888888955116272,
+      "windowHeight": 576.0,
+      "scaleFactor": 1.0,
+      "cocosZoom": 0.7159278988838196,
+      "viewportName": "iPad 1024x768",
+      "w": 1024.0,
+      "h": 768.0,
+      "isIpad": true,
+      "totalRadius": 31.6227766,
+      "cellCount": 1,
+      "screenScale": 1.3333333333333333,
+      "expectedSwiftZoom": 0.9545705318450928
+    },
+    {
+      "phoneRatio": 0.8888888955116272,
+      "windowHeight": 576.0,
+      "scaleFactor": 1.0,
+      "cocosZoom": 0.4517199397087097,
+      "viewportName": "iPad 1024x768",
+      "w": 1024.0,
+      "h": 768.0,
+      "isIpad": true,
+      "totalRadius": 100.0,
+      "cellCount": 1,
+      "screenScale": 1.3333333333333333,
+      "expectedSwiftZoom": 0.6022932529449463
+    },
+    {
+      "phoneRatio": 0.8888888955116272,
+      "windowHeight": 576.0,
+      "scaleFactor": 1.0717734098434448,
+      "cocosZoom": 0.3119778335094452,
+      "viewportName": "iPad 1024x768",
+      "w": 1024.0,
+      "h": 768.0,
+      "isIpad": true,
+      "totalRadius": 300.0,
+      "cellCount": 2,
+      "screenScale": 1.3333333333333333,
+      "expectedSwiftZoom": 0.41597044467926025
+    },
+    {
+      "phoneRatio": 0.8888888955116272,
+      "windowHeight": 576.0,
+      "scaleFactor": 1.148698329925537,
+      "cocosZoom": 0.25340473651885986,
+      "viewportName": "iPad 1024x768",
+      "w": 1024.0,
+      "h": 768.0,
+      "isIpad": true,
+      "totalRadius": 600.0,
+      "cellCount": 4,
+      "screenScale": 1.3333333333333333,
+      "expectedSwiftZoom": 0.3378729820251465
+    },
+    {
+      "phoneRatio": 0.8888888955116272,
+      "windowHeight": 576.0,
+      "scaleFactor": 1.2311444282531738,
+      "cocosZoom": 0.22140033543109894,
+      "viewportName": "iPad 1024x768",
+      "w": 1024.0,
+      "h": 768.0,
+      "isIpad": true,
+      "totalRadius": 1000.0,
+      "cellCount": 8,
+      "screenScale": 1.3333333333333333,
+      "expectedSwiftZoom": 0.2952004472414652
+    },
+    {
+      "phoneRatio": 0.8888888955116272,
+      "windowHeight": 576.0,
+      "scaleFactor": 1.3195079565048218,
+      "cocosZoom": 0.20657381415367126,
+      "viewportName": "iPad 1024x768",
+      "w": 1024.0,
+      "h": 768.0,
+      "isIpad": true,
+      "totalRadius": 1414.2135,
+      "cellCount": 16,
+      "screenScale": 1.3333333333333333,
+      "expectedSwiftZoom": 0.275431752204895
+    },
+    {
+      "phoneRatio": 0.8893229365348816,
+      "windowHeight": 575.7188720703125,
+      "scaleFactor": 1.0,
+      "cocosZoom": 0.7157880663871765,
+      "viewportName": "iPad Pro 1366x1024",
+      "w": 1366.0,
+      "h": 1024.0,
+      "isIpad": true,
+      "totalRadius": 31.6227766,
+      "cellCount": 1,
+      "screenScale": 1.7786458333333333,
+      "expectedSwiftZoom": 1.273133461829275
+    },
+    {
+      "phoneRatio": 0.8893229365348816,
+      "windowHeight": 575.7188720703125,
+      "scaleFactor": 1.0,
+      "cocosZoom": 0.4516317546367645,
+      "viewportName": "iPad Pro 1366x1024",
+      "w": 1366.0,
+      "h": 1024.0,
+      "isIpad": true,
+      "totalRadius": 100.0,
+      "cellCount": 1,
+      "screenScale": 1.7786458333333333,
+      "expectedSwiftZoom": 0.8032929385857035
+    },
+    {
+      "phoneRatio": 0.8893229365348816,
+      "windowHeight": 575.7188720703125,
+      "scaleFactor": 1.0717734098434448,
+      "cocosZoom": 0.31191691756248474,
+      "viewportName": "iPad Pro 1366x1024",
+      "w": 1366.0,
+      "h": 1024.0,
+      "isIpad": true,
+      "totalRadius": 300.0,
+      "cellCount": 2,
+      "screenScale": 1.7786458333333333,
+      "expectedSwiftZoom": 0.5547897257686902
+    },
+    {
+      "phoneRatio": 0.8893229365348816,
+      "windowHeight": 575.7188720703125,
+      "scaleFactor": 1.148698329925537,
+      "cocosZoom": 0.2533552646636963,
+      "viewportName": "iPad Pro 1366x1024",
+      "w": 1366.0,
+      "h": 1024.0,
+      "isIpad": true,
+      "totalRadius": 600.0,
+      "cellCount": 4,
+      "screenScale": 1.7786458333333333,
+      "expectedSwiftZoom": 0.4506292858471473
+    },
+    {
+      "phoneRatio": 0.8893229365348816,
+      "windowHeight": 575.7188720703125,
+      "scaleFactor": 1.2311444282531738,
+      "cocosZoom": 0.2213570922613144,
+      "viewportName": "iPad Pro 1366x1024",
+      "w": 1366.0,
+      "h": 1024.0,
+      "isIpad": true,
+      "totalRadius": 1000.0,
+      "cellCount": 8,
+      "screenScale": 1.7786458333333333,
+      "expectedSwiftZoom": 0.39371586982936907
+    },
+    {
+      "phoneRatio": 0.8893229365348816,
+      "windowHeight": 575.7188720703125,
+      "scaleFactor": 1.3195079565048218,
+      "cocosZoom": 0.2065334916114807,
+      "viewportName": "iPad Pro 1366x1024",
+      "w": 1366.0,
+      "h": 1024.0,
+      "isIpad": true,
+      "totalRadius": 1414.2135,
+      "cellCount": 16,
+      "screenScale": 1.7786458333333333,
+      "expectedSwiftZoom": 0.3673499342985451
+    }
+  ],
+  "joystickVectors": [
+    {
+      "desiredX": 0.0,
+      "desiredY": 8.999999408842996e-05,
+      "offsetX": 0.0,
+      "offsetY": 0.0,
+      "maxRadius": 30.375
+    },
+    {
+      "desiredX": 8.999999408842996e-05,
+      "desiredY": 0.0,
+      "offsetX": 10.0,
+      "offsetY": 0.0,
+      "maxRadius": 30.375
+    },
+    {
+      "desiredX": 8.999999220462901e-05,
+      "desiredY": 0.0,
+      "offsetX": 18.225,
+      "offsetY": 0.0,
+      "maxRadius": 30.375
+    },
+    {
+      "desiredX": 0.06378597766160965,
+      "desiredY": 0.0,
+      "offsetX": 19.0,
+      "offsetY": 0.0,
+      "maxRadius": 30.375
+    },
+    {
+      "desiredX": 0.4999999262913731,
+      "desiredY": 0.0,
+      "offsetX": 24.3,
+      "offsetY": 0.0,
+      "maxRadius": 30.375
+    },
+    {
+      "desiredX": 1.0,
+      "desiredY": 0.0,
+      "offsetX": 30.375,
+      "offsetY": 0.0,
+      "maxRadius": 30.375
+    },
+    {
+      "desiredX": 1.0,
+      "desiredY": 0.0,
+      "offsetX": 60.0,
+      "offsetY": 0.0,
+      "maxRadius": 30.375
+    },
+    {
+      "desiredX": 0.7070764682636865,
+      "desiredY": 0.7070764682636865,
+      "offsetX": 21.478,
+      "offsetY": 21.478,
+      "maxRadius": 30.375
+    }
+  ],
+  "followJoystickVectors": [
+    {
+      "x": 100.0,
+      "y": 100.0,
+      "joyX": 100.0,
+      "joyY": 100.0,
+      "totalRadius": 30.375,
+      "touchX": 100.0,
+      "touchY": 100.0,
+      "factor": 1.0
+    },
+    {
+      "x": 109.625,
+      "y": 100.0,
+      "joyX": 100.0,
+      "joyY": 100.0,
+      "totalRadius": 30.375,
+      "touchX": 140.0,
+      "touchY": 100.0,
+      "factor": 1.0
+    },
+    {
+      "x": 169.625,
+      "y": 100.0,
+      "joyX": 100.0,
+      "joyY": 100.0,
+      "totalRadius": 30.375,
+      "touchX": 200.0,
+      "touchY": 100.0,
+      "factor": 1.0
+    },
+    {
+      "x": 128.52163151597023,
+      "y": 128.52163151597023,
+      "joyX": 100.0,
+      "joyY": 100.0,
+      "totalRadius": 30.375,
+      "touchX": 150.0,
+      "touchY": 150.0,
+      "factor": 1.0
+    },
+    {
+      "x": 117.78244727395533,
+      "y": 117.78244727395533,
+      "joyX": 100.0,
+      "joyY": 100.0,
+      "totalRadius": 30.375,
+      "touchX": 150.0,
+      "touchY": 150.0,
+      "factor": 1.5
+    }
+  ],
+  "speedVectors": [
+    {
+      "mass": 10.0,
+      "radius": 31.622776601683796,
+      "speed": 448.3387756347656
+    },
+    {
+      "mass": 18.0,
+      "radius": 42.426406871192846,
+      "speed": 392.7986145019531
+    },
+    {
+      "mass": 32.0,
+      "radius": 56.568542494923804,
+      "speed": 345.10204315185547
+    },
+    {
+      "mass": 36.0,
+      "radius": 60.0,
+      "speed": 336.0765838623047
+    },
+    {
+      "mass": 100.0,
+      "radius": 100.0,
+      "speed": 267.0584297180176
+    },
+    {
+      "mass": 134.0,
+      "radius": 115.75836902790226,
+      "speed": 250.03896713256836
+    },
+    {
+      "mass": 500.0,
+      "radius": 223.60679774997897,
+      "speed": 185.92510223388672
+    },
+    {
+      "mass": 2500.0,
+      "radius": 500.0,
+      "speed": 129.44037437438965
+    },
+    {
+      "mass": 10000.0,
+      "radius": 1000.0,
+      "speed": 94.75590705871582
+    },
+    {
+      "mass": 20000.0,
+      "radius": 1414.213562373095,
+      "speed": 81.07268333435059
+    }
+  ],
+  "impulseDecayVectors": [
+    {
+      "dt": 0.016666666666666666,
+      "factor": 0.9598833322525024
+    },
+    {
+      "dt": 0.03333333333333333,
+      "factor": 0.9197666645050049
+    },
+    {
+      "dt": 0.05,
+      "factor": 0.8796499967575073
+    },
+    {
+      "dt": 0.1,
+      "factor": 0.7592999935150146
+    }
+  ]
+}

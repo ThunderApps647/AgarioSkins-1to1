@@ -887,4 +887,163 @@ final class AgarParityTests: XCTestCase {
         XCTAssertEqual(AgarSFX.split.binaryPitchJitter, 0.05, accuracy: 1e-6)
         XCTAssertEqual(AgarSFX.virusPop.binaryPitchJitter, 0.20, accuracy: 1e-6)
     }
+
+    func testArm64EmulatedGoldenVectors() throws {
+        struct Arm64Vectors: Decodable {
+            struct ZoomVec: Decodable {
+                let viewportName: String
+                let w: Double
+                let h: Double
+                let isIpad: Bool
+                let totalRadius: Double
+                let cellCount: Int
+                let cocosZoom: Double
+                let expectedSwiftZoom: Double
+            }
+            struct JoyVec: Decodable {
+                let offsetX: Double
+                let offsetY: Double
+                let maxRadius: Double
+                let desiredX: Double
+                let desiredY: Double
+            }
+            struct FollowVec: Decodable {
+                let joyX: Double
+                let joyY: Double
+                let totalRadius: Double
+                let touchX: Double
+                let touchY: Double
+                let factor: Double
+                let x: Double
+                let y: Double
+            }
+            struct SpeedVec: Decodable {
+                let mass: Double
+                let radius: Double
+                let speed: Double
+            }
+            struct DecayVec: Decodable {
+                let dt: Double
+                let factor: Double
+            }
+            let cameraZoomVectors: [ZoomVec]
+            let joystickVectors: [JoyVec]
+            let followJoystickVectors: [FollowVec]
+            let speedVectors: [SpeedVec]
+            let impulseDecayVectors: [DecayVec]
+        }
+
+        let testBundle = Bundle(for: AgarParityTests.self)
+        let url = testBundle.url(forResource: "AgarArm64EmulatedVectors", withExtension: "json", subdirectory: "Fixtures")
+            ?? testBundle.url(forResource: "AgarArm64EmulatedVectors", withExtension: "json")
+        let resolved = try XCTUnwrap(url, "Missing AgarArm64EmulatedVectors.json in test bundle")
+        let vecs = try JSONDecoder().decode(Arm64Vectors.self, from: Data(contentsOf: resolved))
+
+        let tol = 1e-5
+        for v in vecs.cameraZoomVectors {
+            let zoom = Double(OriginalGameplay.calculateZoom(
+                totalRadius: CGFloat(v.totalRadius),
+                cellCount: v.cellCount,
+                viewportSize: CGSize(width: v.w, height: v.h),
+                isPhoneOverride: !v.isIpad
+            ))
+            XCTAssertEqual(zoom, v.expectedSwiftZoom, accuracy: tol, "ARM64 zoom \(v.viewportName) r=\(v.totalRadius) n=\(v.cellCount)")
+        }
+
+        for v in vecs.joystickVectors {
+            var joy = AgarJoystickInput()
+            joy.updateTouch(offset: CGSize(width: v.offsetX, height: v.offsetY), maxRadius: CGFloat(v.maxRadius))
+            XCTAssertEqual(Double(joy.axis.width), v.desiredX, accuracy: tol, "ARM64 joy.x(\(v.offsetX),\(v.offsetY))")
+            XCTAssertEqual(Double(joy.axis.height), v.desiredY, accuracy: tol, "ARM64 joy.y(\(v.offsetX),\(v.offsetY))")
+        }
+
+        for v in vecs.followJoystickVectors {
+            let out = AgarJoystickInput.followJoystick(
+                currentCenter: CGPoint(x: v.joyX, y: v.joyY),
+                touchPoint: CGPoint(x: v.touchX, y: v.touchY),
+                totalRadius: CGFloat(v.totalRadius),
+                factor: CGFloat(v.factor)
+            )
+            XCTAssertEqual(Double(out.x), v.x, accuracy: tol, "ARM64 follow.x(\(v.touchX),\(v.touchY))")
+            XCTAssertEqual(Double(out.y), v.y, accuracy: tol, "ARM64 follow.y(\(v.touchX),\(v.touchY))")
+        }
+
+        for v in vecs.speedVectors {
+            let spd = OriginalGameplay.speed(forMass: v.mass)
+            // ARM64 sub_100047320 uses 32-bit float powf -> relative accuracy 1e-5
+            XCTAssertEqual(spd, v.speed, accuracy: max(tol, v.speed * 1e-5), "ARM64 speed(mass:\(v.mass))")
+        }
+
+        for v in vecs.impulseDecayVectors {
+            XCTAssertEqual(OriginalGameplay.impulseDecay(dt: v.dt), v.factor, accuracy: tol, "ARM64 impulseDecay(dt:\(v.dt))")
+        }
+    }
+
+    @MainActor
+    func testCCBINodeCompletenessAudit() throws {
+        struct ManifestNode: Decodable {
+            let cls: String
+            let varName: String
+            let x: Double
+            let y: Double
+            let w: Double
+            let h: Double
+        }
+        struct Manifest: Decodable {
+            let iPhone: [String: [ManifestNode]]
+            let iPad: [String: [ManifestNode]]
+        }
+
+        let testBundle = Bundle(for: AgarParityTests.self)
+        let url = testBundle.url(forResource: "ccbi_node_manifest", withExtension: "json", subdirectory: "Fixtures")
+            ?? testBundle.url(forResource: "ccbi_node_manifest", withExtension: "json")
+        let resolved = try XCTUnwrap(url, "Missing ccbi_node_manifest.json in test bundle")
+        let manifest = try JSONDecoder().decode(Manifest.self, from: Data(contentsOf: resolved))
+
+        let store = CCBIAtlasStore.shared
+        let screens = [
+            "MenuMain", "MenuSettings", "MenuShopSkins", "PotionSlot",
+            "Controls-Sides", "Score", "EmojiWidget", "PauseButton",
+            "LeaderboardWidget", "MenuBattleResultPopup"
+        ]
+
+        func countVisibleCCBINodes(_ node: CCBINode) -> Int {
+            if case .bool(false) = node.props["visible"] { return 0 }
+            return 1 + node.children.reduce(0) { $0 + countVisibleCCBINodes($1) }
+        }
+
+        for name in screens {
+            let root = try XCTUnwrap(store.loadCCBI(named: name), "Failed to load \(name).ccbi")
+            let visibleCount = countVisibleCCBINodes(root)
+            XCTAssertGreaterThan(visibleCount, 0, "\(name).ccbi must have visible nodes")
+
+            let phoneNodes = try XCTUnwrap(manifest.iPhone[name], "Missing iPhone manifest for \(name)")
+            let padNodes = try XCTUnwrap(manifest.iPad[name], "Missing iPad manifest for \(name)")
+            XCTAssertFalse(phoneNodes.isEmpty, "\(name) iPhone manifest must not be empty")
+            XCTAssertFalse(padNodes.isEmpty, "\(name) iPad manifest must not be empty")
+
+            for n in phoneNodes {
+                XCTAssertGreaterThan(n.w, 0.5, "\(name) iPhone node \(n.cls)/\(n.varName) zero width")
+                XCTAssertGreaterThan(n.h, 0.5, "\(name) iPhone node \(n.cls)/\(n.varName) zero height")
+            }
+            for n in padNodes {
+                XCTAssertGreaterThan(n.w, 0.5, "\(name) iPad node \(n.cls)/\(n.varName) zero width")
+                XCTAssertGreaterThan(n.h, 0.5, "\(name) iPad node \(n.cls)/\(n.varName) zero height")
+            }
+
+            // Render CCBISceneView at both iPhone and iPad sizes and assert non-empty raster
+            for (label, sz, isPad) in [("iPhone", CGSize(width: 852, height: 393), false), ("iPad", CGSize(width: 1024, height: 768), true)] {
+                let s = OriginalGameplay.uiScale(for: sz, isPhoneOverride: !isPad)
+                let view = CCBISceneView(ccbiName: name, designSize: sz, uiScale: s, context: CCBIBindingContext())
+                    .frame(width: sz.width, height: sz.height)
+                    .background(Color.white)
+                let renderer = ImageRenderer(content: view)
+                renderer.scale = 1.0
+                renderer.proposedSize = .init(sz)
+                let img = try XCTUnwrap(renderer.uiImage, "\(name) \(label) CCBISceneView returned nil")
+                XCTAssertGreaterThan(img.size.width, 100, "\(name) \(label) width")
+                XCTAssertGreaterThan(img.size.height, 100, "\(name) \(label) height")
+            }
+        }
+    }
 }

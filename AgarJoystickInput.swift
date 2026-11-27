@@ -32,6 +32,22 @@ struct AgarJoystickInput {
         wasDragging = false
     }
 
+    /// `ControlsWidget::followJoystickToPoint:factor:` (`0x1000ec4a8`)
+    static func followJoystick(currentCenter: CGPoint, touchPoint: CGPoint, totalRadius: CGFloat, factor: CGFloat = 1.0) -> CGPoint {
+        let dx = currentCenter.x - touchPoint.x
+        let dy = currentCenter.y - touchPoint.y
+        let dist = hypot(dx, dy)
+        let excess = dist - totalRadius * factor
+        guard excess > 0.0, dist > 1e-6 else {
+            return currentCenter
+        }
+        let inv = -excess / dist
+        return CGPoint(
+            x: currentCenter.x + dx * inv,
+            y: currentCenter.y + dy * inv
+        )
+    }
+
     /// `JoystickInput::updateAxisWithTouchPosition:priority:` (`0x10028dfd0`)
     mutating func updateTouch(offset: CGSize, maxRadius overrideMaxRadius: CGFloat? = nil) {
         if let overrideMaxRadius {

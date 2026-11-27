@@ -1,0 +1,2654 @@
+{
+  "iPhone": {
+    "MenuMain": [
+      {
+        "cls": "MenuMainView",
+        "varName": "",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "_inputBox",
+        "x": -149.1,
+        "y": 326.19,
+        "w": 298.2,
+        "h": 39.3
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "_inputMenu",
+        "x": -149.1,
+        "y": 326.19,
+        "w": 298.2,
+        "h": 39.3
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "_menuMain",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_leaguesButtonNode",
+        "x": -364.59,
+        "y": 196.5,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_leaguesButton",
+        "x": -389.16,
+        "y": 165.8,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_mysteryPotionsButtonNode",
+        "x": -254.06,
+        "y": 196.5,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_mysteryPotionsButton",
+        "x": -278.62,
+        "y": 165.8,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_dailyQuestButtonNode",
+        "x": -309.33,
+        "y": 196.5,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_dailyQuestButton",
+        "x": -333.89,
+        "y": 165.8,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_freeCoinsButtonNode",
+        "x": -419.86,
+        "y": 196.5,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "",
+        "x": -419.86,
+        "y": 196.5,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": -215.07,
+        "y": 318.21,
+        "w": 55.27,
+        "h": 55.27
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_skinsBonusButton",
+        "x": -215.07,
+        "y": 318.21,
+        "w": 55.27,
+        "h": 55.27
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_plusSprite",
+        "x": -220.29,
+        "y": 351.06,
+        "w": 27.63,
+        "h": 27.63
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": -444.42,
+        "y": 558.8,
+        "w": 49.12,
+        "h": 49.12
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -443.19,
+        "y": 585.2,
+        "w": 46.67,
+        "h": 31.93
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -444.42,
+        "y": 558.8,
+        "w": 49.12,
+        "h": 49.12
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": 131.25,
+        "y": 534.23,
+        "w": 122.81,
+        "h": 49.12
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 132.48,
+        "y": 560.64,
+        "w": 120.36,
+        "h": 31.93
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_shopButtonNode",
+        "x": 131.25,
+        "y": 534.23,
+        "w": 122.81,
+        "h": 49.12
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 131.25,
+        "y": 534.23,
+        "w": 122.81,
+        "h": 49.12
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "",
+        "x": 112.83,
+        "y": 534.23,
+        "w": 122.81,
+        "h": 49.12
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_shopRedBadge",
+        "x": 187.74,
+        "y": 515.08,
+        "w": 122.81,
+        "h": 49.12
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": -419.86,
+        "y": 270.19,
+        "w": 52.81,
+        "h": 50.35
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_boostXpButton",
+        "x": -446.26,
+        "y": 245.01,
+        "w": 52.81,
+        "h": 50.35
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": -419.86,
+        "y": 319.31,
+        "w": 51.58,
+        "h": 50.35
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_boostMassButton",
+        "x": -445.65,
+        "y": 294.14,
+        "w": 51.58,
+        "h": 50.35
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -426.0,
+        "y": 346.33,
+        "w": 852.0,
+        "h": 171.94
+      },
+      {
+        "cls": "StaticPlayButtonContainer",
+        "varName": "_staticPlayButtonsContainer",
+        "x": -426.0,
+        "y": 346.33,
+        "w": 852.0,
+        "h": 171.94
+      },
+      {
+        "cls": "MCScrollList",
+        "varName": "_playButtonsScrollNode",
+        "x": -333.89,
+        "y": 346.33,
+        "w": 24.56,
+        "h": 171.94
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCMenuItem",
+        "varName": "_topSlot5",
+        "x": -198.8,
+        "y": 196.5,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_vipSubscriptionButton",
+        "x": -223.36,
+        "y": 165.8,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "CCMenuItem",
+        "varName": "_topSlot6",
+        "x": -143.53,
+        "y": 196.5,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "CCMenuItem",
+        "varName": "",
+        "x": -419.86,
+        "y": 473.44,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "_leftSlot",
+        "x": -419.86,
+        "y": 473.44,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "_newsfeedButton",
+        "x": -419.86,
+        "y": 473.44,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -418.63,
+        "y": 505.37,
+        "w": 46.67,
+        "h": 31.93
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -419.86,
+        "y": 479.58,
+        "w": 49.12,
+        "h": 49.12
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_newsfeedBadge",
+        "x": -388.91,
+        "y": 472.71,
+        "w": 24.56,
+        "h": 24.56
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_newsfeedAmountLabel",
+        "x": -388.91,
+        "y": 472.71,
+        "w": 24.56,
+        "h": 24.56
+      },
+      {
+        "cls": "CCMenuItem",
+        "varName": "",
+        "x": -364.59,
+        "y": 528.09,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "_bottomLeftSlot",
+        "x": -364.59,
+        "y": 528.09,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "_giftCenterButton",
+        "x": -364.59,
+        "y": 534.23,
+        "w": 49.12,
+        "h": 49.12
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -363.37,
+        "y": 560.64,
+        "w": 46.67,
+        "h": 31.93
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -364.59,
+        "y": 534.23,
+        "w": 49.12,
+        "h": 49.12
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_giftCenterBadge",
+        "x": -333.64,
+        "y": 527.36,
+        "w": 24.56,
+        "h": 24.56
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_giftCenterAmountLabel",
+        "x": -333.64,
+        "y": 527.36,
+        "w": 24.56,
+        "h": 24.56
+      },
+      {
+        "cls": "CCMenuItem",
+        "varName": "",
+        "x": -309.33,
+        "y": 528.09,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "_bottomRightSlot",
+        "x": -309.33,
+        "y": 528.09,
+        "w": 49.12,
+        "h": 61.41
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "_partyModeButton",
+        "x": -309.33,
+        "y": 534.23,
+        "w": 49.12,
+        "h": 49.12
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -308.1,
+        "y": 560.64,
+        "w": 46.67,
+        "h": 31.93
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -309.33,
+        "y": 534.23,
+        "w": 49.12,
+        "h": 49.12
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_partyModeBadge",
+        "x": -290.66,
+        "y": 515.08,
+        "w": 49.12,
+        "h": 49.12
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_matchStatsView",
+        "x": -852.0,
+        "y": 393.0,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": 260.2,
+        "y": 534.23,
+        "w": 159.66,
+        "h": 49.12
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 261.12,
+        "y": 560.64,
+        "w": 157.81,
+        "h": 31.93
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_xpAnim",
+        "x": 260.2,
+        "y": 544.06,
+        "w": 159.66,
+        "h": 49.12
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_xpAnimLabel",
+        "x": 260.2,
+        "y": 544.06,
+        "w": 159.66,
+        "h": 49.12
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 260.2,
+        "y": 534.23,
+        "w": 159.66,
+        "h": 49.12
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "_xpBarFrame",
+        "x": 287.22,
+        "y": 544.67,
+        "w": 85.97,
+        "h": 15.97
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": 376.87,
+        "y": 540.38,
+        "w": 36.84,
+        "h": 36.84
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_playerAvatar",
+        "x": 358.45,
+        "y": 558.8,
+        "w": 36.84,
+        "h": 36.84
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 375.65,
+        "y": 539.15,
+        "w": 39.3,
+        "h": 39.3
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_profileNameLabel",
+        "x": 267.57,
+        "y": 531.78,
+        "w": 159.66,
+        "h": 49.12
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_coinBar",
+        "x": -6.14,
+        "y": 0.0,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_dnaBar",
+        "x": -135.09,
+        "y": 0.0,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_seasonEntryPoint",
+        "x": 184.22,
+        "y": 38.07,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_adventureEntryPoint",
+        "x": 184.22,
+        "y": 38.07,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_speechButtonsLayer",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_extraButtonsLayer",
+        "x": -852.0,
+        "y": 393.0,
+        "w": 852.0,
+        "h": 393.0
+      }
+    ],
+    "MenuSettings": [
+      {
+        "cls": "MenuSettingsView",
+        "varName": "",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCNodeColor",
+        "varName": "",
+        "x": -852.0,
+        "y": 393.0,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_tableNode",
+        "x": -834.96,
+        "y": 412.4,
+        "w": 834.96,
+        "h": 341.91
+      },
+      {
+        "cls": "CCNodeColor",
+        "varName": "",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 49.12
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "",
+        "x": -852.0,
+        "y": 0.0,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_scrollbarNode",
+        "x": 407.66,
+        "y": 243.66,
+        "w": 9.82,
+        "h": 341.91
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "",
+        "x": -426.0,
+        "y": 22.11,
+        "w": 852.0,
+        "h": 393.0
+      }
+    ],
+    "MenuShopSkins": [
+      {
+        "cls": "MenuShopSkinsView",
+        "varName": "",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCNodeColor",
+        "varName": "",
+        "x": -852.0,
+        "y": 393.0,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_header",
+        "x": -852.0,
+        "y": 0.0,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_titleLabel",
+        "x": -553.8,
+        "y": 22.11,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_coinBar",
+        "x": -6.14,
+        "y": 0.0,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_dnaBar",
+        "x": -135.09,
+        "y": 0.0,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_tabsNode",
+        "x": -426.0,
+        "y": 233.83,
+        "w": 852.0,
+        "h": 37.33
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -426.0,
+        "y": 267.24,
+        "w": 852.0,
+        "h": 322.26
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -434.52,
+        "y": 267.24,
+        "w": 869.04,
+        "h": 322.26
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_tableNode",
+        "x": -421.74,
+        "y": 267.24,
+        "w": 843.48,
+        "h": 306.15
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_scrollbarNode",
+        "x": -417.48,
+        "y": 576.61,
+        "w": 834.96,
+        "h": 12.89
+      }
+    ],
+    "PotionSlot": [
+      {
+        "cls": "PotionSlot",
+        "varName": "",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_headerParent",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_readyNode",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "_openReadyButton",
+        "x": -55.27,
+        "y": 520.23,
+        "w": 110.53,
+        "h": 44.21
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "_openReadyButtonFramedSprite",
+        "x": -55.27,
+        "y": 520.23,
+        "w": 110.53,
+        "h": 44.21
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_openReadyButtonLabel",
+        "x": -55.27,
+        "y": 520.23,
+        "w": 110.53,
+        "h": 44.21
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_particlesNode",
+        "x": -383.4,
+        "y": 324.23,
+        "w": 766.8,
+        "h": 137.55
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_potionParentNode",
+        "x": -383.4,
+        "y": 324.23,
+        "w": 766.8,
+        "h": 137.55
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_hoursNode",
+        "x": -426.0,
+        "y": 238.26,
+        "w": 852.0,
+        "h": 39.3
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_brewingTimer",
+        "x": 0.0,
+        "y": 238.26,
+        "w": 852.0,
+        "h": 39.3
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_potionTypeLabel",
+        "x": -426.0,
+        "y": 288.86,
+        "w": 852.0,
+        "h": 393.0
+      }
+    ],
+    "Controls-Sides": [
+      {
+        "cls": "ControlsWidget",
+        "varName": "",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCMenu",
+        "varName": "",
+        "x": -427.5,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "_alternativeShootButton",
+        "x": -399.25,
+        "y": 500.46,
+        "w": 79.83,
+        "h": 79.83
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -399.25,
+        "y": 500.46,
+        "w": 79.83,
+        "h": 79.83
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "_alternativeSplitButton",
+        "x": -399.25,
+        "y": 410.07,
+        "w": 79.83,
+        "h": 79.83
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -399.25,
+        "y": 410.07,
+        "w": 79.83,
+        "h": 79.83
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "_shootButton",
+        "x": 316.43,
+        "y": 500.46,
+        "w": 79.83,
+        "h": 79.83
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": 316.43,
+        "y": 500.46,
+        "w": 79.83,
+        "h": 79.83
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "_splitButton",
+        "x": 316.43,
+        "y": 410.07,
+        "w": 79.83,
+        "h": 79.83
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": 316.43,
+        "y": 410.07,
+        "w": 79.83,
+        "h": 79.83
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "",
+        "x": -399.25,
+        "y": 500.46,
+        "w": 79.83,
+        "h": 79.83
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "",
+        "x": -399.25,
+        "y": 412.04,
+        "w": 79.83,
+        "h": 79.83
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "",
+        "x": 316.43,
+        "y": 500.46,
+        "w": 79.83,
+        "h": 79.83
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "",
+        "x": 316.43,
+        "y": 412.04,
+        "w": 79.83,
+        "h": 79.83
+      }
+    ],
+    "Score": [
+      {
+        "cls": "ScoreWidget",
+        "varName": "",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_scoreLabel",
+        "x": -364.59,
+        "y": -167.02,
+        "w": 852.0,
+        "h": 393.0
+      }
+    ],
+    "EmojiWidget": [
+      {
+        "cls": "EmojiWidget",
+        "varName": "",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_speechBubbleReferenceNode",
+        "x": -419.73,
+        "y": 257.16,
+        "w": 48.11,
+        "h": 48.11
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -419.73,
+        "y": 257.16,
+        "w": 48.11,
+        "h": 307.03
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "",
+        "x": -419.73,
+        "y": 257.16,
+        "w": 48.11,
+        "h": 48.11
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "",
+        "x": -419.73,
+        "y": 257.16,
+        "w": 48.11,
+        "h": 48.11
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -443.78,
+        "y": 281.21,
+        "w": 48.11,
+        "h": 48.11
+      },
+      {
+        "cls": "MCClippingNode",
+        "varName": "_normalClippingNode",
+        "x": -443.78,
+        "y": 281.21,
+        "w": 48.11,
+        "h": 41.61
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -443.78,
+        "y": 281.21,
+        "w": 48.11,
+        "h": 48.11
+      },
+      {
+        "cls": "MCAutoScalableSprite",
+        "varName": "",
+        "x": -443.78,
+        "y": 281.21,
+        "w": 48.11,
+        "h": 48.11
+      },
+      {
+        "cls": "MCClippingNode",
+        "varName": "_normalClippingNode",
+        "x": -467.83,
+        "y": 326.07,
+        "w": 48.11,
+        "h": 6.49
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -467.83,
+        "y": 284.46,
+        "w": 48.11,
+        "h": 48.11
+      },
+      {
+        "cls": "MCClippingNode",
+        "varName": "",
+        "x": -419.73,
+        "y": 298.61,
+        "w": 48.11,
+        "h": 245.63
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_selectorArea",
+        "x": -419.73,
+        "y": -69.83,
+        "w": 48.11,
+        "h": 55.27
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "_selectorFrame",
+        "x": -419.73,
+        "y": -97.46,
+        "w": 48.11,
+        "h": 82.9
+      },
+      {
+        "cls": "MCScrollList",
+        "varName": "_selector",
+        "x": -419.73,
+        "y": -63.69,
+        "w": 48.11,
+        "h": 9.82
+      }
+    ],
+    "PauseButton": [
+      {
+        "cls": "PauseButtonWidget",
+        "varName": "",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCMenu",
+        "varName": "",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "_pauseButton",
+        "x": -419.72,
+        "y": 202.78,
+        "w": 48.11,
+        "h": 48.11
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -419.72,
+        "y": 202.78,
+        "w": 48.11,
+        "h": 48.11
+      }
+    ],
+    "LeaderboardWidget": [
+      {
+        "cls": "LeaderboardWidget",
+        "varName": "",
+        "x": -426.0,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": 252.39,
+        "y": 202.78,
+        "w": 167.33,
+        "h": 48.11
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "_toggleMenu",
+        "x": 252.39,
+        "y": 202.78,
+        "w": 167.33,
+        "h": 48.11
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "_elasticFrame",
+        "x": 371.62,
+        "y": 202.78,
+        "w": 48.11,
+        "h": 48.11
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": 347.56,
+        "y": 226.83,
+        "w": 48.11,
+        "h": 48.11
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_friendsCounter",
+        "x": 273.31,
+        "y": 202.78,
+        "w": 167.33,
+        "h": 48.11
+      }
+    ],
+    "MenuBattleResultPopup": [
+      {
+        "cls": "MenuBattleResultPopupView",
+        "varName": "",
+        "x": -421.47,
+        "y": 196.5,
+        "w": 852.0,
+        "h": 393.0
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "_mainFrame",
+        "x": -213.46,
+        "y": 216.48,
+        "w": 435.98,
+        "h": 353.05
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "",
+        "x": -213.46,
+        "y": 216.48,
+        "w": 435.98,
+        "h": 353.05
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": 199.46,
+        "y": 201.28,
+        "w": 41.92,
+        "h": 41.92
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -208.55,
+        "y": 262.04,
+        "w": 223.52,
+        "h": 290.17
+      },
+      {
+        "cls": "MCAutoScalableSprite",
+        "varName": "_celebrationPellets",
+        "x": -208.55,
+        "y": 255.9,
+        "w": 223.52,
+        "h": 290.17
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -195.65,
+        "y": 262.04,
+        "w": 199.12,
+        "h": 290.17
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -195.65,
+        "y": 262.04,
+        "w": 199.12,
+        "h": 85.97
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_battleResult",
+        "x": -195.65,
+        "y": 219.05,
+        "w": 199.12,
+        "h": 85.97
+      },
+      {
+        "cls": "MCAlignmentNode",
+        "varName": "_leaderboardAlignmentNode",
+        "x": -195.65,
+        "y": 357.79,
+        "w": 199.12,
+        "h": 290.17
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "_emptyLeaderBoard",
+        "x": -195.04,
+        "y": 359.05,
+        "w": 199.12,
+        "h": 193.16
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "",
+        "x": -195.04,
+        "y": 359.05,
+        "w": 199.12,
+        "h": 193.16
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_rewardContainer",
+        "x": 21.06,
+        "y": 286.6,
+        "w": 183.65,
+        "h": 241.04
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": 21.06,
+        "y": 286.6,
+        "w": 183.65,
+        "h": 241.04
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_title",
+        "x": 21.06,
+        "y": 202.24,
+        "w": 183.65,
+        "h": 241.04
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_description",
+        "x": 21.06,
+        "y": 358.91,
+        "w": 183.65,
+        "h": 241.04
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_titleLabel",
+        "x": -213.46,
+        "y": 68.2,
+        "w": 435.98,
+        "h": 353.05
+      }
+    ]
+  },
+  "iPad": {
+    "MenuMain": [
+      {
+        "cls": "MenuMainView",
+        "varName": "",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "_inputBox",
+        "x": -179.2,
+        "y": 654.51,
+        "w": 358.4,
+        "h": 42.67
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "_inputMenu",
+        "x": -179.2,
+        "y": 654.51,
+        "w": 358.4,
+        "h": 42.67
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "_menuMain",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_leaguesButtonNode",
+        "x": -445.33,
+        "y": 384.0,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_leaguesButton",
+        "x": -472.0,
+        "y": 350.67,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_mysteryPotionsButtonNode",
+        "x": -325.33,
+        "y": 384.0,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_mysteryPotionsButton",
+        "x": -352.0,
+        "y": 350.67,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_dailyQuestButtonNode",
+        "x": -385.33,
+        "y": 384.0,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_dailyQuestButton",
+        "x": -412.0,
+        "y": 350.67,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_freeCoinsButtonNode",
+        "x": -505.33,
+        "y": 384.0,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "",
+        "x": -505.33,
+        "y": 384.0,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": -255.28,
+        "y": 645.84,
+        "w": 60.0,
+        "h": 60.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_skinsBonusButton",
+        "x": -255.28,
+        "y": 645.84,
+        "w": 60.0,
+        "h": 60.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_plusSprite",
+        "x": -260.95,
+        "y": 681.51,
+        "w": 30.0,
+        "h": 30.0
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": -532.0,
+        "y": 1118.67,
+        "w": 53.33,
+        "h": 53.33
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -530.67,
+        "y": 1147.33,
+        "w": 50.67,
+        "h": 34.67
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -532.0,
+        "y": 1118.67,
+        "w": 53.33,
+        "h": 53.33
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": 192.0,
+        "y": 1092.0,
+        "w": 133.33,
+        "h": 53.33
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 193.33,
+        "y": 1120.67,
+        "w": 130.67,
+        "h": 34.67
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_shopButtonNode",
+        "x": 192.0,
+        "y": 1092.0,
+        "w": 133.33,
+        "h": 53.33
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 192.0,
+        "y": 1092.0,
+        "w": 133.33,
+        "h": 53.33
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "",
+        "x": 172.0,
+        "y": 1092.0,
+        "w": 133.33,
+        "h": 53.33
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_shopRedBadge",
+        "x": 253.33,
+        "y": 1071.2,
+        "w": 133.33,
+        "h": 53.33
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": -505.33,
+        "y": 464.0,
+        "w": 57.33,
+        "h": 54.67
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_boostXpButton",
+        "x": -534.0,
+        "y": 436.67,
+        "w": 57.33,
+        "h": 54.67
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": -505.33,
+        "y": 517.33,
+        "w": 56.0,
+        "h": 54.67
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_boostMassButton",
+        "x": -533.33,
+        "y": 490.0,
+        "w": 56.0,
+        "h": 54.67
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -512.0,
+        "y": 751.47,
+        "w": 1024.0,
+        "h": 186.67
+      },
+      {
+        "cls": "StaticPlayButtonContainer",
+        "varName": "_staticPlayButtonsContainer",
+        "x": -512.0,
+        "y": 751.47,
+        "w": 1024.0,
+        "h": 186.67
+      },
+      {
+        "cls": "MCScrollList",
+        "varName": "_playButtonsScrollNode",
+        "x": -412.0,
+        "y": 751.47,
+        "w": 26.67,
+        "h": 186.67
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCMenuItem",
+        "varName": "_topSlot5",
+        "x": -265.33,
+        "y": 384.0,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_vipSubscriptionButton",
+        "x": -292.0,
+        "y": 350.67,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "CCMenuItem",
+        "varName": "_topSlot6",
+        "x": -205.33,
+        "y": 384.0,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "CCMenuItem",
+        "varName": "",
+        "x": -505.33,
+        "y": 1026.0,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "_leftSlot",
+        "x": -505.33,
+        "y": 1026.0,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "_newsfeedButton",
+        "x": -505.33,
+        "y": 1026.0,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -504.0,
+        "y": 1060.67,
+        "w": 50.67,
+        "h": 34.67
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -505.33,
+        "y": 1032.67,
+        "w": 53.33,
+        "h": 53.33
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_newsfeedBadge",
+        "x": -471.73,
+        "y": 1025.2,
+        "w": 26.67,
+        "h": 26.67
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_newsfeedAmountLabel",
+        "x": -471.73,
+        "y": 1025.2,
+        "w": 26.67,
+        "h": 26.67
+      },
+      {
+        "cls": "CCMenuItem",
+        "varName": "",
+        "x": -445.33,
+        "y": 1085.33,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "_bottomLeftSlot",
+        "x": -445.33,
+        "y": 1085.33,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "_giftCenterButton",
+        "x": -445.33,
+        "y": 1092.0,
+        "w": 53.33,
+        "h": 53.33
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -444.0,
+        "y": 1120.67,
+        "w": 50.67,
+        "h": 34.67
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -445.33,
+        "y": 1092.0,
+        "w": 53.33,
+        "h": 53.33
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_giftCenterBadge",
+        "x": -411.73,
+        "y": 1084.53,
+        "w": 26.67,
+        "h": 26.67
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_giftCenterAmountLabel",
+        "x": -411.73,
+        "y": 1084.53,
+        "w": 26.67,
+        "h": 26.67
+      },
+      {
+        "cls": "CCMenuItem",
+        "varName": "",
+        "x": -385.33,
+        "y": 1085.33,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "_bottomRightSlot",
+        "x": -385.33,
+        "y": 1085.33,
+        "w": 53.33,
+        "h": 66.67
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "_partyModeButton",
+        "x": -385.33,
+        "y": 1092.0,
+        "w": 53.33,
+        "h": 53.33
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -384.0,
+        "y": 1120.67,
+        "w": 50.67,
+        "h": 34.67
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -385.33,
+        "y": 1092.0,
+        "w": 53.33,
+        "h": 53.33
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_partyModeBadge",
+        "x": -365.07,
+        "y": 1071.2,
+        "w": 53.33,
+        "h": 53.33
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_matchStatsView",
+        "x": -1024.0,
+        "y": 768.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": 332.0,
+        "y": 1092.0,
+        "w": 173.33,
+        "h": 53.33
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 333.0,
+        "y": 1120.67,
+        "w": 171.33,
+        "h": 34.67
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_xpAnim",
+        "x": 332.0,
+        "y": 1102.67,
+        "w": 173.33,
+        "h": 53.33
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_xpAnimLabel",
+        "x": 332.0,
+        "y": 1102.67,
+        "w": 173.33,
+        "h": 53.33
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 332.0,
+        "y": 1092.0,
+        "w": 173.33,
+        "h": 53.33
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "_xpBarFrame",
+        "x": 361.33,
+        "y": 1103.33,
+        "w": 93.33,
+        "h": 17.33
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": 458.67,
+        "y": 1098.67,
+        "w": 40.0,
+        "h": 40.0
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_playerAvatar",
+        "x": 438.67,
+        "y": 1118.67,
+        "w": 40.0,
+        "h": 40.0
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 457.33,
+        "y": 1097.33,
+        "w": 42.67,
+        "h": 42.67
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_profileNameLabel",
+        "x": 340.0,
+        "y": 1089.33,
+        "w": 173.33,
+        "h": 53.33
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_coinBar",
+        "x": -6.67,
+        "y": 0.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_dnaBar",
+        "x": -146.67,
+        "y": 0.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_seasonEntryPoint",
+        "x": 200.0,
+        "y": 41.33,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_adventureEntryPoint",
+        "x": 200.0,
+        "y": 41.33,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_speechButtonsLayer",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_extraButtonsLayer",
+        "x": -1024.0,
+        "y": 768.0,
+        "w": 1024.0,
+        "h": 768.0
+      }
+    ],
+    "MenuSettings": [
+      {
+        "cls": "MenuSettingsView",
+        "varName": "",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCNodeColor",
+        "varName": "",
+        "x": -1024.0,
+        "y": 768.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_tableNode",
+        "x": -1003.52,
+        "y": 811.25,
+        "w": 1003.52,
+        "h": 668.16
+      },
+      {
+        "cls": "CCNodeColor",
+        "varName": "",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 53.33
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "",
+        "x": -1024.0,
+        "y": 0.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_scrollbarNode",
+        "x": 491.09,
+        "y": 476.16,
+        "w": 10.67,
+        "h": 668.16
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "",
+        "x": -512.0,
+        "y": 24.0,
+        "w": 1024.0,
+        "h": 768.0
+      }
+    ],
+    "MenuShopSkins": [
+      {
+        "cls": "MenuShopSkinsView",
+        "varName": "",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCNodeColor",
+        "varName": "",
+        "x": -1024.0,
+        "y": 768.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_header",
+        "x": -1024.0,
+        "y": 0.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_titleLabel",
+        "x": -665.6,
+        "y": 24.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_coinBar",
+        "x": -6.67,
+        "y": 0.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_dnaBar",
+        "x": -146.67,
+        "y": 0.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_tabsNode",
+        "x": -512.0,
+        "y": 489.39,
+        "w": 1024.0,
+        "h": 40.53
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -512.0,
+        "y": 522.24,
+        "w": 1024.0,
+        "h": 629.76
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -522.24,
+        "y": 522.24,
+        "w": 1044.48,
+        "h": 629.76
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_tableNode",
+        "x": -506.88,
+        "y": 522.24,
+        "w": 1013.76,
+        "h": 598.27
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_scrollbarNode",
+        "x": -501.76,
+        "y": 1126.81,
+        "w": 1003.52,
+        "h": 25.19
+      }
+    ],
+    "PotionSlot": [
+      {
+        "cls": "PotionSlot",
+        "varName": "",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_headerParent",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_readyNode",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "_openReadyButton",
+        "x": -60.0,
+        "y": 1035.84,
+        "w": 120.0,
+        "h": 48.0
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "_openReadyButtonFramedSprite",
+        "x": -60.0,
+        "y": 1035.84,
+        "w": 120.0,
+        "h": 48.0
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_openReadyButtonLabel",
+        "x": -60.0,
+        "y": 1035.84,
+        "w": 120.0,
+        "h": 48.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_particlesNode",
+        "x": -460.8,
+        "y": 633.6,
+        "w": 921.6,
+        "h": 268.8
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_potionParentNode",
+        "x": -460.8,
+        "y": 633.6,
+        "w": 921.6,
+        "h": 268.8
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_hoursNode",
+        "x": -512.0,
+        "y": 412.27,
+        "w": 1024.0,
+        "h": 76.8
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_brewingTimer",
+        "x": 0.0,
+        "y": 412.27,
+        "w": 1024.0,
+        "h": 76.8
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_potionTypeLabel",
+        "x": -512.0,
+        "y": 564.48,
+        "w": 1024.0,
+        "h": 768.0
+      }
+    ],
+    "Controls-Sides": [
+      {
+        "cls": "ControlsWidget",
+        "varName": "",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCMenu",
+        "varName": "",
+        "x": -513.8,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "_alternativeShootButton",
+        "x": -475.22,
+        "y": 1012.67,
+        "w": 86.67,
+        "h": 86.67
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -475.22,
+        "y": 1012.67,
+        "w": 86.67,
+        "h": 86.67
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "_alternativeSplitButton",
+        "x": -475.22,
+        "y": 836.03,
+        "w": 86.67,
+        "h": 86.67
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -475.22,
+        "y": 836.03,
+        "w": 86.67,
+        "h": 86.67
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "_shootButton",
+        "x": 384.94,
+        "y": 1012.67,
+        "w": 86.67,
+        "h": 86.67
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": 384.94,
+        "y": 1012.67,
+        "w": 86.67,
+        "h": 86.67
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "_splitButton",
+        "x": 384.94,
+        "y": 836.03,
+        "w": 86.67,
+        "h": 86.67
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": 384.94,
+        "y": 836.03,
+        "w": 86.67,
+        "h": 86.67
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "",
+        "x": -475.22,
+        "y": 1012.67,
+        "w": 86.67,
+        "h": 86.67
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "",
+        "x": -475.22,
+        "y": 839.87,
+        "w": 86.67,
+        "h": 86.67
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "",
+        "x": 384.94,
+        "y": 1012.67,
+        "w": 86.67,
+        "h": 86.67
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "",
+        "x": 384.94,
+        "y": 839.87,
+        "w": 86.67,
+        "h": 86.67
+      }
+    ],
+    "Score": [
+      {
+        "cls": "ScoreWidget",
+        "varName": "",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_scoreLabel",
+        "x": -445.33,
+        "y": -352.0,
+        "w": 1024.0,
+        "h": 768.0
+      }
+    ],
+    "EmojiWidget": [
+      {
+        "cls": "EmojiWidget",
+        "varName": "",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_speechBubbleReferenceNode",
+        "x": -505.19,
+        "y": 449.85,
+        "w": 52.23,
+        "h": 52.23
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -505.19,
+        "y": 449.85,
+        "w": 52.23,
+        "h": 333.33
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "",
+        "x": -505.19,
+        "y": 449.85,
+        "w": 52.23,
+        "h": 52.23
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStatic",
+        "varName": "",
+        "x": -505.19,
+        "y": 449.85,
+        "w": 52.23,
+        "h": 52.23
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -531.3,
+        "y": 475.97,
+        "w": 52.23,
+        "h": 52.23
+      },
+      {
+        "cls": "MCClippingNode",
+        "varName": "_normalClippingNode",
+        "x": -531.3,
+        "y": 475.97,
+        "w": 52.23,
+        "h": 45.18
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -531.3,
+        "y": 475.97,
+        "w": 52.23,
+        "h": 52.23
+      },
+      {
+        "cls": "MCAutoScalableSprite",
+        "varName": "",
+        "x": -531.3,
+        "y": 475.97,
+        "w": 52.23,
+        "h": 52.23
+      },
+      {
+        "cls": "MCClippingNode",
+        "varName": "_normalClippingNode",
+        "x": -557.42,
+        "y": 524.67,
+        "w": 52.23,
+        "h": 7.05
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -557.42,
+        "y": 479.5,
+        "w": 52.23,
+        "h": 52.23
+      },
+      {
+        "cls": "MCClippingNode",
+        "varName": "",
+        "x": -505.19,
+        "y": 494.85,
+        "w": 52.23,
+        "h": 266.67
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_selectorArea",
+        "x": -505.19,
+        "y": 94.85,
+        "w": 52.23,
+        "h": 60.0
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "_selectorFrame",
+        "x": -505.19,
+        "y": 64.85,
+        "w": 52.23,
+        "h": 90.0
+      },
+      {
+        "cls": "MCScrollList",
+        "varName": "_selector",
+        "x": -505.19,
+        "y": 101.52,
+        "w": 52.23,
+        "h": 10.67
+      }
+    ],
+    "PauseButton": [
+      {
+        "cls": "PauseButtonWidget",
+        "varName": "",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCMenu",
+        "varName": "",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "_pauseButton",
+        "x": -505.19,
+        "y": 390.81,
+        "w": 52.23,
+        "h": 52.23
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -505.19,
+        "y": 390.81,
+        "w": 52.23,
+        "h": 52.23
+      }
+    ],
+    "LeaderboardWidget": [
+      {
+        "cls": "LeaderboardWidget",
+        "varName": "",
+        "x": -512.0,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": 323.52,
+        "y": 390.81,
+        "w": 181.67,
+        "h": 52.23
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "_toggleMenu",
+        "x": 323.52,
+        "y": 390.81,
+        "w": 181.67,
+        "h": 52.23
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "_elasticFrame",
+        "x": 452.96,
+        "y": 390.81,
+        "w": 52.23,
+        "h": 52.23
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": 426.84,
+        "y": 416.93,
+        "w": 52.23,
+        "h": 52.23
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_friendsCounter",
+        "x": 346.23,
+        "y": 390.81,
+        "w": 181.67,
+        "h": 52.23
+      }
+    ],
+    "MenuBattleResultPopup": [
+      {
+        "cls": "MenuBattleResultPopupView",
+        "varName": "",
+        "x": -507.08,
+        "y": 384.0,
+        "w": 1024.0,
+        "h": 768.0
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "_mainFrame",
+        "x": -231.75,
+        "y": 576.36,
+        "w": 473.33,
+        "h": 383.29
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "",
+        "x": -231.75,
+        "y": 576.36,
+        "w": 473.33,
+        "h": 383.29
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": 216.55,
+        "y": 559.86,
+        "w": 45.51,
+        "h": 45.51
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -226.42,
+        "y": 625.82,
+        "w": 242.67,
+        "h": 315.02
+      },
+      {
+        "cls": "MCAutoScalableSprite",
+        "varName": "_celebrationPellets",
+        "x": -226.42,
+        "y": 619.15,
+        "w": 242.67,
+        "h": 315.02
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -212.41,
+        "y": 625.82,
+        "w": 216.18,
+        "h": 315.02
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": -212.41,
+        "y": 625.82,
+        "w": 216.18,
+        "h": 93.33
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_battleResult",
+        "x": -212.41,
+        "y": 579.15,
+        "w": 216.18,
+        "h": 93.33
+      },
+      {
+        "cls": "MCAlignmentNode",
+        "varName": "_leaderboardAlignmentNode",
+        "x": -212.41,
+        "y": 729.78,
+        "w": 216.18,
+        "h": 315.02
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "_emptyLeaderBoard",
+        "x": -211.75,
+        "y": 731.14,
+        "w": 216.18,
+        "h": 209.71
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "",
+        "x": -211.75,
+        "y": 731.14,
+        "w": 216.18,
+        "h": 209.71
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_rewardContainer",
+        "x": 22.86,
+        "y": 652.49,
+        "w": 199.38,
+        "h": 261.69
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": 22.86,
+        "y": 652.49,
+        "w": 199.38,
+        "h": 261.69
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_title",
+        "x": 22.86,
+        "y": 560.9,
+        "w": 199.38,
+        "h": 261.69
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_description",
+        "x": 22.86,
+        "y": 730.99,
+        "w": 199.38,
+        "h": 261.69
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_titleLabel",
+        "x": -231.75,
+        "y": 415.37,
+        "w": 473.33,
+        "h": 383.29
+      }
+    ]
+  }
+}
