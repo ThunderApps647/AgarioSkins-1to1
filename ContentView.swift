@@ -13409,6 +13409,7 @@ struct MainMenu: View {
             let sideInset = max(geometry.safeAreaInsets.leading, geometry.safeAreaInsets.trailing)
             let safeW = max(1, geometry.size.width - sideInset * 2)
             let s = OriginalGameplay.uiScale(for: CGSize(width: safeW, height: geometry.size.height))
+            let hasModalOverlay = showPartyMenu || showSkinsModal || activeInfoTab != nil || showSettings
 
             ZStack {
                 if let bg = CCBIAtlasStore.shared.sprite(for: OriginalGameplay.menuBackgroundSpritePath(for: geometry.size))
@@ -13597,10 +13598,12 @@ struct MainMenu: View {
                                                     .offset(y: 16 * s)
                                             }
                                             .frame(width: 120 * s, height: 80 * s)
+                                            .contentShape(Rectangle())
                                         }
                                         .buttonStyle(CCBIMenuItemButtonStyle())
                                         .accessibilityIdentifier("menu.playOnline")
                                     }
+                                    .frame(width: 252 * s, height: 80 * s)
                                 )
                             ]
                             if let skin = selectedSkinName {
@@ -13616,6 +13619,8 @@ struct MainMenu: View {
                     )
                 )
                 .padding(.horizontal, sideInset)
+                .allowsHitTesting(!hasModalOverlay)
+                .accessibilityHidden(hasModalOverlay)
                 .zIndex(1)
 
                 if showPartyMenu { partyOverlay(scale: s, containerSize: geometry.size).zIndex(2) }

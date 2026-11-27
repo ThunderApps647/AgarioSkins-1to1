@@ -8,8 +8,27 @@ final class AgarUITests: XCTestCase {
     }
 
     private func capture(_ app: XCUIApplication, name: String) {
-        let shot = XCUIScreen.main.screenshot()
-        let att = XCTAttachment(screenshot: shot)
+        let raw = XCUIScreen.main.screenshot().image
+        let outImage: UIImage
+        if raw.size.height > raw.size.width {
+            let targetSize = CGSize(width: raw.size.height, height: raw.size.width)
+            let fmt = UIGraphicsImageRendererFormat()
+            fmt.scale = raw.scale
+            let renderer = UIGraphicsImageRenderer(size: targetSize, format: fmt)
+            outImage = renderer.image { ctx in
+                ctx.cgContext.translateBy(x: targetSize.width * 0.5, y: targetSize.height * 0.5)
+                ctx.cgContext.rotate(by: .pi * 0.5)
+                raw.draw(in: CGRect(
+                    x: -raw.size.width * 0.5,
+                    y: -raw.size.height * 0.5,
+                    width: raw.size.width,
+                    height: raw.size.height
+                ))
+            }
+        } else {
+            outImage = raw
+        }
+        let att = XCTAttachment(image: outImage)
         att.name = name
         att.lifetime = .keepAlways
         add(att)
@@ -25,12 +44,17 @@ final class AgarUITests: XCTestCase {
     @discardableResult
     private func waitAndTap(_ element: XCUIElement, timeout: TimeInterval = 5.0) -> Bool {
         guard element.waitForExistence(timeout: timeout) else { return false }
-        if element.isHittable {
-            element.tap()
-        } else {
-            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        }
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         return true
+    }
+
+    private func waitUntilGone(_ element: XCUIElement, timeout: TimeInterval = 4.0) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if !element.exists { return true }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        return !element.exists
     }
 
     private func firstExisting(_ app: XCUIApplication, ids: [String], timeout: TimeInterval = 4.0) -> XCUIElement? {
@@ -61,6 +85,7 @@ final class AgarUITests: XCTestCase {
         // 1. Settings route + toggle
         if let settingsBtn = firstExisting(app, ids: ["ccbi.settingsButtonCallback"], timeout: 3.0) {
             waitAndTap(settingsBtn)
+            XCTAssertTrue(waitUntilGone(playBtn, timeout: 3.0), "MenuMain should hide behind Settings modal")
             let backBtn = firstExisting(app, ids: ["ccbi.backButtonCallback", "ccbi._backButton"], timeout: 4.0)
             XCTAssertNotNil(backBtn, "Settings modal should expose back button")
             RunLoop.current.run(until: Date().addingTimeInterval(0.4))
@@ -70,7 +95,8 @@ final class AgarUITests: XCTestCase {
             }
             capture(app, name: "Live_02_Settings.png")
             if let backBtn { waitAndTap(backBtn) }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+            XCTAssertTrue(playBtn.waitForExistence(timeout: 4.0), "Closing Settings should return to MenuMain")
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
         } else {
             XCTFail("Settings button missing on MenuMain")
         }
@@ -78,12 +104,14 @@ final class AgarUITests: XCTestCase {
         // 2. Skins route + tabs + close
         if let skinsBtn = firstExisting(app, ids: ["ccbi.skinsButtonCallback"], timeout: 3.0) {
             waitAndTap(skinsBtn)
+            XCTAssertTrue(waitUntilGone(playBtn, timeout: 3.0), "MenuMain should hide behind Skins modal")
             let backBtn = firstExisting(app, ids: ["ccbi.backButtonCallback", "ccbi._backButton"], timeout: 4.0)
             XCTAssertNotNil(backBtn, "Skins modal should open and expose back button")
             RunLoop.current.run(until: Date().addingTimeInterval(0.5))
             capture(app, name: "Live_03_Skins.png")
             if let backBtn { waitAndTap(backBtn) }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+            XCTAssertTrue(playBtn.waitForExistence(timeout: 4.0), "Closing Skins should return to MenuMain")
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
         } else {
             XCTFail("Skins button missing on MenuMain")
         }
@@ -91,22 +119,23 @@ final class AgarUITests: XCTestCase {
         // 3. Shop, Quests, Potions, Leagues, Profile, Play Online routing verification
         let modalRoutes: [(label: String, ids: [String], closeIds: [String])] = [
             ("Shop", ["ccbi.shopButtonCallback"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
-            ("Quests", ["ccbi._dailyQuestButtonNode.pressedCallback", "ccbi._dailyQuestButtonNode"], ["ccbi.backButtonCallback", "ccbi.playButtonCallback"]),
-            ("Potions", ["ccbi._mysteryPotionsButtonNode.pressedCallback", "ccbi._mysteryPotionsButtonNode"], ["ccbi.backButtonCallback"]),
+            ("Quests", ["ccbi._dailyQuestButtonNode.pressedCallback", "ccbi._dailyQuestButtonNode"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
+            ("Potions", ["ccbi._mysteryPotionsButtonNode.pressedCallback", "ccbi._mysteryPotionsButtonNode"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
             ("Leagues", ["ccbi._leaguesButtonNode.pressedCallback", "ccbi._leaguesButtonNode"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
             ("Profile", ["ccbi.profileButtonCallback"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
             ("Play Online", ["menu.playOnline"], ["online.close"])
         ]
         for route in modalRoutes {
-            if let trigger = firstExisting(app, ids: route.ids, timeout: 2.5) {
-                waitAndTap(trigger)
-                RunLoop.current.run(until: Date().addingTimeInterval(0.35))
-                if let close = firstExisting(app, ids: route.closeIds, timeout: 3.5) {
-                    waitAndTap(close)
-                    RunLoop.current.run(until: Date().addingTimeInterval(0.35))
-                } else {
-                    XCTFail("\(route.label) modal failed to expose close/back button")
-                }
+            let trigger = try XCTUnwrap(firstExisting(app, ids: route.ids, timeout: 3.0), "\(route.label) button must exist on MenuMain")
+            waitAndTap(trigger)
+            XCTAssertTrue(waitUntilGone(playBtn, timeout: 3.0), "\(route.label) should open over MenuMain")
+            RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+            if let close = firstExisting(app, ids: route.closeIds, timeout: 3.5) {
+                waitAndTap(close)
+                XCTAssertTrue(playBtn.waitForExistence(timeout: 4.0), "Closing \(route.label) should return to MenuMain")
+                RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+            } else {
+                XCTFail("\(route.label) modal failed to expose close/back button")
             }
         }
 
@@ -121,8 +150,8 @@ final class AgarUITests: XCTestCase {
         // Drag virtual joystick on left-bottom quadrant toward top-left edge/corner
         let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.16, dy: 0.72))
         let dragTopLeft = app.coordinate(withNormalizedOffset: CGVector(dx: 0.06, dy: 0.56))
-        start.press(forDuration: 0.05, thenDragTo: dragTopLeft)
-        RunLoop.current.run(until: Date().addingTimeInterval(0.45))
+        start.press(forDuration: 0.05, thenDragTo: dragTopLeft, withVelocity: .default, thenHoldForDuration: 0.9)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.25))
         capture(app, name: "Live_05_Arena_Edge.png")
 
         // Exercise HUD actions (Emoji toggle, Leaderboard toggle, Split, Feed, Pause)
