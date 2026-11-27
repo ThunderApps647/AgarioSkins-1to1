@@ -47,15 +47,15 @@ struct AgarJoystickInput {
             dir = lastNonZeroDirection
         }
 
-        // Tight low-throw angular damping (`rawMag < 0.25`): prevents center jitter while allowing crisp reversals
+        // Tight low-throw angular damping (`rawMag < 0.20`): prevents center jitter while allowing crisp reversals (`0x102766790`)
         let curMag = hypot(axis.width, axis.height)
-        if rawMag < 0.25 && curMag > 0.001 && dist > 0.001 {
+        if rawMag < 0.20 && curMag > 0.001 && dist > 0.001 {
             let newAngle = atan2(dir.height, dir.width)
             let curAngle = atan2(axis.height, axis.width)
             var delta = newAngle - curAngle
             while delta > .pi { delta -= 2.0 * .pi }
             while delta <= -.pi { delta += 2.0 * .pi }
-            let blended = curAngle + delta * (4.0 * rawMag)
+            let blended = curAngle + delta * (2.0 * rawMag)
             dir = CGSize(width: cos(blended), height: sin(blended))
         }
 
@@ -91,7 +91,8 @@ struct AgarJoystickInput {
         if stopOnRelease {
             releaseTimer += TimeInterval(dt)
             let progress = min(1.0, releaseTimer / max(0.05, decayTime))
-            let rem = CGFloat(max(0.0, 1.0 - progress))
+            let alpha: Double = progress < 0.70 ? 0.0 : min(1.0, (progress - 0.70) / 0.30)
+            let rem = CGFloat(max(0.0, 1.0 - alpha))
             axis = CGSize(width: axisAtRelease.width * rem, height: axisAtRelease.height * rem)
             scale = hypot(axis.width, axis.height)
         } else if hypot(axis.width, axis.height) < 0.001 && hypot(lastNonZeroDirection.width, lastNonZeroDirection.height) > 0.001 {

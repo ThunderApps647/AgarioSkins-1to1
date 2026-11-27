@@ -1217,12 +1217,14 @@ struct OnlineGameView: View {
     private func updateCellDeformation(dt: CGFloat) {
         let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
         let visRect = visibleWorldRect
+        let cocosZoom = zoomLevel / OriginalGameplay.uiScale(for: UIScreen.main.bounds.size)
         AgarPhysicsCore.deformVertices(
             cells: &playerCells,
             neighborsByOwner: true,
             visibleWorldRect: visRect,
             worldSize: worldSize,
             dt: dt,
+            cocosZoom: cocosZoom,
             massManager: world.massManager
         )
         AgarPhysicsCore.deformVertices(
@@ -1230,7 +1232,8 @@ struct OnlineGameView: View {
             neighborsByOwner: false,
             visibleWorldRect: visRect,
             worldSize: worldSize,
-            dt: dt
+            dt: dt,
+            cocosZoom: cocosZoom
         )
     }
 }

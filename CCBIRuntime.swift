@@ -684,6 +684,7 @@ struct CCBIBindingContext {
     var labelColorOverrides: [String: Color] = [:]
     var visibilityOverrides: [String: Bool] = [:]
     var opacityOverrides: [String: Double] = [:]
+    var selectedVarStates: [String: Bool] = [:]
     var slotViews: [String: AnyView] = [:]
     var replacingSlotViews: [String: AnyView] = [:]
     var designScaleModifier: ((CGSize) -> CGFloat)? = nil
@@ -729,6 +730,8 @@ private struct CCBINodeRenderer: View {
     let context: CCBIBindingContext
     var positionOverride: (CGFloat, CGFloat)? = nil
     var anchorOverride: CGPoint? = nil
+    var sizeOverride: CGSize? = nil
+    var forceVisible: Bool = false
 
     private var childContext: CCBIBindingContext {
         if node.varName.isEmpty { return context }
@@ -741,7 +744,7 @@ private struct CCBINodeRenderer: View {
         let isVisible = resolveVisible()
         if isVisible {
             let subFileRoot = loadSubCCBFileIfNeeded()
-            let resolvedSize = resolveContentSize(node: node, parentSize: parentDesignSize, subRoot: subFileRoot)
+            let resolvedSize = sizeOverride ?? resolveContentSize(node: node, parentSize: parentDesignSize, subRoot: subFileRoot)
             let anchor = effectiveAnchorPoint(node: node, subRoot: subFileRoot)
             let (posSX, posSY) = positionOverride ?? resolvePosition(node: node, parentSize: parentDesignSize)
             let (scaleX, scaleY) = resolveScale(node: node)
@@ -826,6 +829,7 @@ private struct CCBINodeRenderer: View {
         if let ov = context.scopedLookup(context.visibilityOverrides, varName: node.varName) {
             return ov
         }
+        if forceVisible { return true }
         if case let .bool(v) = node.props["visible"] { return v }
         return true
     }
@@ -855,8 +859,10 @@ private struct CCBINodeRenderer: View {
         if case let .point(x, y) = node.props["anchorPoint"] {
             return CGPoint(x: x, y: y)
         }
+        let isCenterMenuItem = node.cls == "CCMenuItem" || node.base == "CCMenuItem"
+            || node.cls.contains("MenuItemToggle") || node.base.contains("MenuItemToggle")
         let isMenuItem = node.cls.contains("MenuItem") || node.base.contains("MenuItem")
-        if !isMenuItem && (
+        if isCenterMenuItem || (!isMenuItem && (
             node.cls == "CCSprite" || node.base == "CCSprite" ||
             node.cls == "MCAutoScalableSprite" || node.base == "MCAutoScalableSprite" ||
             node.cls == "MCFramedSprite" || node.base == "MCFramedSprite" ||
@@ -867,7 +873,7 @@ private struct CCBINodeRenderer: View {
             node.cls == "MCAlignmentNode" || node.base == "MCAlignmentNode" ||
             node.cls == "MCAlignmentNodeStatic" || node.base == "MCAlignmentNodeStatic" ||
             node.cls == "MCSpineNode" || node.base == "MCSpineNode"
-        ) {
+        )) {
             return CGPoint(x: 0.5, y: 0.5)
         }
         return .zero
@@ -884,8 +890,8 @@ private struct CCBINodeRenderer: View {
         guard case let .pos(rawX, rawY, refCorner, xUnit, yUnit, _) = node.props["position"] else {
             return (0, parentSize.height)
         }
-        let px: CGFloat = (xUnit == 2) ? rawX * parentSize.width : rawX
-        let py: CGFloat = (yUnit == 2) ? rawY * parentSize.height : rawY
+        let px: CGFloat = (xUnit == 2) ? rawX * parentSize.width : (xUnit == 3 ? max(0, parentSize.width - rawX) : rawX)
+        let py: CGFloat = (yUnit == 2) ? rawY * parentSize.height : (yUnit == 3 ? max(0, parentSize.height - rawY) : rawY)
         // Convert Cocos2d ReferenceCorner -> SwiftUI top-left coordinates (design points)
         switch refCorner {
         case 0: return (px, parentSize.height - py)
@@ -1078,20 +1084,35 @@ private struct CCBINodeRenderer: View {
                 attributes: [.font: uiFont],
                 context: nil
             )
-            let w = reqW > 0 ? min(reqW, ceil(rect.width) + 2) : (ceil(rect.width) + 2)
+            let w = reqW > 0 ? min(reqW, ceil(rect.width) + 4) : (ceil(rect.width) + 4)
             return CGSize(width: w, height: ceil(rect.height) + 2)
         }
         return resolveContentSize(node: child, parentSize: parentSize, subRoot: nil)
     }
 
-    private func filteredNormalChildren(designSize: CGSize) -> [(node: CCBINode, posOverride: (CGFloat, CGFloat)?, anchorOverride: CGPoint?)] {
+    private struct FilteredChildEntry {
+        let node: CCBINode
+        let posOverride: (CGFloat, CGFloat)?
+        let anchorOverride: CGPoint?
+        let sizeOverride: CGSize?
+        let forceVisible: Bool
+    }
+
+    private func subtreeMatchesVisibilityOverride(_ n: CCBINode, ctx: CCBIBindingContext, target: Bool) -> Bool {
+        if let ov = ctx.scopedLookup(ctx.visibilityOverrides, varName: n.varName) {
+            return ov == target
+        }
+        return n.children.contains { subtreeMatchesVisibilityOverride($0, ctx: ctx, target: target) }
+    }
+
+    private func filteredNormalChildren(designSize: CGSize) -> [FilteredChildEntry] {
         if node.cls == "MCAlignmentNode" || node.base == "MCAlignmentNode" ||
            node.cls == "MCAlignmentNodeStatic" || node.base == "MCAlignmentNodeStatic" {
             let gap = alignmentSpacing(node)
             let visibleChildren = node.children.filter { childIsVisible($0) }
             guard !visibleChildren.isEmpty else { return [] }
             let sizes = visibleChildren.map { measureTightChildSize(child: $0, parentSize: designSize) }
-            var out: [(CCBINode, (CGFloat, CGFloat)?, CGPoint?)] = []
+            var out: [FilteredChildEntry] = []
             let isVertical: Bool = {
                 if case let .int(d) = node.props["direction"], d == 1 { return true }
                 return false
@@ -1100,44 +1121,91 @@ private struct CCBINodeRenderer: View {
                 let totalH = sizes.reduce(CGFloat(0)) { $0 + $1.height } + gap * CGFloat(max(0, visibleChildren.count - 1))
                 var curY = max(CGFloat(0), (designSize.height - totalH) * 0.5)
                 for (c, cs) in zip(visibleChildren, sizes) {
-                    out.append((c, (designSize.width * 0.5, curY + cs.height * 0.5), CGPoint(x: 0.5, y: 0.5)))
+                    out.append(FilteredChildEntry(
+                        node: c,
+                        posOverride: (designSize.width * 0.5, curY + cs.height * 0.5),
+                        anchorOverride: CGPoint(x: 0.5, y: 0.5),
+                        sizeOverride: cs,
+                        forceVisible: false
+                    ))
                     curY += cs.height + gap
                 }
             } else {
                 let totalW = sizes.reduce(CGFloat(0)) { $0 + $1.width } + gap * CGFloat(max(0, visibleChildren.count - 1))
                 var curX = max(CGFloat(0), (designSize.width - totalW) * 0.5)
                 for (c, cs) in zip(visibleChildren, sizes) {
-                    out.append((c, (curX + cs.width * 0.5, designSize.height * 0.5), CGPoint(x: 0.5, y: 0.5)))
+                    out.append(FilteredChildEntry(
+                        node: c,
+                        posOverride: (curX + cs.width * 0.5, designSize.height * 0.5),
+                        anchorOverride: CGPoint(x: 0.5, y: 0.5),
+                        sizeOverride: cs,
+                        forceVisible: false
+                    ))
                     curX += cs.width + gap
                 }
             }
             return out
         }
 
+        let isMenuItem = node.cls.contains("MenuItem") || node.base.contains("MenuItem")
+        let isMenuItemToggle = node.cls.contains("MenuItemToggle") || node.base.contains("MenuItemToggle")
+        if isMenuItemToggle, node.props["normalNodeTag"] == nil {
+            let cctx = childContext
+            let toggleOverrideIndices: [Int] = node.children.enumerated().compactMap { idx, c in
+                subtreeMatchesVisibilityOverride(c, ctx: cctx, target: true) ? idx : nil
+            }
+            if !toggleOverrideIndices.isEmpty {
+                return node.children.enumerated().compactMap { idx, c in
+                    guard toggleOverrideIndices.contains(idx) else { return nil }
+                    return FilteredChildEntry(node: c, posOverride: nil, anchorOverride: nil, sizeOverride: nil, forceVisible: true)
+                }
+            }
+        }
         let normTag: Int? = {
             if case let .int(t) = node.props["normalNodeTag"] { return t }
             return nil
         }()
         let selTag: Int? = {
-            if (node.cls.contains("MenuItem") || node.base.contains("MenuItem")),
+            if isMenuItem,
                case let .int(t) = node.props["selectedNodeTag"], t != normTag {
                 return t
             }
             return nil
         }()
         let disTag: Int? = {
-            if (node.cls.contains("MenuItem") || node.base.contains("MenuItem")),
+            if isMenuItem,
                case let .int(t) = node.props["disabledNodeTag"], t != normTag {
                 return t
             }
             return nil
         }()
+        let isSelected = isMenuItem && (context.scopedLookup(context.selectedVarStates, varName: node.varName) == true)
+        let activeTag: Int? = {
+            guard isSelected else { return normTag }
+            if let s = selTag, node.children.contains(where: { if case let .int(t) = $0.props["name"] { return t == s }; return false }) {
+                return s
+            }
+            if let d = disTag, node.children.contains(where: { if case let .int(t) = $0.props["name"] { return t == d }; return false }) {
+                return d
+            }
+            if normTag == 2, node.children.contains(where: { if case let .int(t) = $0.props["name"] { return t == 1 }; return false }) {
+                return 1
+            }
+            return normTag
+        }()
 
         return node.children.compactMap { c in
+            if isSelected, activeTag != normTag {
+                if case let .int(tag) = c.props["name"] {
+                    if tag != activeTag { return nil }
+                    return FilteredChildEntry(node: c, posOverride: nil, anchorOverride: nil, sizeOverride: nil, forceVisible: true)
+                }
+                return FilteredChildEntry(node: c, posOverride: nil, anchorOverride: nil, sizeOverride: nil, forceVisible: false)
+            }
             if case let .int(tag) = c.props["name"], tag == selTag || tag == disTag {
                 return nil
             }
-            return (c, nil, nil)
+            return FilteredChildEntry(node: c, posOverride: nil, anchorOverride: nil, sizeOverride: nil, forceVisible: false)
         }
     }
 
@@ -1213,7 +1281,9 @@ private struct CCBINodeRenderer: View {
                         scaleFactor: scaleFactor,
                         context: childContext,
                         positionOverride: entry.posOverride,
-                        anchorOverride: entry.anchorOverride
+                        anchorOverride: entry.anchorOverride,
+                        sizeOverride: entry.sizeOverride,
+                        forceVisible: entry.forceVisible
                     )
                 }
             }
@@ -1356,10 +1426,13 @@ private struct CCBINodeRenderer: View {
         }()
 
         let req = requestedLabelDimensions(parentDesignSize: parentDesignSize)
+        let hasReqW = req.width > 1.0
+        let hasReqH = req.height > 1.0
         let hasExplicitNewline = spec.text.contains("\n")
-        let singleLine = !hasExplicitNewline && (isSingleLineLabel() || (req.width > 0 && req.height > 0 && spec.text.count <= 24))
-        let autoShrink = (req.width > 1.0 && req.height > 1.0) || singleLine
-        let constrainHeight = (req.width > 1.0 && req.height > 1.0 && !singleLine)
+        let singleLine = !hasExplicitNewline && (isSingleLineLabel() || (hasReqW && hasReqH && spec.text.count <= 24))
+        let autoShrink = (hasReqW && hasReqH) || (hasReqW && singleLine && req.width >= 90)
+        let constrainHeight = (hasReqW && hasReqH && !singleLine)
+        let constrainWidth = (hasReqW && (!singleLine || hasReqH)) || (hasReqW && singleLine && req.width >= 90) || (sizeOverride != nil && !singleLine)
         return CCBILabelView(
             text: spec.text,
             fontName: spec.fontName,
@@ -1368,13 +1441,13 @@ private struct CCBINodeRenderer: View {
             outlineColor: outlineColor,
             outlineWidth: outlinePx,
             alignment: align,
-            constrainWidth: (req.width > 0 && !singleLine) || designSize.width > 0,
+            constrainWidth: constrainWidth,
             constrainHeight: constrainHeight,
             singleLine: singleLine,
             autoShrink: autoShrink
         )
         .frame(
-            width: designSize.width > 0 ? designSize.width * scaleFactor : nil,
+            width: constrainWidth && designSize.width > 0 ? designSize.width * scaleFactor : nil,
             height: designSize.height > 0 ? designSize.height * scaleFactor : nil,
             alignment: Alignment(horizontal: hAlign, vertical: vAlign)
         )

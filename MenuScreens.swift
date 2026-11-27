@@ -875,6 +875,11 @@ private struct PotionsHelpOverlayView: View {
                         "_newUserFlowInfoLabel": false,
                         "_probabilitiesButtonContainer": false
                     ],
+                    selectedVarStates: [
+                        "_howToToggleButton": selectedTab == 0,
+                        "_rewardsToggleButton": selectedTab == 1,
+                        "_mysteryToggleButton": selectedTab == 2
+                    ],
                     slotViews: [
                         "_potionAlignmentNode": AnyView(
                             HStack(spacing: 8 * s) {
@@ -1439,6 +1444,11 @@ struct LeaguesModalView: View {
                             "_upperDescriptionLabel": false,
                             "_middleDescriptionLabel": false,
                             "_greyBackground": true
+                        ],
+                        selectedVarStates: [
+                            "_myLeagueButton": selectedTab == 0,
+                            "_countryButton": selectedTab == 1,
+                            "_worldButton": selectedTab == 2
                         ],
                         slotViews: [
                             "_leagueBadgeRootNode": AnyView(

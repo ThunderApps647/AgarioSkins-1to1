@@ -2898,7 +2898,7 @@ struct GameWorldView: View {
         renderBox.showGrid = showGrid
         renderBox.showSkins = showSkins
         renderBox.showMassText = showMassText
-        renderBox.showBoundaryOverlay = false
+        renderBox.showBoundaryOverlay = true
         renderBox.tokens = tokens
         renderBox.foodManager = foodManager
         renderBox.massManager = massManager
@@ -5197,7 +5197,6 @@ struct ContentView: View {
                 moveBots(dt: deltaTime)
                 let virusesMoved = moveViruses(dt: deltaTime)
                 
-                updateCellDeformation(dt: deltaTime)
                 updateVirusMasses(dt: deltaTime)
                 
                 handleCellSelfCollisions(cells: &playerCells)
@@ -5306,6 +5305,10 @@ struct ContentView: View {
                 
                 handleCellMerging(cells: &playerCells, dt: deltaTime)
                 handleCellMerging(cells: &botCells, dt: deltaTime)
+                
+                handleCellSelfCollisions(cells: &playerCells)
+                handleCellSelfCollisions(cells: &botCells)
+                updateCellDeformation(dt: deltaTime)
                 
                 let targetPos = playerCenter
                 cameraJumpOffset = .zero
@@ -10356,14 +10359,21 @@ struct ContentView: View {
             return lastJoystickDirection.normalized()
         }()
         let magSq = rawAxis.width * rawAxis.width + rawAxis.height * rawAxis.height
+        let rawMag = sqrt(magSq)
         let isStopped = centerAimUntilCursorMoves || magSq < 0.01
 
         let flockCenter = playerCenter
         let reach = AgarPhysicsCore.worldCursorReach(cells: playerCells, viewportSize: UIScreen.main.bounds.size)
+        let unitDir: CGSize = (!isStopped && rawMag > 0.0001)
+            ? CGSize(width: rawAxis.width / rawMag, height: rawAxis.height / rawMag)
+            : .zero
         let worldCursor = isStopped
             ? flockCenter
-            : CGPoint(x: flockCenter.x + rawAxis.width * reach.worldReach,
-                      y: flockCenter.y + rawAxis.height * reach.worldReach)
+            : CGPoint(x: flockCenter.x + unitDir.width * reach.worldReach,
+                      y: flockCenter.y + unitDir.height * reach.worldReach)
+        let analogThrottle: CGFloat = (joystickIsDragging || stopOnRelease)
+            ? min(1.0, max(0.25, rawMag))
+            : 1.0
         let baseRadius = CGFloat(OriginalGameplay.baseRadius)
 
         var idToIndex = [UUID: Int]()
@@ -10372,7 +10382,6 @@ struct ContentView: View {
             for i in playerCells.indices { idToIndex[playerCells[i].id] = i }
         }
 
-        let cellCount = playerCells.count
         for i in playerCells.indices {
             if playerCells[i].splitImmunityTimer > 0 {
                 playerCells[i].splitImmunityTimer -= dt
@@ -10428,10 +10437,14 @@ struct ContentView: View {
 
             let dirMag = hypot(dirX, dirY)
             if dirMag > 0.0001 {
-                let k = min(1.0, (reach.inputDist * dirMag) / solidRadius)
-                var step = playerCells[i].cachedMovementSpeed * k * dt
-                if isStopped && cellCount == 1 {
-                    step = min(step, distToTarget)
+                let k: CGFloat
+                var step: CGFloat
+                if isStopped {
+                    k = min(1.0, distToTarget / max(solidRadius, 1.0)) * dirMag
+                    step = min(playerCells[i].cachedMovementSpeed * k * dt, distToTarget)
+                } else {
+                    k = min(1.0, (reach.inputDist * dirMag) / solidRadius) * analogThrottle
+                    step = playerCells[i].cachedMovementSpeed * k * dt
                 }
                 playerCells[i].position.x += (dirX / dirMag) * step
                 playerCells[i].position.y += (dirY / dirMag) * step
@@ -10597,12 +10610,14 @@ struct ContentView: View {
     
     private func updateCellDeformation(dt: CGFloat) {
         let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
+        let cocosZoom = zoomLevel / OriginalGameplay.uiScale(for: UIScreen.main.bounds.size)
         AgarPhysicsCore.deformVertices(
             cells: &playerCells,
             neighborsByOwner: true,
             visibleWorldRect: visibleWorldRect,
             worldSize: worldSize,
             dt: dt,
+            cocosZoom: cocosZoom,
             massManager: massManager
         )
         AgarPhysicsCore.deformVertices(
@@ -10611,6 +10626,7 @@ struct ContentView: View {
             visibleWorldRect: visibleWorldRect,
             worldSize: worldSize,
             dt: dt,
+            cocosZoom: cocosZoom,
             massManager: nil
         )
     }
@@ -11975,7 +11991,7 @@ struct LeaderboardHUDButton: View {
                     context: rowCtx
                 )
                 .frame(width: expandedWidth, height: rowSlot)
-                .offset(x: showPfpColumn ? 0 : -15 * uiScale)
+                .offset(x: showPfpColumn ? 0 : -10 * uiScale)
                 .shadow(color: Color.black.opacity(0.65), radius: 0.8, x: 0, y: 0.8)
                 .transition(.identity)
             }
@@ -12142,7 +12158,6 @@ struct ActionButtonsHUD: View, Equatable {
                     }
                     .frame(width: buttonSide * 0.56, height: buttonSide * 0.56)
                 }
-                .padding(6)
                 .overlay(
                     ImmediatePressSurface(onDown: { if canSplit { onSplit() } }, onUp: {})
                 )
@@ -12183,7 +12198,6 @@ struct ActionButtonsHUD: View, Equatable {
                         )
                 }
                 .scaleEffect(feedButtonScale)
-                .padding(6)
                 .overlay(
                     ImmediatePressSurface(onDown: { feedPressed = true; onFeedDown() },
                                           onUp: { feedPressed = false; onFeedUp() })
@@ -13133,6 +13147,7 @@ struct MainMenu: View {
                 }
             }
             .padding(.horizontal, 10 * s)
+            .offset(y: 12 * s)
         )
 
         let tableSlot = AnyView(
@@ -13361,6 +13376,9 @@ struct MainMenu: View {
                             "_freeCoinsButtonNode._badgeNode": false,
                             "_leaguesButton._badgeNode": false,
                             "_dailyQuestButtonNode._badgeNode": false,
+                            "_topSlot5": false,
+                            "_topSlot6": false,
+                            "_playButtonsScrollNode": false,
                             "_partyModeBadge": !partyCode.isEmpty,
                             "_mysteryPotionsButtonNode._badgeNode": potionStore.readyCount(now: Date().timeIntervalSince1970) > 0
                         ],
@@ -13664,6 +13682,7 @@ struct MainMenu: View {
         }
         return CCBISceneView(
             ccbFile: "MenuSettingsNode_26.2.0.ccbi",
+            centerRoot: true,
             context: CCBIBindingContext(
                 actions: [
                     "toggleSwipeCallback:": toggleAction

@@ -171,12 +171,11 @@ enum AgarPhysicsCore {
         visibleWorldRect: CGRect,
         worldSize: CGFloat,
         dt: CGFloat,
+        cocosZoom: CGFloat = 1.0,
         massManager: EjectedMassManager? = nil
     ) {
         let count = cells.count
         guard count > 0 else { return }
-        let vertexCount = max(20, min(64, (128 / max(1, count)) & ~1))
-        let trig = SoftBodyTrigCache.get(count: vertexCount)
         let stepScale = min(CGFloat(1.5), max(CGFloat(0.25), dt * 60.0))
         let wobbleDecay = pow(CGFloat(0.7), stepScale)
         let visRect = visibleWorldRect
@@ -196,13 +195,16 @@ enum AgarPhysicsCore {
                 continue
             }
 
-            if cells[i].deformedVertices.count != vertexCount ||
-               cells[i].vertexDisplacements.count != vertexCount ||
-               cells[i].vertexRadii.count != vertexCount {
-                cells[i].deformedVertices = [CGPoint](repeating: .zero, count: vertexCount)
-                cells[i].vertexDisplacements = [CGFloat](repeating: 0, count: vertexCount)
-                cells[i].vertexRadii = [CGFloat](repeating: visualRadius, count: vertexCount)
-                for k in 0..<vertexCount {
+            let cellVertexCount = max(24, min(72, (Int(floor(max(1.0, visualRadius * cocosZoom))) & ~1)))
+            let trig = SoftBodyTrigCache.get(count: cellVertexCount)
+
+            if cells[i].deformedVertices.count != cellVertexCount ||
+               cells[i].vertexDisplacements.count != cellVertexCount ||
+               cells[i].vertexRadii.count != cellVertexCount {
+                cells[i].deformedVertices = [CGPoint](repeating: .zero, count: cellVertexCount)
+                cells[i].vertexDisplacements = [CGFloat](repeating: 0, count: cellVertexCount)
+                cells[i].vertexRadii = [CGFloat](repeating: visualRadius, count: cellVertexCount)
+                for k in 0..<cellVertexCount {
                     cells[i].deformedVertices[k] = CGPoint(x: trig[k].cos * visualRadius, y: trig[k].sin * visualRadius)
                 }
                 continue
@@ -239,24 +241,24 @@ enum AgarPhysicsCore {
             // 1. SoftBodyCellView::calcDisplacements (`0x1003a5c34`): random jelly impulse + 0.7 damping + 3-tap smooth
             var rawDisp = cells[i].vertexDisplacements
             let noiseAmp: CGFloat = visualRadius > 18.0 ? 0.5 : 0.15
-            for k in 0..<vertexCount {
+            for k in 0..<cellVertexCount {
                 let jitter = (CGFloat.random(in: -0.5...0.5) * noiseAmp) * stepScale
                 let next = min(CGFloat(10.0), max(CGFloat(-10.0), rawDisp[k] + jitter)) * wobbleDecay
                 rawDisp[k] = next
             }
             var disp = rawDisp
-            for k in 0..<vertexCount {
-                let prev = rawDisp[(k - 1 + vertexCount) % vertexCount]
-                let nxt = rawDisp[(k + 1) % vertexCount]
+            for k in 0..<cellVertexCount {
+                let prev = rawDisp[(k - 1 + cellVertexCount) % cellVertexCount]
+                let nxt = rawDisp[(k + 1) % cellVertexCount]
                 disp[k] = (8.0 * rawDisp[k] + prev + nxt) / 10.0
             }
 
             // 2. Boundary & cell-to-cell squash when radius > 18
             let massRad = OriginalGameplay.shotMassBaseRadiusCGFloat
             let minR = visualRadius * 0.45
-            var radialTarget = [CGFloat](repeating: visualRadius, count: vertexCount)
+            var radialTarget = [CGFloat](repeating: visualRadius, count: cellVertexCount)
             if visualRadius > 18.0 && (nearWall || !nearbyMass.isEmpty || !siblingNeighbors.isEmpty) {
-                for k in 0..<vertexCount {
+                for k in 0..<cellVertexCount {
                     let c = trig[k].cos
                     let s = trig[k].sin
                     let baseR = max(minR, cells[i].vertexRadii[k] + disp[k])
@@ -299,12 +301,12 @@ enum AgarPhysicsCore {
             var prevR = cells[i].vertexRadii
             var nextR = prevR
             let blend = min(1.0, stepScale)
-            for k in 0..<vertexCount {
+            for k in 0..<cellVertexCount {
                 let candidate = max(minR, prevR[k] + disp[k])
                 let tgt = min(visualRadius * 1.12, min(radialTarget[k], candidate))
                 let driven = (12.0 * tgt + visualRadius) / 13.0
-                let pPrev = prevR[(k - 1 + vertexCount) % vertexCount]
-                let pNext = prevR[(k + 1) % vertexCount]
+                let pPrev = prevR[(k - 1 + cellVertexCount) % cellVertexCount]
+                let pNext = prevR[(k + 1) % cellVertexCount]
                 let smoothed = (8.0 * driven + pPrev + pNext) / 10.0
                 nextR[k] = prevR[k] + (smoothed - prevR[k]) * blend
                 cells[i].deformedVertices[k] = CGPoint(x: trig[k].cos * nextR[k], y: trig[k].sin * nextR[k])

@@ -55,7 +55,7 @@ final class ArenaRenderBox {
     var showGrid: Bool = true
     var showSkins: Bool = true
     var showMassText: Bool = true
-    var showBoundaryOverlay: Bool = false // Classic / FFA has undefined boundary params in agarskins.ipa
+    var showBoundaryOverlay: Bool = true
     var tokens: [Token] = []
     var foodManager: FoodManager?
     var massManager: EjectedMassManager?
@@ -82,7 +82,19 @@ private final class ArenaTextureCache {
     private var imageTextures: [String: MTLTexture] = [:]
     private var labelTextures: [LabelCacheKey: (texture: MTLTexture, size: CGSize)] = [:]
     private var labelOrder: [LabelCacheKey] = []
+    private var width30Cache: [String: Float] = [:]
+    private lazy var font30: UIFont = {
+        UIFont(name: "OpenSans-Bold", size: 30) ?? UIFont.systemFont(ofSize: 30, weight: .bold)
+    }()
     private let maxLabelCache = 280
+
+    func widthAt30pt(for text: String) -> Float {
+        if let hit = width30Cache[text] { return hit }
+        let w = Float((text as NSString).size(withAttributes: [.font: font30]).width)
+        if width30Cache.count > 256 { width30Cache.removeAll(keepingCapacity: true) }
+        width30Cache[text] = w
+        return w
+    }
 
     struct LabelCacheKey: Hashable {
         let text: String
@@ -701,7 +713,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 let rW = Float(v.radius)
                 // SoftBodyCellView::calculateVirusEdgeRadiusDelta (0x1003a49fc)
                 let spikeDelta = rW * Float(OriginalGameplay.virusEdgeRadiusMultiplier) + 5.0
-                let vCount = min(180, max(44, (2 * Int(floor(max(1, rW * ptZoom)))) & ~1))
+                let vCount = min(120, max(30, (2 * Int(floor(max(1, rW * cocosZoom)))) & ~1))
                 appendVirusFan(cx: sx, cy: sy, radiusWorld: rW, zoomPx: zoomPx, pointCount: vCount,
                                radiusOffsetWorld: 5.0, spikeDeltaWorld: spikeDelta, color: borderColVirus)
                 appendVirusFan(cx: sx, cy: sy, radiusWorld: rW, zoomPx: zoomPx, pointCount: vCount,
@@ -764,9 +776,16 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 let screenSolidR = Float(c.cachedSolidRadius) * zoomPx
                 if screenSolidR > 12.0 * scale {
                     let level = box.ownerLevels[c.ownerID]
-                    let fontPx = max(8.0 * scale, screenSolidR * 0.40)
-                    let massPx = max(8.0 * scale, screenSolidR * 0.30 * Float(c.massFontScale))
-                    let centeredMassPx = max(8.0 * scale, screenSolidR * 0.34 * Float(c.massFontScale))
+                    let rWFloat = Float(c.cachedSolidRadius)
+                    let w30 = c.name.isEmpty ? Float(0) : texCache.widthAt30pt(for: c.name)
+                    let nameScale = max(Float(0.8), (3.24 * rWFloat) / (w30 + 161.0))
+                    let fontPx = max(8.0 * scale, 30.0 * nameScale * zoomPx)
+                    let baseScale = c.name.isEmpty ? max(Float(1.0), ((rWFloat - 47.0) * 0.6) / 50.0 + 1.0) : nameScale
+                    let h30: Float = 41.0
+                    let targetMassScale = min(3.0 / max(cocosZoom, 0.05), (0.5 * rWFloat) / h30)
+                    let massScale = min(2.0 * baseScale, targetMassScale)
+                    let massPx = max(8.0 * scale, 30.0 * massScale * zoomPx * Float(c.massFontScale))
+                    let centeredMassPx = max(8.0 * scale, 30.0 * min(2.0 * max(Float(1.0), baseScale), targetMassScale) * zoomPx * Float(c.massFontScale))
                     let massInt = max(10, Int(round(c.mass)))
                     let badgeAspect = Float(LeagueBadge.imageAspect)
 
@@ -792,7 +811,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                         }
                         let aspect = Float(lbl.size.width / max(1.0, lbl.size.height))
                         let textH = targetFontPx * 1.28
-                        let textW = min(screenSolidR * 1.65, textH * aspect)
+                        let textW = min(screenSolidR * 1.90, textH * aspect)
                         let finalH = textW / max(0.05, aspect)
                         if let lvl {
                             let bH = targetFontPx * 1.1475
