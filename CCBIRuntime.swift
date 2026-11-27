@@ -1273,7 +1273,7 @@ private struct CCBINodeRenderer: View {
             let swiftAnchorX = anchor.x
             let swiftAnchorY = 1.0 - anchor.y
 
-            let isSkinSlotPlaceholder = (node.varName == "_skin" && replacingSlot != nil)
+            let isSkinSlotPlaceholder = (node.varName == "_skin" && context.scopedLookup(context.replacingSlotViews, varName: node.varName) != nil)
         let isZeroContainer = (resolvedSize.width <= 0 && resolvedSize.height <= 0) || isSkinSlotPlaceholder
             let isSlotReplaced = context.scopedLookup(context.replacingSlotViews, varName: node.varName) != nil
                 || (context.scopedLookup(context.slotViews, varName: node.varName) != nil && (

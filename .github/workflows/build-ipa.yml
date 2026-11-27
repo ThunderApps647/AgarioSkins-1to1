@@ -42,7 +42,7 @@ jobs:
             CODE_SIGN_IDENTITY="" | tee build/xctest.log
           TEST_RC=${PIPESTATUS[0]}
           IPAD_RC=0
-          if [ -n "$IPAD_ID" ]; then
+          if [ $TEST_RC -eq 0 ] && [ -n "$IPAD_ID" ]; then
             xcrun simctl boot "$IPAD_ID" || true
             xcodebuild test-without-building \
               -project "Agar.io.xcodeproj" \
