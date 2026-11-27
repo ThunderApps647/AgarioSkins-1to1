@@ -718,14 +718,17 @@ struct PotionsModalView: View {
                 .padding(.horizontal, sideInset)
 
                 // PotionSlot.ccbi 4 pedestal slots centered in MenuMysteryPotions body band (y=74..294 of 320)
-                HStack(spacing: 8 * s) {
-                    ForEach(potionStore.slots) { slot in
-                        potionCCBICard(slot: slot, scale: s)
+                VStack(spacing: 0) {
+                    Spacer().frame(height: 74 * s)
+                    HStack(spacing: 8 * s) {
+                        ForEach(potionStore.slots) { slot in
+                            potionCCBICard(slot: slot, scale: s)
+                                .frame(maxWidth: .infinity, height: 210 * s)
+                        }
                     }
+                    .padding(.horizontal, max(12 * s, sideInset + 10))
+                    Spacer(minLength: 20 * s)
                 }
-                .padding(.horizontal, max(12 * s, sideInset + 10))
-                .padding(.top, 74 * s)
-                .padding(.bottom, 26 * s)
                 .frame(width: geometry.size.width, height: geometry.size.height)
 
                 if let reward = activeReward {

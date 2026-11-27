@@ -43,7 +43,9 @@ jobs:
           TEST_RC=${PIPESTATUS[0]}
           IPAD_RC=0
           if [ $TEST_RC -eq 0 ] && [ -n "$IPAD_ID" ]; then
+            xcrun simctl shutdown "$IPHONE_ID" || true
             xcrun simctl boot "$IPAD_ID" || true
+            xcrun simctl bootstatus "$IPAD_ID" -b || true
             xcodebuild test-without-building \
               -project "Agar.io.xcodeproj" \
               -scheme "Agar.io" \
