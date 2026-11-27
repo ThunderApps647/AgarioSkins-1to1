@@ -749,7 +749,8 @@ final class SkinEdgeClampCache {
         if let cached = cache[key] { return cached }
         if failedNames.contains(key) { return nil }
         
-        guard let source = UIImage(named: skinName),
+        let resolved = SkinSelectorPreview.resolvedAssetName(for: skinName)
+        guard let source = UIImage(named: resolved),
               let image = uprightCGImage(source),
               image.width > 0,
               image.height > 0 else {
@@ -912,7 +913,8 @@ final class DualSkinCatalog {
         guard let skinName else { return false }
         if let cached = isDualByName[skinName] { return cached }
         var dual = false
-        if let image = UIImage(named: skinName), image.size.height > 0 {
+        let resolved = SkinSelectorPreview.resolvedAssetName(for: skinName)
+        if let image = UIImage(named: resolved), image.size.height > 0 {
             // UIImage.size is in points; width/height share the same scale factor,
             // so the point ratio equals the pixel ratio.
             dual = image.size.width >= image.size.height * DualSkin.aspectThreshold
@@ -1173,8 +1175,18 @@ enum SkinEffectsRenderer {
 /// uses, so the button doubles as a check that the "SkinEffects" page is bundled.
 struct SkinSelectorPreview: View {
     let skinName: String
-    
+
+    static func resolvedAssetName(for name: String) -> String {
+        if name == "Dragon" { return "skin1" }
+        if Int(name) != nil {
+            if UIImage(named: "skin_\(name)") != nil { return "skin_\(name)" }
+            if UIImage(named: name) != nil { return name }
+        }
+        return name
+    }
+
     var body: some View {
+        let resolvedName = Self.resolvedAssetName(for: skinName)
         if DualSkinCatalog.shared.isDual(skinName) {
             TimelineView(.animation) { timeline in
                 // Reading the timeline date keeps SwiftUI invalidating the canvas every frame.
@@ -1190,7 +1202,7 @@ struct SkinSelectorPreview: View {
                     // Left half only: draw the double-width sheet at 2x the destination
                     // width so the base half fills the circle and the alt half falls
                     // outside the clip.
-                    skinContext.draw(Image(skinName).resizable(),
+                    skinContext.draw(Image(resolvedName).resizable(),
                                      in: CGRect(x: circleRect.minX, y: circleRect.minY,
                                                 width: circleRect.width * 2,
                                                 height: circleRect.height))
@@ -1202,7 +1214,7 @@ struct SkinSelectorPreview: View {
                 }
             }
         } else {
-            Image(skinName).resizable().scaledToFill().clipShape(Circle())
+            Image(resolvedName).resizable().scaledToFill().clipShape(Circle())
         }
     }
 }
@@ -1570,7 +1582,8 @@ final class SkinGameplayPaletteCache {
     func palette(for skinName: String) -> SkinGameplayPalette? {
         if let cached = cache[skinName] { return cached }
         if failedNames.contains(skinName) { return nil }
-        guard let source = UIImage(named: skinName),
+        let resolved = SkinSelectorPreview.resolvedAssetName(for: skinName)
+        guard let source = UIImage(named: resolved),
               let fullImage = drawableCGImage(source) else {
             failedNames.insert(skinName)
             return nil

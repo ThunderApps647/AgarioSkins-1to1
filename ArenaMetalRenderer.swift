@@ -120,14 +120,7 @@ private final class ArenaTextureCache {
     }
 
     func skinTexture(name: String, isAlternate: Bool = false) -> MTLTexture? {
-        let resolvedName: String = {
-            if name == "Dragon" { return "skin1" }
-            if Int(name) != nil {
-                if UIImage(named: "skin_\(name)") != nil { return "skin_\(name)" }
-                if UIImage(named: name) != nil { return name }
-            }
-            return name
-        }()
+        let resolvedName = SkinSelectorPreview.resolvedAssetName(for: name)
         let key = "skin:\(resolvedName):\(isAlternate ? 1 : 0)"
         if let hit = imageTextures[key] { return hit }
         guard let img = UIImage(named: resolvedName) ?? UIImage(named: "Skins/\(resolvedName)") else {
