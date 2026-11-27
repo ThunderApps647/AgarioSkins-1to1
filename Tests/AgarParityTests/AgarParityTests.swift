@@ -1033,8 +1033,9 @@ final class AgarParityTests: XCTestCase {
 
             // Render CCBISceneView at both iPhone and iPad sizes and assert non-empty raster
             for (label, sz, isPad) in [("iPhone", CGSize(width: 852, height: 393), false), ("iPad", CGSize(width: 1024, height: 768), true)] {
-                let s = OriginalGameplay.uiScale(for: sz, isPhoneOverride: !isPad)
-                let view = CCBISceneView(ccbiName: name, designSize: sz, uiScale: s, context: CCBIBindingContext())
+                var ctx = CCBIBindingContext()
+                ctx.designScaleModifier = { size in OriginalGameplay.uiScale(for: size, isPhoneOverride: !isPad) }
+                let view = CCBISceneView(ccbFile: name, context: ctx)
                     .frame(width: sz.width, height: sz.height)
                     .background(Color.white)
                 let renderer = ImageRenderer(content: view)
