@@ -51,7 +51,7 @@ final class AgarUITests: XCTestCase {
 
         // 1. Settings route + toggle
         if let settingsBtn = firstExisting(app, ids: ["ccbi.settingsButtonCallback"], timeout: 3.0) {
-            settingsBtn.tap()
+            waitAndTap(settingsBtn)
             let backBtn = firstExisting(app, ids: ["ccbi.backButtonCallback", "ccbi._backButton"], timeout: 4.0)
             XCTAssertNotNil(backBtn, "Settings modal should expose back button")
             RunLoop.current.run(until: Date().addingTimeInterval(0.4))
@@ -60,7 +60,7 @@ final class AgarUITests: XCTestCase {
                 RunLoop.current.run(until: Date().addingTimeInterval(0.25))
             }
             capture(app, name: "Live_02_Settings.png")
-            if let backBtn { backBtn.tap() }
+            if let backBtn { waitAndTap(backBtn) }
             RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         } else {
             XCTFail("Settings button missing on MenuMain")
@@ -68,12 +68,12 @@ final class AgarUITests: XCTestCase {
 
         // 2. Skins route + tabs + close
         if let skinsBtn = firstExisting(app, ids: ["ccbi.skinsButtonCallback"], timeout: 3.0) {
-            skinsBtn.tap()
+            waitAndTap(skinsBtn)
             let backBtn = firstExisting(app, ids: ["ccbi.backButtonCallback", "ccbi._backButton"], timeout: 4.0)
             XCTAssertNotNil(backBtn, "Skins modal should open and expose back button")
             RunLoop.current.run(until: Date().addingTimeInterval(0.5))
             capture(app, name: "Live_03_Skins.png")
-            if let backBtn { backBtn.tap() }
+            if let backBtn { waitAndTap(backBtn) }
             RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         } else {
             XCTFail("Skins button missing on MenuMain")
@@ -90,10 +90,10 @@ final class AgarUITests: XCTestCase {
         ]
         for route in modalRoutes {
             if let trigger = firstExisting(app, ids: route.ids, timeout: 2.5) {
-                trigger.tap()
+                waitAndTap(trigger)
                 RunLoop.current.run(until: Date().addingTimeInterval(0.35))
                 if let close = firstExisting(app, ids: route.closeIds, timeout: 3.5) {
-                    close.tap()
+                    waitAndTap(close)
                     RunLoop.current.run(until: Date().addingTimeInterval(0.35))
                 } else {
                     XCTFail("\(route.label) modal failed to expose close/back button")
@@ -103,7 +103,7 @@ final class AgarUITests: XCTestCase {
 
         // 4. Launch live Classic match -> MTKView + HUD + Edge boundary drag + Pause modal
         XCTAssertTrue(playBtn.waitForExistence(timeout: 3.0))
-        playBtn.tap()
+        waitAndTap(playBtn)
 
         let pauseBtn = try XCTUnwrap(firstExisting(app, ids: ["ccbi.pauseButtonCallback"], timeout: 6.0), "Pause HUD button must appear in live match")
         RunLoop.current.run(until: Date().addingTimeInterval(0.8))
@@ -118,27 +118,27 @@ final class AgarUITests: XCTestCase {
 
         // Exercise HUD actions (Emoji toggle, Leaderboard toggle, Split, Feed, Pause)
         if let emojiBtn = firstExisting(app, ids: ["ccbi.onToggle"], timeout: 2.0) {
-            emojiBtn.tap()
+            waitAndTap(emojiBtn)
             RunLoop.current.run(until: Date().addingTimeInterval(0.25))
         }
         if let lbBtn = firstExisting(app, ids: ["hud.leaderboard"], timeout: 2.0) {
-            lbBtn.tap()
+            waitAndTap(lbBtn)
             RunLoop.current.run(until: Date().addingTimeInterval(0.25))
         }
         if let splitBtn = firstExisting(app, ids: ["hud.split"], timeout: 2.0) {
-            splitBtn.tap()
+            waitAndTap(splitBtn)
             RunLoop.current.run(until: Date().addingTimeInterval(0.15))
         }
         if let feedBtn = firstExisting(app, ids: ["hud.feed"], timeout: 2.0) {
-            feedBtn.tap()
+            waitAndTap(feedBtn)
             RunLoop.current.run(until: Date().addingTimeInterval(0.15))
         }
 
-        pauseBtn.tap()
+        waitAndTap(pauseBtn)
         let resumeNo = firstExisting(app, ids: ["ccbi.quitCancelButtonCallback", "ccbi._noButton"], timeout: 3.0)
         XCTAssertNotNil(resumeNo, "MenuPause modal should open when Pause is tapped")
         RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         capture(app, name: "Live_06_Arena_HUD_and_Pause.png")
-        if let resumeNo { resumeNo.tap() }
+        if let resumeNo { waitAndTap(resumeNo) }
     }
 }

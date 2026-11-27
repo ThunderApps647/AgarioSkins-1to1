@@ -1284,15 +1284,19 @@ private struct CCBINodeRenderer: View {
                 ))
 
             let isClippingNode = node.cls == "MCClippingNode" || node.base == "MCClippingNode"
-            let rawVisual = nodeContent(designSize: resolvedSize, subFileRoot: subFileRoot)
-                .frame(width: max(0, resolvedSize.width * scaleFactor),
-                       height: max(0, resolvedSize.height * scaleFactor),
-                       alignment: isZeroContainer ? .center : .topLeading)
+            let baseVisual: AnyView = (isZeroContainer && isSlotReplaced)
+                ? AnyView(nodeContent(designSize: resolvedSize, subFileRoot: subFileRoot))
+                : AnyView(
+                    nodeContent(designSize: resolvedSize, subFileRoot: subFileRoot)
+                        .frame(width: max(0, resolvedSize.width * scaleFactor),
+                               height: max(0, resolvedSize.height * scaleFactor),
+                               alignment: isZeroContainer ? .center : .topLeading)
+                )
             let visual = Group {
                 if isClippingNode {
-                    rawVisual.clipShape(Rectangle()).clipped()
+                    baseVisual.clipShape(Rectangle()).clipped()
                 } else {
-                    rawVisual
+                    baseVisual
                 }
             }
             .scaleEffect(x: isSlotReplaced ? 1.0 : scaleX,
@@ -1318,7 +1322,8 @@ private struct CCBINodeRenderer: View {
 
             if let handler = blockHandler ?? varTapHandler {
                 let accName = resolveBlockSelector() ?? (!node.varName.isEmpty ? node.varName : node.stableID)
-                let accID = "ccbi.\(accName)"
+                let scopedAcc = context.scopePath.isEmpty ? accName : "\(context.scopePath.joined(separator: ".")).\(accName)"
+                let accID = "ccbi.\(scopedAcc)"
                 if context.useImmediateTouch {
                     CCBIImmediateTapWrapper(
                         action: {
