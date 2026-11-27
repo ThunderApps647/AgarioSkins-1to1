@@ -47,15 +47,15 @@ struct AgarJoystickInput {
             dir = lastNonZeroDirection
         }
 
-        // Low-throw angular damping (`rawMag < 0.5`): blends heading smoothly instead of snapping 180 deg near center
+        // Tight low-throw angular damping (`rawMag < 0.25`): prevents center jitter while allowing crisp reversals
         let curMag = hypot(axis.width, axis.height)
-        if rawMag < 0.5 && curMag > 0.001 && dist > 0.001 {
+        if rawMag < 0.25 && curMag > 0.001 && dist > 0.001 {
             let newAngle = atan2(dir.height, dir.width)
             let curAngle = atan2(axis.height, axis.width)
             var delta = newAngle - curAngle
             while delta > .pi { delta -= 2.0 * .pi }
             while delta <= -.pi { delta += 2.0 * .pi }
-            let blended = curAngle + delta * (2.0 * rawMag)
+            let blended = curAngle + delta * (4.0 * rawMag)
             dir = CGSize(width: cos(blended), height: sin(blended))
         }
 

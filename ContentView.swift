@@ -2331,6 +2331,8 @@ struct PlayerCell: Identifiable {
     var eaterID: UUID? = nil
     var skinDeformation:[CGFloat] = Array(repeating: 0.0, count: 64)
     var deformedVertices: [CGPoint] = []
+    var vertexDisplacements: [CGFloat] = []
+    var vertexRadii: [CGFloat] = []
     /// Lets the deformation pass skip untouched off-screen cells without walking 20-128 zeros.
     var hasActiveDeformation: Bool = false
     
@@ -4765,7 +4767,7 @@ struct ContentView: View {
                 if isPlaying {
                     GameWorldView(
                         worldSize: OriginalGameplay.offlineArenaSideLength,
-                        screenSize: CGSize(width: geometry.size.width, height: geometry.size.height + geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom),
+                        screenSize: geometry.size,
                         smoothedPlayerPosition: $smoothedPlayerPosition,
                         zoomLevel: $zoomLevel,
                         playerCells: $playerCells,
@@ -4785,7 +4787,6 @@ struct ContentView: View {
                         activeEmoteStartedAt: activeEmoteStartedAt,
                         activeEmoteExpiresAt: activeEmoteExpiresAt
                     )
-                    .offset(y: -(geometry.safeAreaInsets.top + geometry.safeAreaInsets.bottom) / 2)
                     .onAppear(perform: spawnInitialObjects)
                     .zIndex(0)
                 } else {
@@ -4855,7 +4856,7 @@ struct ContentView: View {
                                 joystickBasePosition = nil
                                 let isTap = value.translation.width.magnitude < 5 && value.translation.height.magnitude < 5
                                 if isTap {
-                                    let playerScreenCenter = CGPoint(x: geometry.size.width / 2, y: (geometry.size.height + geometry.safeAreaInsets.top - geometry.safeAreaInsets.bottom) / 2)
+                                    let playerScreenCenter = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
                                     let tapDir = CGSize(width: value.startLocation.x - playerScreenCenter.x, height: value.startLocation.y - playerScreenCenter.y)
                                     let mag = hypot(tapDir.width, tapDir.height)
                                     if mag > 0.001 {
@@ -4874,7 +4875,11 @@ struct ContentView: View {
                         PlayerArrow(geometry: geometry, joystickIsDragging: joystickIsDragging, joystickOffset: joystickOffset, lastJoystickDirection: lastJoystickDirection, playerCells: playerCells, playerCenter: playerCenter, zoomLevel: $zoomLevel)
                     }
                     if joystickIsDragging {
-                        JoystickView(joystickOffset: $joystickOffset, joystickBasePosition: $joystickBasePosition)
+                        JoystickView(
+                            joystickOffset: $joystickOffset,
+                            joystickBasePosition: $joystickBasePosition,
+                            uiScale: OriginalGameplay.uiScale(for: geometry.size)
+                        )
                     }
                 }
                 
@@ -4941,23 +4946,29 @@ struct ContentView: View {
                         .zIndex(1)
                     }
 
-                    // Bottom-center Offline Quest Tracker pill (Hud::setupOfflineHud -> addQuestTrackerWidget)
+                    // Bottom-center Offline Quest Tracker pill (GameHUD-DailyQuestsProgress.ccbi)
                     VStack {
                         Spacer()
                         let questTarget = offlineQuestStage == 0 ? 70 : (offlineQuestStage == 1 ? 150 : 300)
                         let shownProgress = min(offlineQuestProgress, questTarget)
-                        Text("Eat pellets \(shownProgress)/\(questTarget)")
-                            .font(.custom("UbuntuSans-Bold", size: 15))
-                            .foregroundColor(.white)
-                            .shadow(color: .black.opacity(0.45), radius: 1, x: 0, y: 1)
-                            .padding(.horizontal, 26)
-                            .padding(.vertical, 6)
-                            .background(
-                                Capsule()
-                                    .fill(Color(white: 0.78, opacity: 0.52))
-                                    .overlay(Capsule().stroke(Color(white: 0.62, opacity: 0.55), lineWidth: 1.5))
+                        let s = OriginalGameplay.uiScale(for: geometry.size)
+                        CCBISceneView(
+                            ccbFile: "GameHUD-DailyQuestsProgress.ccbi",
+                            centerRoot: true,
+                            context: CCBIBindingContext(
+                                labelOverrides: [
+                                    "_questProgressObjectiveDark": "Eat pellets \(shownProgress)/\(questTarget)",
+                                    "_questProgressObjectiveLight": "Eat pellets \(shownProgress)/\(questTarget)"
+                                ],
+                                visibilityOverrides: [
+                                    "_questProgressObjectiveLight": darkModeGrid,
+                                    "_questProgressObjectiveDark": !darkModeGrid
+                                ],
+                                designScaleModifier: { _ in s }
                             )
-                            .padding(.bottom, 12)
+                        )
+                        .frame(width: 210 * s, height: 30 * s)
+                        .padding(.bottom, max(4 * s, geometry.safeAreaInsets.bottom))
                     }
                     .allowsHitTesting(false)
                     .zIndex(1)
@@ -10493,9 +10504,12 @@ struct ContentView: View {
                     newCell.massFontScale = 0.5
                 }
                 
+                cells[index].mass = newMass
                 cells[index].targetMass = newMass
+                cells[index].lagMass = newMass
                 cells[index].mergeTimer = dynamicMergeTime
                 cells[index].canMerge = false
+                cells[index].refreshCachedRadii()
                 
                 let splitVelocity = CGSize(width: launchDirection.width * ejectionForce,
                                            height: launchDirection.height * ejectionForce)
@@ -10732,9 +10746,12 @@ struct ContentView: View {
                 guard action.cellIndex < botCells.count else { continue }
                 let poppedHalvesFont = botCells[action.cellIndex].targetMass + CGFloat(OriginalGameplay.virusBaseMass) >= massFontHalfThreshold
                 let parentVelocity = botCells[action.cellIndex].velocity
+                botCells[action.cellIndex].mass = pieceMass
                 botCells[action.cellIndex].targetMass = pieceMass
+                botCells[action.cellIndex].lagMass = pieceMass
                 botCells[action.cellIndex].mergeTimer = 30.0 + Double(pieceMass) * 0.02
                 botCells[action.cellIndex].canMerge = false
+                botCells[action.cellIndex].refreshCachedRadii()
                 let childCount = max(1, massList.count - 1)
                 let basePhase = Double.random(in: 0..<(2 * Double.pi))
                 for k in 1..<massList.count {
@@ -10780,9 +10797,12 @@ struct ContentView: View {
                 SoundManager.shared.play(.virusPop, minInterval: 0.06)
                 let poppedHalvesFont = playerCells[action.cellIndex].targetMass + CGFloat(OriginalGameplay.virusBaseMass) >= massFontHalfThreshold
                 let parentVelocity = playerCells[action.cellIndex].velocity
+                playerCells[action.cellIndex].mass = pieceMass
                 playerCells[action.cellIndex].targetMass = pieceMass
+                playerCells[action.cellIndex].lagMass = pieceMass
                 playerCells[action.cellIndex].mergeTimer = 30.0 + Double(pieceMass) * 0.02
                 playerCells[action.cellIndex].canMerge = false
+                playerCells[action.cellIndex].refreshCachedRadii()
                 let childCount = max(1, massList.count - 1)
                 let basePhase = Double.random(in: 0..<(2 * Double.pi))
                 for k in 1..<massList.count {
@@ -11896,6 +11916,7 @@ struct LeaderboardHUDButton: View {
     }
 
     private var rowsBlock: some View {
+        let showPfpColumn = rows.contains { $0.isPartyMember }
         let rowColorWhite = Color.white
         let rowColorPlayer = Color(hex: 0xFFE38A)
         return VStack(alignment: .leading, spacing: 0) {
@@ -11925,6 +11946,8 @@ struct LeaderboardHUDButton: View {
                     context: rowCtx
                 )
                 .frame(width: expandedWidth, height: rowSlot)
+                .offset(x: showPfpColumn ? 0 : -15 * uiScale)
+                .shadow(color: Color.black.opacity(0.65), radius: 0.8, x: 0, y: 0.8)
                 .transition(.identity)
             }
         }
@@ -12067,16 +12090,56 @@ struct ActionButtonsHUD: View, Equatable {
             let shootX = sceneW * 0.863
             let shootCenterY = geometry.size.height * 0.875
 
+            let bgSprite = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/spritesheets/Bundle/All/ingameUI/splitshot_bg.png")?.image
+            let splitIcon = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/spritesheets/Bundle/All/ingameUI/split.png")?.image
+            let shotIcon = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/spritesheets/Bundle/All/ingameUI/shot.png")?.image
+
+            let splitSlot = AnyView(
+                ZStack {
+                    Group {
+                        if let bgSprite {
+                            Image(uiImage: bgSprite).resizable().aspectRatio(contentMode: .fit)
+                        } else {
+                            Image("hud-splitshot-bg").resizable().aspectRatio(contentMode: .fit)
+                        }
+                    }
+                    .frame(width: buttonSide, height: buttonSide)
+                    Group {
+                        if let splitIcon {
+                            Image(uiImage: splitIcon).resizable().aspectRatio(contentMode: .fit)
+                        } else {
+                            Image("hud-split").resizable().aspectRatio(contentMode: .fit)
+                        }
+                    }
+                    .frame(width: buttonSide * 0.56, height: buttonSide * 0.56)
+                }
+                .padding(6)
+                .overlay(
+                    ImmediatePressSurface(onDown: { if canSplit { onSplit() } }, onUp: {})
+                )
+                .allowsHitTesting(canSplit)
+                .accessibilityLabel("Split cell")
+                .accessibilityAddTraits(.isButton)
+            )
+
             let ejectSlot = AnyView(
                 ZStack {
-                    Image("hud-splitshot-bg")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: buttonSide, height: buttonSide)
-                    Image("hud-shot")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: buttonSide * 0.56, height: buttonSide * 0.56)
+                    Group {
+                        if let bgSprite {
+                            Image(uiImage: bgSprite).resizable().aspectRatio(contentMode: .fit)
+                        } else {
+                            Image("hud-splitshot-bg").resizable().aspectRatio(contentMode: .fit)
+                        }
+                    }
+                    .frame(width: buttonSide, height: buttonSide)
+                    Group {
+                        if let shotIcon {
+                            Image(uiImage: shotIcon).resizable().aspectRatio(contentMode: .fit)
+                        } else {
+                            Image("hud-shot").resizable().aspectRatio(contentMode: .fit)
+                        }
+                    }
+                    .frame(width: buttonSide * 0.56, height: buttonSide * 0.56)
 
                     Circle()
                         .fill(Color.black.opacity(0.22))
@@ -12102,14 +12165,12 @@ struct ActionButtonsHUD: View, Equatable {
             )
 
             let controlsCtx = CCBIBindingContext(
-                actions: [
-                    "splitButtonCallback": { if canSplit { onSplit() } }
-                ],
                 opacityOverrides: [
                     "_splitButton": canSplit ? 1.0 : 0.45,
                     "_shootButton": canFeed ? (feedPressed ? 0.55 : 1.0) : 0.45
                 ],
                 replacingSlotViews: [
+                    "_splitButton": splitSlot,
                     "_shootButton": ejectSlot
                 ],
                 designScaleModifier: { _ in s }
@@ -13238,6 +13299,9 @@ struct MainMenu: View {
                             "_top3xSprite": false,
                             "_bottom2xSprite": false,
                             "_bottom3xSprite": false,
+                            "_activeBackgroundSprite": false,
+                            "_inventoryBackgroundSprite": false,
+                            "_inventoryLabel": false,
                             "_freeCoinsButtonNode._badgeNode": false,
                             "_leaguesButton._badgeNode": false,
                             "_dailyQuestButtonNode._badgeNode": false,
@@ -13534,16 +13598,11 @@ struct PlayerArrow: View {
     @Binding var zoomLevel: CGFloat
     
     var body: some View {
-        let screenCenter = CGPoint(x: geometry.size.width / 2, y: (geometry.size.height + geometry.safeAreaInsets.top) / 2)
+        let s = OriginalGameplay.uiScale(for: geometry.size)
+        let screenCenter = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
         let direction = joystickIsDragging ? joystickOffset : lastJoystickDirection
         let angle = atan2(Double(direction.height), Double(direction.width))
         
-        // v44: the arrow rides a CIRCLE around the player - the bounding circle
-        // of all cells (farthest cell edge from the centre). v43 projected each
-        // cell onto the aim direction, which made the arrow hug the silhouette
-        // of the split pieces, so its distance pulsed as the aim rotated.
-        // Direction-independent radius = perfect circle path; for a single cell
-        // it still reduces to exactly that cell's radius.
         var extent: CGFloat = 0
         for cell in playerCells {
             let dx = cell.position.x - playerCenter.x
@@ -13551,45 +13610,74 @@ struct PlayerArrow: View {
             extent = max(extent, sqrt(dx * dx + dy * dy) + cell.cachedSolidRadius)
         }
         
-        // The gap between the cell edge and the arrow used to be 50 WORLD units,
-        // which the zoom then scaled: huge on a small (zoomed-in) single cell,
-        // shrinking to almost nothing on a big (zoomed-out) one. Keep it a constant
-        // SCREEN distance instead, matched to how it looked at ~2k mass
-        // (50 * zoom(2000) ≈ 24pt), which was the sweet spot.
-        let rawOffset = extent * zoomLevel + 24
+        let rawOffset = extent * zoomLevel + 18 * s
         let rawX = screenCenter.x + (rawOffset * CGFloat(cos(angle)))
         let rawY = screenCenter.y + (rawOffset * CGFloat(sin(angle)))
         
-        let padding: CGFloat = 40
-        let minX = padding
-        let maxX = geometry.size.width - padding
+        let padding: CGFloat = 32 * s
+        let minX = padding + geometry.safeAreaInsets.leading
+        let maxX = geometry.size.width - padding - geometry.safeAreaInsets.trailing
         let minY = padding + geometry.safeAreaInsets.top
-        let maxY = geometry.size.height + geometry.safeAreaInsets.top - padding
+        let maxY = geometry.size.height - padding - geometry.safeAreaInsets.bottom
         
         let clampedX = min(maxX, max(minX, rawX))
         let clampedY = min(maxY, max(minY, rawY))
+        let dirSprite = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/spritesheets/Bundle/All/ingameUI/direction_arrow.png")?.image
         
-        return Image("arrow")
-            .resizable().aspectRatio(contentMode: .fit).frame(width: 24, height: 28).foregroundColor(.white)
-            .rotationEffect(Angle(radians: angle + Double.pi / 2)).position(x: clampedX, y: clampedY).opacity(0.5)
+        return Group {
+            if let dirSprite {
+                Image(uiImage: dirSprite)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 18 * s, height: 16 * s)
+                    .rotationEffect(Angle(radians: angle))
+            } else {
+                Image("arrow")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 24, height: 28)
+                    .foregroundColor(.white)
+                    .rotationEffect(Angle(radians: angle + Double.pi / 2))
+            }
+        }
+        .position(x: clampedX, y: clampedY)
+        .opacity(0.65)
     }
 }
 
 struct JoystickView: View {
     @Binding var joystickOffset: CGSize
     @Binding var joystickBasePosition: CGPoint?
+    var uiScale: CGFloat = 1.2
     
     var body: some View {
+        let baseImg = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/spritesheets/Bundle/All/Controls/game_joystick_bg.png")?.image
+        let knobImg = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/spritesheets/Bundle/All/Controls/game_joystick.png")?.image
         ZStack {
-            ZStack {
-                Image("joystick-base").resizable().scaledToFit().frame(width: 140.4)
-                Circle().fill(Color.black).frame(width: 68).offset(joystickOffset).blendMode(.destinationOut)
-            }.compositingGroup()
-            Image("joystick-circle").resizable().scaledToFit().frame(width: 70.2).offset(joystickOffset)
+            if let baseImg {
+                Image(uiImage: baseImg)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 82 * uiScale, height: 82 * uiScale)
+            } else {
+                ZStack {
+                    Image("joystick-base").resizable().scaledToFit().frame(width: 82 * uiScale)
+                    Circle().fill(Color.black).frame(width: 40 * uiScale).offset(joystickOffset).blendMode(.destinationOut)
+                }.compositingGroup()
+            }
+            if let knobImg {
+                Image(uiImage: knobImg)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 42.5 * uiScale, height: 42.5 * uiScale)
+                    .offset(joystickOffset)
+            } else {
+                Image("joystick-circle").resizable().scaledToFit().frame(width: 42.5 * uiScale).offset(joystickOffset)
+            }
         }
-        .opacity(0.5)
+        .opacity(0.55)
         .position(joystickBasePosition ?? .zero)
-        .animation(.linear(duration: 0.1), value: joystickOffset)
+        .allowsHitTesting(false)
     }
 }
 

@@ -1201,12 +1201,18 @@ private struct CCBINodeRenderer: View {
         return (rawKey, fontName, fontSizeDesign)
     }
 
-    private func requestedLabelConstraint(parentDesignSize: CGSize) -> CGFloat {
-        if case let .size(rw, _, wu, _, _) = node.props["requestedDimensions"] {
+    private func requestedLabelDimensions(parentDesignSize: CGSize) -> CGSize {
+        if case let .size(rw, rh, wu, hu, _) = node.props["requestedDimensions"] {
             let w = evalDim(rw, unit: wu, parent: parentDesignSize.width)
-            if w > 1.0 { return w }
+            let h = evalDim(rh, unit: hu, parent: parentDesignSize.height)
+            return CGSize(width: w > 1.0 ? w : 0, height: h > 1.0 ? h : 0)
         }
-        return 0
+        return .zero
+    }
+
+    private func isSingleLineLabel() -> Bool {
+        if case let .bool(sl) = node.props["forceSingleLine"] { return sl }
+        return false
     }
 
     private func measureLabelDesignSize(parentDesignSize: CGSize) -> CGSize {
@@ -1214,15 +1220,22 @@ private struct CCBINodeRenderer: View {
         guard !spec.text.isEmpty else { return .zero }
         let uiFont = UIFont(name: spec.fontName, size: max(7, spec.fontSizeDesign))
             ?? UIFont.systemFont(ofSize: max(7, spec.fontSizeDesign), weight: .bold)
-        let reqW = requestedLabelConstraint(parentDesignSize: parentDesignSize)
-        let boundW = reqW > 0 ? reqW : 10000
+        let req = requestedLabelDimensions(parentDesignSize: parentDesignSize)
+        let singleLine = isSingleLineLabel()
+        if req.width > 1.0 && req.height > 1.0 && !singleLine {
+            return req
+        }
+        let boundW: CGFloat = (singleLine && req.height <= 1.0) ? 10000 : (req.width > 0 ? req.width : 10000)
         let rect = (spec.text as NSString).boundingRect(
             with: CGSize(width: boundW, height: 10000),
             options: [.usesLineFragmentOrigin, .usesFontLeading],
             attributes: [.font: uiFont],
             context: nil
         )
-        let w = reqW > 0 ? min(reqW, ceil(rect.width) + 2) : (ceil(rect.width) + 2)
+        if singleLine && req.height <= 1.0 {
+            return CGSize(width: ceil(rect.width) + 2, height: ceil(rect.height) + 2)
+        }
+        let w = req.width > 0 ? min(req.width, ceil(rect.width) + 2) : (ceil(rect.width) + 2)
         return CGSize(width: w, height: ceil(rect.height) + 2)
     }
 
@@ -1284,7 +1297,9 @@ private struct CCBINodeRenderer: View {
             return .center
         }()
 
-        let reqW = requestedLabelConstraint(parentDesignSize: parentDesignSize)
+        let req = requestedLabelDimensions(parentDesignSize: parentDesignSize)
+        let singleLine = isSingleLineLabel() || (req.width > 0 && req.height > 0 && spec.text.count <= 24)
+        let autoShrink = (req.width > 1.0 && req.height > 1.0) || singleLine
         return CCBILabelView(
             text: spec.text,
             fontName: spec.fontName,
@@ -1293,7 +1308,9 @@ private struct CCBINodeRenderer: View {
             outlineColor: outlineColor,
             outlineWidth: outlinePx,
             alignment: align,
-            constrainWidth: reqW > 0 || designSize.width > 0
+            constrainWidth: (req.width > 0 && !isSingleLineLabel()) || designSize.width > 0,
+            singleLine: singleLine,
+            autoShrink: autoShrink
         )
         .frame(
             width: designSize.width > 0 ? designSize.width * scaleFactor : nil,
@@ -1312,11 +1329,16 @@ private struct CCBILabelView: View {
     let outlineWidth: CGFloat
     let alignment: TextAlignment
     let constrainWidth: Bool
+    var singleLine: Bool = false
+    var autoShrink: Bool = false
 
     var body: some View {
         let base = Text(text)
             .font(.custom(fontName, size: fontSize))
             .multilineTextAlignment(alignment)
+            .lineLimit(singleLine ? 1 : nil)
+            .minimumScaleFactor(autoShrink ? 0.45 : 1.0)
+            .allowsTightening(autoShrink)
             .fixedSize(horizontal: !constrainWidth, vertical: true)
 
         if let oc = outlineColor, outlineWidth > 0 {

@@ -531,7 +531,9 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         )
 
         // 1. Background + Infinite 50u Grid (`OptimizedArenaBackground::draw` 0x10030e108)
-        let intensity = min(Float(0.85), max(Float(0.10), (50.0 * 50.0 * ptZoom * ptZoom) / 5000.0 + 0.10))
+        let uiScale = max(Float(0.5), min(Float(view.bounds.height) / 320.0, Float(view.bounds.width) / 480.0))
+        let cocosZoom = ptZoom / uiScale
+        let intensity = min(Float(0.85), max(Float(0.10), (50.0 * 50.0 * cocosZoom * cocosZoom) / 5000.0 + 0.10))
         let gridGray = box.darkMode ? intensity : (1.0 - intensity)
         let bgCol = box.darkMode ? SIMD4<Float>(0, 0, 0, 1) : SIMD4<Float>(1, 1, 1, 1)
         var gridU = GridUniforms(
@@ -687,8 +689,8 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         }
         drawables.sort { $0.sortMass < $1.sortMass }
 
-        let borderColVirus = SIMD4<Float>(0x2B / 255.0, 0xB8 / 255.0, 0x2B / 255.0, 1.0)
-        let fillColVirus = SIMD4<Float>(0x33 / 255.0, 1.0, 0x33 / 255.0, 1.0)
+        let borderColVirus = SIMD4<Float>(0.0, 0.9, 0.0, 1.0)
+        let fillColVirus = SIMD4<Float>(0.0, 1.0, 0.0, 1.0)
         let partyRingCol = SIMD4<Float>(1.0, 0x8C / 255.0, 0.0, 1.0)
 
         for item in drawables {
@@ -843,15 +845,18 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                     }
                 }
 
-                // Emote bubble over local cells when active
+                // Emote bubble over local cells clipped to cell polygon (`CellOverlayImage::drawWithVertices` 0x1002e2ae8)
                 if isLocal, let emoteName = box.activeEmoteAsset, nowTS < box.activeEmoteExpiresAt,
                    let emoteTex = texCache.texture(named: emoteName) {
                     let elapsed = nowTS - box.activeEmoteStartedAt
                     let remaining = box.activeEmoteExpiresAt - nowTS
                     let alpha = Float(min(1.0, min(elapsed / 0.12, remaining / 0.2)))
-                    let side = rW * zoomPx * 1.45
-                    if alpha > 0.01 && side > 8 {
-                        drawQuad(enc: enc, texture: emoteTex, centerX: sx, centerY: sy, width: side, height: side, alpha: alpha, viewportSize: vpPx)
+                    let rFallback = max(1.5, (rW + innerOff) * zoomPx)
+                    if alpha > 0.01 && rFallback > 4 {
+                        drawTexturedFan(enc: enc, texture: emoteTex, cx: sx, cy: sy,
+                                        verts: c.deformedVertices, zoomPx: zoomPx,
+                                        radiusOffsetWorld: innerOff, fallbackRadiusPx: rFallback,
+                                        baseRadiusWorld: Float(c.cachedVisualRadius), alpha: alpha, viewportSize: vpPx)
                     }
                 }
             }

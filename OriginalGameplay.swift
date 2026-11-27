@@ -57,22 +57,26 @@ enum OriginalGameplay {
                               customZoomMultiplier: CGFloat = 1.0) -> CGFloat {
         let w = max(viewportSize.width, 1)
         let h = max(viewportSize.height, 1)
+        let designH: CGFloat = 320.0
+        let designW = designH * (w / h)
+        let screenScale = h / designH
         #if canImport(UIKit)
-        // BaseArenaView::calculateWindowHeight (`0x10037506c`): only deviceType == 0 (iPad)
-        // divides windowHeight by `(winW/winH)/zoomMultiplier`; iPhone uses `view.bounds.height`.
-        let isPad = UIDevice.current.userInterfaceIdiom == .pad
+        // BaseArenaView::calculateWindowHeight (`0x10037506c`): only deviceType == 0 (iPhone)
+        // divides windowHeight by `(winW/winH)/zoomMultiplier`; iPad uses `designH`.
+        let isPhone = UIDevice.current.userInterfaceIdiom != .pad
         #else
-        let isPad = false
+        let isPhone = true
         #endif
-        let phoneRatio = isPad ? ((w / h) / zoomMultiplier) : 1.0
-        let windowHeight = h / max(phoneRatio, 0.001)
+        let phoneRatio = isPhone ? ((designW / designH) / zoomMultiplier) : 1.0
+        let windowHeight = designH / max(phoneRatio, 0.001)
         let rEff = max(totalRadius, CGFloat(baseRadius))
         let n = CGFloat(max(1, cellCount))
         let scaleFactor = pow(n, 0.1)
         let maxScaleFactor = pow(n, 0.32)
         let minZoom = max(minZoomValue, (0.37 * windowHeight * maxScaleFactor) / rEff)
-        let q = min(1.0, windowHeight / (42.0 * rEff))
-        return min(pow(q, 0.4) * scaleFactor, minZoom) * customZoomMultiplier
+        let q = windowHeight / (42.0 * rEff)
+        let cocosZoom = min(pow(max(q, 0.0001), 0.4) * scaleFactor, minZoom)
+        return cocosZoom * screenScale * customZoomMultiplier
     }
 
     /// `BaseArenaView::calcPlayerCellsMassCenter` (`0x100375878`): weights by cell radius, not mass.

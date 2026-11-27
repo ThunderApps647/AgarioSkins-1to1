@@ -125,7 +125,7 @@ enum AgarPhysicsCore {
         }
     }
 
-    // MARK: - Soft-Body Vertex Spring Solver (`SoftBodyCellView::updateCellVertices`)
+    // MARK: - Soft-Body Vertex Spring Solver (`SoftBodyCellView::calcDisplacements` & `updateCellRadius`)
 
     static func deformVertices(
         cells: inout [PlayerCell],
@@ -139,7 +139,8 @@ enum AgarPhysicsCore {
         guard count > 0 else { return }
         let vertexCount = max(20, min(64, (128 / max(1, count)) & ~1))
         let trig = SoftBodyTrigCache.get(count: vertexCount)
-        let relax = 1.0 - pow(CGFloat(0.04), dt)
+        let stepScale = min(CGFloat(1.5), max(CGFloat(0.25), dt * 60.0))
+        let wobbleDecay = pow(CGFloat(0.7), stepScale)
         let visRect = visibleWorldRect
 
         for i in cells.indices {
@@ -151,12 +152,18 @@ enum AgarPhysicsCore {
             ) {
                 if !cells[i].deformedVertices.isEmpty {
                     cells[i].deformedVertices.removeAll(keepingCapacity: false)
+                    cells[i].vertexDisplacements.removeAll(keepingCapacity: false)
+                    cells[i].vertexRadii.removeAll(keepingCapacity: false)
                 }
                 continue
             }
 
-            if cells[i].deformedVertices.count != vertexCount {
+            if cells[i].deformedVertices.count != vertexCount ||
+               cells[i].vertexDisplacements.count != vertexCount ||
+               cells[i].vertexRadii.count != vertexCount {
                 cells[i].deformedVertices = [CGPoint](repeating: .zero, count: vertexCount)
+                cells[i].vertexDisplacements = [CGFloat](repeating: 0, count: vertexCount)
+                cells[i].vertexRadii = [CGFloat](repeating: visualRadius, count: vertexCount)
                 for k in 0..<vertexCount {
                     cells[i].deformedVertices[k] = CGPoint(x: trig[k].cos * visualRadius, y: trig[k].sin * visualRadius)
                 }
@@ -168,9 +175,9 @@ enum AgarPhysicsCore {
 
             var nearbyMass: [EjectedMass] = []
             var siblingNeighbors: [(pos: CGPoint, radius: CGFloat)] = []
-            let doComplex = !cells[i].isBot && count <= 20
+            let doComplex = (!cells[i].isBot || nearWall) && count <= 24
             if doComplex {
-                if let mm = massManager {
+                if !cells[i].isBot, let mm = massManager {
                     let sr = visualRadius + 100
                     nearbyMass = mm.getLimitedVisibleMassesArray(
                         in: CGRect(x: pos.x - sr, y: pos.y - sr, width: sr * 2, height: sr * 2),
@@ -191,29 +198,34 @@ enum AgarPhysicsCore {
                 }
             }
 
-            if !nearWall && nearbyMass.isEmpty && siblingNeighbors.isEmpty {
-                for k in 0..<vertexCount {
-                    let targetX = trig[k].cos * visualRadius
-                    let targetY = trig[k].sin * visualRadius
-                    let cur = cells[i].deformedVertices[k]
-                    cells[i].deformedVertices[k] = CGPoint(
-                        x: cur.x + (targetX - cur.x) * relax,
-                        y: cur.y + (targetY - cur.y) * relax
-                    )
-                }
-            } else {
-                let squashFactor = CGFloat(OriginalGameplay.percentageOfCellToSquash * 2.0)
-                let massRad = OriginalGameplay.shotMassBaseRadiusCGFloat
-                let minR = visualRadius * 0.45
+            // 1. SoftBodyCellView::calcDisplacements (`0x1003a5c34`): random jelly impulse + 0.7 damping + 3-tap smooth
+            var rawDisp = cells[i].vertexDisplacements
+            let noiseAmp: CGFloat = visualRadius > 18.0 ? 0.5 : 0.15
+            for k in 0..<vertexCount {
+                let jitter = (CGFloat.random(in: -0.5...0.5) * noiseAmp) * stepScale
+                let next = min(CGFloat(10.0), max(CGFloat(-10.0), rawDisp[k] + jitter)) * wobbleDecay
+                rawDisp[k] = next
+            }
+            var disp = rawDisp
+            for k in 0..<vertexCount {
+                let prev = rawDisp[(k - 1 + vertexCount) % vertexCount]
+                let nxt = rawDisp[(k + 1) % vertexCount]
+                disp[k] = (8.0 * rawDisp[k] + prev + nxt) / 10.0
+            }
+
+            // 2. Boundary & cell-to-cell squash when radius > 18
+            let massRad = OriginalGameplay.shotMassBaseRadiusCGFloat
+            let minR = visualRadius * 0.45
+            var radialTarget = [CGFloat](repeating: visualRadius, count: vertexCount)
+            if visualRadius > 18.0 && (nearWall || !nearbyMass.isEmpty || !siblingNeighbors.isEmpty) {
                 for k in 0..<vertexCount {
                     let c = trig[k].cos
                     let s = trig[k].sin
-                    var vx = c * visualRadius
-                    var vy = s * visualRadius
+                    let baseR = max(minR, cells[i].vertexRadii[k] + disp[k])
+                    let wx = pos.x + c * baseR
+                    let wy = pos.y + s * baseR
                     var overlap: CGFloat = 0
 
-                    let wx = pos.x + vx
-                    let wy = pos.y + vy
                     for m in nearbyMass {
                         let dx = wx - m.position.x
                         let dy = wy - m.position.y
@@ -230,25 +242,36 @@ enum AgarPhysicsCore {
                             overlap = max(overlap, (nb.radius - sqrt(d2)) * 0.55)
                         }
                     }
-                    if overlap > 0 {
-                        let rClamped = max(minR, visualRadius - overlap)
-                        vx = c * rClamped
-                        vy = s * rClamped
-                    }
                     if nearWall {
-                        if wx < 0 { vx -= wx * squashFactor }
-                        else if wx > worldSize { vx -= (wx - worldSize) * squashFactor }
-                        if wy < 0 { vy -= wy * squashFactor }
-                        else if wy > worldSize { vy -= (wy - worldSize) * squashFactor }
+                        if wx < 0 { overlap = max(overlap, -wx) }
+                        else if wx > worldSize { overlap = max(overlap, wx - worldSize) }
+                        if wy < 0 { overlap = max(overlap, -wy) }
+                        else if wy > worldSize { overlap = max(overlap, wy - worldSize) }
                     }
-
-                    let cur = cells[i].deformedVertices[k]
-                    cells[i].deformedVertices[k] = CGPoint(
-                        x: cur.x + (vx - cur.x) * relax,
-                        y: cur.y + (vy - cur.y) * relax
-                    )
+                    if overlap > 0 {
+                        let push = min(1.0, overlap / 6.0 + 0.5)
+                        disp[k] = (disp[k] > 0 ? -1.0 : (disp[k] - 1.0)) * push
+                        radialTarget[k] = max(minR, baseR - overlap * 0.8)
+                    }
                 }
             }
+            cells[i].vertexDisplacements = disp
+
+            // 3. SoftBodyCellView::updateCellRadius (`0x1003a5a0c`): 3-tap radial spring
+            var prevR = cells[i].vertexRadii
+            var nextR = prevR
+            let blend = min(1.0, stepScale)
+            for k in 0..<vertexCount {
+                let candidate = max(minR, prevR[k] + disp[k])
+                let tgt = min(visualRadius * 1.12, min(radialTarget[k], candidate))
+                let driven = (12.0 * tgt + visualRadius) / 13.0
+                let pPrev = prevR[(k - 1 + vertexCount) % vertexCount]
+                let pNext = prevR[(k + 1) % vertexCount]
+                let smoothed = (8.0 * driven + pPrev + pNext) / 10.0
+                nextR[k] = prevR[k] + (smoothed - prevR[k]) * blend
+                cells[i].deformedVertices[k] = CGPoint(x: trig[k].cos * nextR[k], y: trig[k].sin * nextR[k])
+            }
+            cells[i].vertexRadii = nextR
         }
     }
 }
