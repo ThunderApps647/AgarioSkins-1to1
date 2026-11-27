@@ -303,7 +303,12 @@ class AssetLibrary:
         en_path = os.path.join(ASSETS_DIR, "en_text.json")
         if os.path.exists(en_path):
             with open(en_path, "r", encoding="utf-8") as f:
-                self.strings = json.load(f)
+                raw_en = json.load(f)
+                texts = raw_en.get("texts", raw_en) if isinstance(raw_en, dict) else raw_en
+                if isinstance(texts, list):
+                    self.strings = {e["k"]: e["v"] for e in texts if isinstance(e, dict) and "k" in e and "v" in e}
+                elif isinstance(texts, dict):
+                    self.strings = texts
 
         for fn in os.listdir(ATLAS_DIR):
             if fn.endswith(".plist"):
@@ -401,14 +406,12 @@ def resource_scale_for(is_ipad: bool) -> float:
     return 1.0 if is_ipad else 0.46875
 
 
-def eval_dim(val: float, unit: int, parent: float, ui_scale: float) -> float:
-    if unit == 0:   # points
-        return val * ui_scale
-    if unit == 1:   # UIPoints
-        return val * ui_scale
+def eval_dim(val: float, unit: int, parent: float) -> float:
     if unit == 2:   # normalized (0..1)
         return val * parent
-    return val * ui_scale
+    if unit == 3:
+        return max(0.0, parent - val)
+    return val
 
 
 def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: AssetLibrary, out_scale: float = 2.0):
@@ -418,11 +421,13 @@ def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: As
 
     s = ui_scale_for(w_pt, h_pt, is_ipad)
     rs = resource_scale_for(is_ipad)
+    dw, dh = w_pt / s, h_pt / s
+    px_scale = s * out_scale
     canvas = Image.new("RGBA", (int(round(w_pt * out_scale)), int(round(h_pt * out_scale))), (0, 0, 0, 0))
     manifest_nodes = []
 
-    def draw_node(node, parent_rect_pt):
-        px, py, pw, ph = parent_rect_pt
+    def draw_node(node, parent_rect_dp):
+        px, py, pw, ph = parent_rect_dp
         props = node["props"]
         if props.get("visible", True) is False:
             return
@@ -430,7 +435,7 @@ def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: As
         cls = node["cls"]
         base = node["base"]
 
-        # Content size
+        # Content size in design points
         def _extract_sf(p):
             sf = p.get("spriteFrame") or p.get("displayFrame") or p.get("normalSpriteFrame")
             if isinstance(sf, tuple) and sf[0] == "spriteFrame":
@@ -441,17 +446,17 @@ def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: As
 
         cs_prop = props.get("contentSize")
         if cs_prop and cs_prop[0] == "size":
-            nw = eval_dim(cs_prop[1], cs_prop[3], pw, s)
-            nh = eval_dim(cs_prop[2], cs_prop[4], ph, s)
+            nw = eval_dim(cs_prop[1], cs_prop[3], pw)
+            nh = eval_dim(cs_prop[2], cs_prop[4], ph)
         elif cls in ("CCSprite", "MCFramedSprite") or base in ("CCSprite", "MCFramedSprite"):
             spr_name = _extract_sf(props)
             if node["varName"] == "_background" and "background" in spr_name.lower():
-                nw, nh = w_pt, h_pt
+                nw, nh = dw, dh
             else:
                 img = lib.get_sprite(spr_name) or lib.get_mcfs_image(props.get("descriptionName", ""))
                 if img is not None:
-                    nw = img.width * 0.5 * rs * s
-                    nh = img.height * 0.5 * rs * s
+                    nw = img.width * 0.5 * rs
+                    nh = img.height * 0.5 * rs
                 else:
                     nw, nh = 0.0, 0.0
         else:
@@ -462,42 +467,41 @@ def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: As
         sx, sy = (sc_prop[1], sc_prop[2]) if (isinstance(sc_prop, tuple) and sc_prop[0] == "scale") else (1.0, 1.0)
         nw_s, nh_s = nw * abs(sx), nh * abs(sy)
 
-        # Position (Cocos2d bottom-left origin -> UIKit top-left origin)
+        # Position (matching CCBIRuntime.resolvePosition in design points, top-left origin)
         pos_prop = props.get("position")
         if isinstance(pos_prop, tuple) and pos_prop[0] == "pos":
             rx, ry, ref_corner, xu, yu, _ = pos_prop[1:]
-            dx = eval_dim(rx, xu, pw, s)
-            dy = eval_dim(ry, yu, ph, s)
+            dx = eval_dim(rx, xu, pw)
+            dy = eval_dim(ry, yu, ph)
             if ref_corner == 0:   # bottom-left
-                cx, cy_cc = dx, dy
+                cx, cy_top = dx, ph - dy
             elif ref_corner == 1: # top-left
-                cx, cy_cc = dx, ph - dy
+                cx, cy_top = dx, dy
             elif ref_corner == 2: # top-right
-                cx, cy_cc = pw - dx, ph - dy
+                cx, cy_top = pw - dx, dy
             else:                 # bottom-right
-                cx, cy_cc = pw - dx, dy
+                cx, cy_top = pw - dx, ph - dy
         else:
-            cx, cy_cc = 0.0, 0.0
+            cx, cy_top = 0.0, ph
 
-        # Anchor point (root container & ignoreAnchorPointForPosition=True use 0,0)
+        # Anchor point
         ap_prop = props.get("anchorPoint")
         ax, ay = (ap_prop[1], ap_prop[2]) if (isinstance(ap_prop, tuple) and ap_prop[0] == "pt") else (0.5, 0.5)
-        is_root = (parent_rect_pt == (0.0, 0.0, w_pt, h_pt) and cls not in ("CCSprite", "MCFramedSprite"))
+        is_root = (parent_rect_dp == (0.0, 0.0, dw, dh) and cls not in ("CCSprite", "MCFramedSprite"))
         if props.get("ignoreAnchorPointForPosition", False) or is_root:
             ax, ay = 0.0, 0.0
 
-        left_pt = px + cx - ax * nw_s
-        bottom_cc = cy_cc - ay * nh_s
-        top_pt = py + (ph - (bottom_cc + nh_s))
+        left_dp = px + cx - ax * nw_s
+        top_dp = py + cy_top - (1.0 - ay) * nh_s
 
         if nw_s > 0.5 and nh_s > 0.5:
             manifest_nodes.append({
                 "cls": cls,
                 "varName": node["varName"],
-                "x": round(left_pt, 2),
-                "y": round(top_pt, 2),
-                "w": round(nw_s, 2),
-                "h": round(nh_s, 2),
+                "x": round(left_dp * s, 2),
+                "y": round(top_dp * s, 2),
+                "w": round(nw_s * s, 2),
+                "h": round(nh_s * s, 2),
             })
 
         # Render visual
@@ -506,21 +510,26 @@ def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: As
         if cls == "CCBFile" or base == "CCBFile":
             sub_file = props.get("ccbFile", "")
             if isinstance(sub_file, str) and sub_file:
-                sub_path = os.path.join(CCBI_DIR, sub_file if sub_file.endswith(".ccbi") else sub_file + ".ccbi")
+                bn = os.path.basename(sub_file)
+                if bn.endswith(".ccb"):
+                    bn = bn[:-4] + ".ccbi"
+                elif not bn.endswith(".ccbi"):
+                    bn += ".ccbi"
+                sub_path = os.path.join(CCBI_DIR, bn)
                 if os.path.exists(sub_path):
                     with open(sub_path, "rb") as sf_f:
                         sub_root = CCBIReader(sf_f.read()).parse()
-                    draw_node(sub_root, (left_pt, top_pt, max(1.0, nw_s), max(1.0, nh_s)))
-        elif cls == "CCLayerColor" or base == "CCLayerColor":
+                    draw_node(sub_root, (left_dp, top_dp, max(1.0, nw_s if nw_s > 0.5 else pw), max(1.0, nh_s if nh_s > 0.5 else ph)))
+        elif cls in ("CCLayerColor", "CCNodeColor") or base in ("CCLayerColor", "CCNodeColor"):
             col = props.get("color")
             if isinstance(col, tuple) and col[0] == "rgba":
                 rgba = (int(col[1] * 255), int(col[2] * 255), int(col[3] * 255), int(col[4] * 255 * opacity))
-                box = Image.new("RGBA", (max(1, int(round(nw_s * out_scale))), max(1, int(round(nh_s * out_scale)))), rgba)
-                canvas.alpha_composite(box, (int(round(left_pt * out_scale)), int(round(top_pt * out_scale))))
+                box = Image.new("RGBA", (max(1, int(round(nw_s * px_scale))), max(1, int(round(nh_s * px_scale)))), rgba)
+                canvas.alpha_composite(box, (int(round(left_dp * px_scale)), int(round(top_dp * px_scale))))
         elif cls in ("CCSprite", "MCFramedSprite", "CCScale9Sprite") or base in ("CCSprite", "MCFramedSprite", "CCScale9Sprite"):
             spr_name = _extract_sf(props)
             if node["varName"] == "_background" and "background" in spr_name.lower():
-                aspect = w_pt / max(1.0, h_pt)
+                aspect = dw / max(1.0, dh)
                 if aspect <= 1.48:
                     spr_name = "background-ipadpro.png"
                 elif aspect >= 1.95:
@@ -529,12 +538,19 @@ def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: As
                     spr_name = "backgroundWide.png"
             img = lib.get_sprite(spr_name) or lib.get_mcfs_image(props.get("descriptionName", ""))
             if img is not None and nw_s > 1 and nh_s > 1:
-                resized = img.resize((max(1, int(round(nw_s * out_scale))), max(1, int(round(nh_s * out_scale)))), Image.Resampling.LANCZOS)
+                resized = img.resize((max(1, int(round(nw_s * px_scale))), max(1, int(round(nh_s * px_scale)))), Image.Resampling.LANCZOS)
+                col = props.get("color")
+                if isinstance(col, tuple) and col[0] == "rgba" and (col[1] < 0.99 or col[2] < 0.99 or col[3] < 0.99):
+                    r, g, b, a = resized.split()
+                    r = r.point(lambda p: int(p * col[1]))
+                    g = g.point(lambda p: int(p * col[2]))
+                    b = b.point(lambda p: int(p * col[3]))
+                    resized = Image.merge("RGBA", (r, g, b, a))
                 if opacity < 0.99:
                     r, g, b, a = resized.split()
                     a = a.point(lambda p: int(p * opacity))
                     resized = Image.merge("RGBA", (r, g, b, a))
-                canvas.alpha_composite(resized, (int(round(left_pt * out_scale)), int(round(top_pt * out_scale))))
+                canvas.alpha_composite(resized, (int(round(left_dp * px_scale)), int(round(top_dp * px_scale))))
         elif cls in ("CCLabelTTF", "MCLabelTTF") or base in ("CCLabelTTF", "MCLabelTTF"):
             txt = props.get("string", "")
             if isinstance(txt, tuple):
@@ -544,16 +560,33 @@ def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: As
             fsize_prop = props.get("fontSize")
             fsize = fsize_prop[0] if isinstance(fsize_prop, tuple) else float(fsize_prop or 14.0)
             fname = props.get("fontName", "Ubuntu-Bold")
-            font = lib.get_font(fname, int(round(fsize * s * out_scale)))
+            font = lib.get_font(fname, int(round(fsize * px_scale)))
             draw = ImageDraw.Draw(canvas)
-            tx = int(round((left_pt + nw_s * 0.5) * out_scale))
-            ty = int(round((top_pt + nh_s * 0.5) * out_scale))
-            draw.text((tx, ty), str(txt), font=font, fill=(255, 255, 255, int(255 * opacity)), anchor="mm")
+            tx = int(round((left_dp + nw_s * 0.5) * px_scale))
+            ty = int(round((top_dp + nh_s * 0.5) * px_scale))
+            lcol = props.get("fontColor") or props.get("color")
+            if isinstance(lcol, tuple) and lcol[0] == "rgba":
+                fill_rgba = (int(lcol[1] * 255), int(lcol[2] * 255), int(lcol[3] * 255), int(255 * opacity))
+            else:
+                fill_rgba = (255, 255, 255, int(255 * opacity))
+            draw.text((tx, ty), str(txt), font=font, fill=fill_rgba, anchor="mm")
 
+        child_w = nw_s if nw_s > 0.5 else pw
+        child_h = nh_s if nh_s > 0.5 else ph
         for ch in node["children"]:
-            draw_node(ch, (left_pt, top_pt, nw_s, nh_s))
+            draw_node(ch, (left_dp, top_dp, child_w, child_h))
 
-    draw_node(root, (0.0, 0.0, w_pt, h_pt))
+    # Center modal roots (contentSize < viewport) to match CCBISceneView(centerRoot: true)
+    cs_root = root["props"].get("contentSize")
+    origin_x, origin_y = 0.0, 0.0
+    if cs_root and cs_root[0] == "size" and cs_root[3] != 2 and cs_root[4] != 2:
+        rw = eval_dim(cs_root[1], cs_root[3], dw)
+        rh = eval_dim(cs_root[2], cs_root[4], dh)
+        if 10.0 < rw < dw and 10.0 < rh < dh:
+            origin_x = (dw - rw) * 0.5
+            origin_y = (dh - rh) * 0.5
+
+    draw_node(root, (origin_x, origin_y, dw, dh))
     return canvas, manifest_nodes
 
 
@@ -561,14 +594,24 @@ def main():
     os.makedirs(OUT_DIR, exist_ok=True)
     lib = AssetLibrary()
     targets = [
-        "MenuMain", "MenuSettings", "MenuShopSkins", "PotionSlot",
+        "MenuMain", "MenuSettings", "MenuShopSkins", "MenuMysteryPotions", "PotionSlot",
         "Controls-Sides", "Score", "EmojiWidget", "PauseButton",
-        "LeaderboardWidget", "MenuBattleResultPopup"
+        "LeaderboardWidget", "MenuPause", "ContinueGame", "MenuBattleResultPopup"
     ]
     manifest = {"iPhone": {}, "iPad": {}}
+    bg_cache = {}
     for name in targets:
         for dev, (w, h, is_ipad) in [("iPhone", (852.0, 393.0, False)), ("iPad", (1024.0, 768.0, True))]:
             img, nodes = render_ccbi(name, w, h, is_ipad, lib)
+            if name == "MenuMain":
+                bg_cache[dev] = img
+            elif name in ("MenuPause", "ContinueGame", "MenuBattleResultPopup") and dev in bg_cache:
+                # Match SwiftUI modal backdrop: MenuMain underneath + Color.black.opacity(0.55)
+                base = bg_cache[dev].copy()
+                dim = Image.new("RGBA", base.size, (0, 0, 0, int(255 * 0.55)))
+                base.alpha_composite(dim)
+                base.alpha_composite(img)
+                img = base
             out_png = os.path.join(OUT_DIR, f"{dev}_{name}.png")
             img.save(out_png)
             manifest[dev][name] = nodes

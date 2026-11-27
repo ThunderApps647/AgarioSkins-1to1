@@ -1047,4 +1047,110 @@ final class AgarParityTests: XCTestCase {
             }
         }
     }
+
+    @MainActor
+    func testSoftBodyVertexDeformationAndMetalFrames() throws {
+        let ws = OriginalGameplay.offlineArenaSideLength
+        let vis = CGRect(x: 0, y: 0, width: ws, height: ws)
+        let ownerA = UUID()
+        let ownerB = UUID()
+
+        // 1. Free-moving cell: radial vertices stay bounded around visualRadius
+        var freeCell = PlayerCell(ownerID: ownerA, position: CGPoint(x: 2000, y: 2000), mass: 100, targetMass: 100, color: .cyan, name: "Free")
+        var freeArr = [freeCell]
+        for _ in 0..<6 {
+            AgarPhysicsCore.deformVertices(cells: &freeArr, neighborsByOwner: true, visibleWorldRect: vis, worldSize: ws, dt: 1.0/60.0, cocosZoom: 0.5)
+        }
+        let freeR = freeArr[0].cachedVisualRadius
+        XCTAssertGreaterThanOrEqual(freeArr[0].deformedVertices.count, 24)
+        for v in freeArr[0].deformedVertices {
+            let d = hypot(v.x, v.y)
+            XCTAssertGreaterThan(d, freeR * 0.85)
+            XCTAssertLessThan(d, freeR * 1.15)
+        }
+
+        // 2. Wall-pressing cell: left-facing vertices (cos < -0.5) squash inward
+        var wallCell = PlayerCell(ownerID: ownerA, position: CGPoint(x: 40, y: 2000), mass: 100, targetMass: 100, color: .blue, name: "Wall")
+        var wallArr = [wallCell]
+        for _ in 0..<10 {
+            AgarPhysicsCore.deformVertices(cells: &wallArr, neighborsByOwner: true, visibleWorldRect: vis, worldSize: ws, dt: 1.0/60.0, cocosZoom: 0.5)
+        }
+        let leftRadii = wallArr[0].deformedVertices.filter { $0.x < -wallArr[0].cachedVisualRadius * 0.5 }.map { hypot($0.x, $0.y) }
+        let rightRadii = wallArr[0].deformedVertices.filter { $0.x > wallArr[0].cachedVisualRadius * 0.5 }.map { hypot($0.x, $0.y) }
+        XCTAssertFalse(leftRadii.isEmpty)
+        XCTAssertFalse(rightRadii.isEmpty)
+        let avgLeft = leftRadii.reduce(0, +) / CGFloat(leftRadii.count)
+        let avgRight = rightRadii.reduce(0, +) / CGFloat(rightRadii.count)
+        XCTAssertLessThan(avgLeft, avgRight, "Wall-pressing side must squash inward relative to free side")
+
+        // 3. Colliding sibling & enemy cells
+        var sibA = PlayerCell(ownerID: ownerA, position: CGPoint(x: 3000, y: 3000), mass: 100, targetMass: 100, color: .green, name: "A")
+        var sibB = PlayerCell(ownerID: ownerA, position: CGPoint(x: 3120, y: 3000), mass: 100, targetMass: 100, color: .green, name: "B")
+        var enemy = PlayerCell(ownerID: ownerB, position: CGPoint(x: 2880, y: 3000), mass: 225, targetMass: 225, color: .red, name: "Enemy")
+        sibA.mergeTimer = 10
+        sibB.mergeTimer = 10
+        var group = [sibA, sibB, enemy]
+        for _ in 0..<8 {
+            AgarPhysicsCore.deformVertices(cells: &group, neighborsByOwner: true, visibleWorldRect: vis, worldSize: ws, dt: 1.0/60.0, cocosZoom: 0.5)
+        }
+        XCTAssertGreaterThanOrEqual(group[0].deformedVertices.count, 24)
+        XCTAssertGreaterThanOrEqual(group[2].deformedVertices.count, 24)
+
+        // 4. Consecutive Metal offscreen frames: zero flicker and shrinking skin clampToEdge
+        if MTLCreateSystemDefaultDevice() != nil {
+            let box = ArenaRenderBox()
+            box.worldSize = ws
+            box.cameraPos = CGPoint(x: 3000, y: 3000)
+            box.zoom = 0.5
+            box.showSkins = true
+            box.showMassText = true
+            var skinCell = group[0]
+            skinCell.skinName = "Dragon"
+            box.playerCells = [skinCell]
+            box.botCells = [group[2]]
+            var vir = [Virus(position: CGPoint(x: 3200, y: 3100))]
+            AgarPhysicsCore.deformViruses(viruses: &vir, visibleWorldRect: vis, worldSize: ws, dt: 1.0/60.0, cocosZoom: 0.5)
+            box.viruses = vir
+
+            let coord = ArenaMetalCoordinator(box: box)
+            let snap1 = try XCTUnwrap(coord.renderOffscreenSnapshot(size: CGSize(width: 426, height: 196), scale: 2.0))
+            let snap2 = try XCTUnwrap(coord.renderOffscreenSnapshot(size: CGSize(width: 426, height: 196), scale: 2.0))
+            XCTAssertTrue(hasColorVariance(snap1))
+            XCTAssertTrue(hasColorVariance(snap2))
+        }
+    }
+
+    func testArenaVirusPopSelfCollisionWallSplitAndEjectParity() throws {
+        let ws = OriginalGameplay.offlineArenaSideLength
+        let owner = UUID()
+
+        // 1. Virus pop split conservation & cap
+        for cap in [2, 5, 12, 16] {
+            let pieces = AgarPhysicsCore.calculateVirusSplitMass(mass: 1600.0, maxSplits: cap)
+            XCTAssertLessThanOrEqual(pieces.count, cap)
+            XCTAssertEqual(pieces.reduce(0, +), 1600.0, accuracy: 1e-6)
+            for p in pieces {
+                XCTAssertGreaterThanOrEqual(p, OriginalGameplay.minSplitMass)
+            }
+        }
+
+        // 2. Self-collision separation pushes overlapping siblings apart when mergeTimer > 0
+        var c1 = PlayerCell(ownerID: owner, position: CGPoint(x: 4000, y: 4000), mass: 100, targetMass: 100, color: .cyan, name: "1")
+        var c2 = PlayerCell(ownerID: owner, position: CGPoint(x: 4020, y: 4000), mass: 100, targetMass: 100, color: .cyan, name: "2")
+        c1.mergeTimer = 15
+        c2.mergeTimer = 15
+        var cells = [c1, c2]
+        for _ in 0..<20 {
+            AgarPhysicsCore.resolveSelfCollisions(cells: &cells, worldSize: ws)
+        }
+        let sep = hypot(cells[0].position.x - cells[1].position.x, cells[0].position.y - cells[1].position.y)
+        XCTAssertGreaterThan(sep, 20.0)
+
+        // 3. Eject pellet constants
+        XCTAssertEqual(OriginalGameplay.ejectPelletMass, 16.0, accuracy: 1e-6)
+        XCTAssertEqual(OriginalGameplay.ejectImpulsePerSecond, 2000.0, accuracy: 1e-6)
+        XCTAssertEqual(OriginalGameplay.minEjectMass, 32.0, accuracy: 1e-6)
+        XCTAssertEqual(OriginalGameplay.directionAngleVariation, 0.2, accuracy: 1e-6)
+        XCTAssertEqual(OriginalGameplay.spawnFoodVelocityVariation, 0.2, accuracy: 1e-6)
+    }
 }

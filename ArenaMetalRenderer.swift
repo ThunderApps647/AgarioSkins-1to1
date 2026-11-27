@@ -298,6 +298,31 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
     private var solidBuf: [SolidVertex] = []
     private var trigCache: [Int: [(cos: Float, sin: Float)]] = [:]
 
+    // Triple-buffered per-frame vertex rings to prevent CPU/GPU races and per-frame allocation flicker
+    private let maxFramesInFlight = 3
+    private lazy var inFlightSemaphore = DispatchSemaphore(value: maxFramesInFlight)
+    private var frameRingIndex: Int = 0
+    private var solidRingBuffers: [MTLBuffer] = []
+    private var solidRingCursors: [Int] = [0, 0, 0]
+    private var texRingBuffers: [MTLBuffer] = []
+    private var texRingCursors: [Int] = [0, 0, 0]
+
+    private func ensureRingBuffer(buffers: inout [MTLBuffer], frameIdx: Int, used: Int, neededEnd: Int) -> MTLBuffer? {
+        while buffers.count < maxFramesInFlight {
+            guard let b = device.makeBuffer(length: 256 * 1024, options: .storageModeShared) else { return nil }
+            buffers.append(b)
+        }
+        if neededEnd > buffers[frameIdx].length {
+            let newCap = max(neededEnd, buffers[frameIdx].length * 2)
+            guard let grown = device.makeBuffer(length: newCap, options: .storageModeShared) else { return nil }
+            if used > 0 {
+                memcpy(grown.contents(), buffers[frameIdx].contents(), used)
+            }
+            buffers[frameIdx] = grown
+        }
+        return buffers[frameIdx]
+    }
+
     init(box: ArenaRenderBox) {
         self.box = box
         guard let dev = MTLCreateSystemDefaultDevice(),
@@ -431,11 +456,21 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         enc.setVertexBytes(&vp, length: MemoryLayout<SIMD2<Float>>.stride, index: 1)
         if byteLen <= 4096 {
             enc.setVertexBytes(solidBuf, length: byteLen, index: 0)
-        } else if let buf = device.makeBuffer(bytes: solidBuf, length: byteLen, options: .storageModeShared) {
-            enc.setVertexBuffer(buf, offset: 0, index: 0)
         } else {
-            solidBuf.removeAll(keepingCapacity: true)
-            return
+            let alignedOffset = (solidRingCursors[frameRingIndex] + 15) & ~15
+            let neededEnd = alignedOffset + byteLen
+            if let buf = ensureRingBuffer(buffers: &solidRingBuffers, frameIdx: frameRingIndex, used: solidRingCursors[frameRingIndex], neededEnd: neededEnd) {
+                solidBuf.withUnsafeBytes { raw in
+                    if let base = raw.baseAddress {
+                        memcpy(buf.contents().advanced(by: alignedOffset), base, byteLen)
+                    }
+                }
+                solidRingCursors[frameRingIndex] = neededEnd
+                enc.setVertexBuffer(buf, offset: alignedOffset, index: 0)
+            } else {
+                solidBuf.removeAll(keepingCapacity: true)
+                return
+            }
         }
         enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: solidBuf.count)
         solidBuf.removeAll(keepingCapacity: true)
@@ -509,21 +544,38 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         enc.setVertexBytes(&vp, length: MemoryLayout<SIMD2<Float>>.stride, index: 1)
         if byteLen <= 4096 {
             enc.setVertexBytes(verts, length: byteLen, index: 0)
-        } else if let buf = device.makeBuffer(bytes: verts, length: byteLen, options: .storageModeShared) {
-            enc.setVertexBuffer(buf, offset: 0, index: 0)
         } else {
-            return
+            let alignedOffset = (texRingCursors[frameRingIndex] + 15) & ~15
+            let neededEnd = alignedOffset + byteLen
+            if let buf = ensureRingBuffer(buffers: &texRingBuffers, frameIdx: frameRingIndex, used: texRingCursors[frameRingIndex], neededEnd: neededEnd) {
+                verts.withUnsafeBytes { raw in
+                    if let base = raw.baseAddress {
+                        memcpy(buf.contents().advanced(by: alignedOffset), base, byteLen)
+                    }
+                }
+                texRingCursors[frameRingIndex] = neededEnd
+                enc.setVertexBuffer(buf, offset: alignedOffset, index: 0)
+            } else {
+                return
+            }
         }
         enc.setFragmentTexture(texture, index: 0)
         enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: verts.count)
     }
 
     func draw(in view: MTKView) {
+        inFlightSemaphore.wait()
         guard let drawable = view.currentDrawable,
               let passDesc = view.currentRenderPassDescriptor,
               let cmdBuf = commandQueue.makeCommandBuffer() else {
+            inFlightSemaphore.signal()
             return
         }
+        let sem = inFlightSemaphore
+        cmdBuf.addCompletedHandler { _ in sem.signal() }
+        frameRingIndex = (frameRingIndex + 1) % maxFramesInFlight
+        solidRingCursors[frameRingIndex] = 0
+        texRingCursors[frameRingIndex] = 0
         guard renderFrame(
             passDesc: passDesc,
             drawableSize: view.drawableSize,
@@ -531,6 +583,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
             contentScale: view.contentScaleFactor,
             commandBuffer: cmdBuf
         ) else {
+            cmdBuf.commit()
             return
         }
         cmdBuf.present(drawable)
@@ -555,6 +608,8 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         pass.colorAttachments[0].storeAction = .store
         pass.colorAttachments[0].clearColor = MTLClearColor(red: 1, green: 1, blue: 1, alpha: 1)
 
+        solidRingCursors[frameRingIndex] = 0
+        texRingCursors[frameRingIndex] = 0
         guard renderFrame(
             passDesc: pass,
             drawableSize: CGSize(width: w, height: h),

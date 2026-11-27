@@ -97,11 +97,11 @@ def main():
         ("iPhone_Live_01_MainMenu.png", "iPhone_MenuMain.png"),
         ("iPhone_Live_02_Settings.png", "iPhone_MenuSettings.png"),
         ("iPhone_Live_03_Skins.png", "iPhone_MenuShopSkins.png"),
-        ("iPhone_Live_02b_Potions.png", "iPhone_PotionSlot.png"),
+        ("iPhone_Live_02b_Potions.png", "iPhone_MenuMysteryPotions.png"),
         ("iPad_Live_01_MainMenu.png", "iPad_MenuMain.png"),
         ("iPad_Live_02_Settings.png", "iPad_MenuSettings.png"),
         ("iPad_Live_03_Skins.png", "iPad_MenuShopSkins.png"),
-        ("iPad_Live_02b_Potions.png", "iPad_PotionSlot.png"),
+        ("iPad_Live_02b_Potions.png", "iPad_MenuMysteryPotions.png"),
     ]
 
     failures = []
