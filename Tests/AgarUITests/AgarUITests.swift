@@ -175,6 +175,16 @@ final class AgarUITests: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.35))
             capture(app, name: "Live_05b_Arena_Emote_and_Leaderboard.png")
         }
+        waitAndTap(pauseBtn)
+        let resumeNo = firstExisting(app, ids: ["ccbi.quitCancelButtonCallback", "ccbi._noButton"], timeout: 3.0)
+        XCTAssertNotNil(resumeNo, "MenuPause modal should open when Pause is tapped")
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        capture(app, name: "Live_06_Arena_HUD_and_Pause.png")
+        if let resumeNo {
+            waitAndTap(resumeNo)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+
         if let splitBtn = firstExisting(app, ids: ["hud.split"], timeout: 2.0) {
             waitAndTap(splitBtn)
             RunLoop.current.run(until: Date().addingTimeInterval(0.15))
@@ -183,12 +193,5 @@ final class AgarUITests: XCTestCase {
             waitAndTap(feedBtn)
             RunLoop.current.run(until: Date().addingTimeInterval(0.15))
         }
-
-        waitAndTap(pauseBtn)
-        let resumeNo = firstExisting(app, ids: ["ccbi.quitCancelButtonCallback", "ccbi._noButton"], timeout: 3.0)
-        XCTAssertNotNil(resumeNo, "MenuPause modal should open when Pause is tapped")
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        capture(app, name: "Live_06_Arena_HUD_and_Pause.png")
-        if let resumeNo { waitAndTap(resumeNo) }
     }
 }

@@ -13312,8 +13312,8 @@ struct MainMenu: View {
                             "_tabLabelGrey": "No Skin"
                         ],
                         visibilityOverrides: [
-                            "_whiteTabNode": selectedSkinName != nil,
-                            "_greyTabNode": selectedSkinName == nil
+                            "_whiteTabNode": true,
+                            "_greyTabNode": false
                         ],
                         designScaleModifier: { _ in s }
                     )
