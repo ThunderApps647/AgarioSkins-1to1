@@ -360,7 +360,7 @@ enum AgarPhysicsCore {
             cells[i].vertexDisplacements = disp
 
             // 3. SoftBodyCellView::updateCellRadius (`0x1003a5a0c`): 3-tap radial spring
-            var prevR = cells[i].vertexRadii
+            let prevR = cells[i].vertexRadii
             var nextR = prevR
             let blend = min(1.0, stepScale)
             for k in 0..<cellVertexCount {
@@ -482,7 +482,7 @@ enum AgarPhysicsCore {
             }
             viruses[i].vertexDisplacements = disp
 
-            var prevR = viruses[i].vertexRadii
+            let prevR = viruses[i].vertexRadii
             var nextR = prevR
             let blend = min(1.0, stepScale)
             for k in 0..<vCount {

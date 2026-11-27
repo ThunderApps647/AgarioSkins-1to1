@@ -12401,8 +12401,8 @@ struct EmojiWidgetHUD: View, Equatable {
                     actions: ["onToggle": onToggle],
                     activeSequenceName: seqName,
                     sequencePlayID: toggleSeqID,
-                    slotViews: ["_selector": selectorList],
                     heightOverrides: ["_selectorArea": 76],
+                    slotViews: ["_selector": selectorList],
                     designScaleModifier: { _ in s }
                 )
             )
