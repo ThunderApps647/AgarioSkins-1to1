@@ -71,8 +71,8 @@ Latest local audit (`Build/ci_artifacts6`, 8 pairs):
 |------|------|
 | iPhone Settings | 0.9272 |
 | iPad Settings | 0.9205 |
-| iPhone MainMenu | 0.7999 |
-| iPad MainMenu | 0.8783 |
+| iPhone MainMenu | 0.8115 |
+| iPad MainMenu | 0.8856 |
 | iPhone Skins | 0.7663 |
 | iPad Skins | 0.8355 |
 | iPhone Potions | 0.8304 |
