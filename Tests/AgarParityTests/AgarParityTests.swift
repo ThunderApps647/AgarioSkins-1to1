@@ -662,7 +662,14 @@ final class AgarParityTests: XCTestCase {
                 let host = UIHostingController(rootView: root)
                 host.view.frame = CGRect(origin: .zero, size: size)
                 host.view.backgroundColor = .white
-                keyWin.addSubview(host.view)
+                let parentVC = keyWin.rootViewController
+                if let parentVC {
+                    parentVC.addChild(host)
+                    parentVC.view.addSubview(host.view)
+                    host.didMove(toParent: parentVC)
+                } else {
+                    keyWin.addSubview(host.view)
+                }
                 host.view.setNeedsLayout()
                 host.view.layoutIfNeeded()
                 RunLoop.main.run(until: Date().addingTimeInterval(0.05))
@@ -670,7 +677,9 @@ final class AgarParityTests: XCTestCase {
                 let img = UIGraphicsImageRenderer(size: size, format: fmt).image { _ in
                     host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
                 }
+                if parentVC != nil { host.willMove(toParent: nil) }
                 host.view.removeFromSuperview()
+                if parentVC != nil { host.removeFromParent() }
                 return img
             }
             return UIImage()

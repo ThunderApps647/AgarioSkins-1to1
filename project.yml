@@ -52,6 +52,15 @@ targets:
     info:
       path: Info.plist
       properties:
+        UIInterfaceOrientation: UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIRequiresFullScreen: true
+        UIStatusBarHidden: true
         NSBonjourServices:
           - _http._tcp
         NSAppTransportSecurity:
