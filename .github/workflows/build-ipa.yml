@@ -20,6 +20,37 @@ jobs:
           brew install xcodegen
           xcodegen generate
 
+      - name: Run Golden Vector XCTests & Simulator Snapshots
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/agar_snapshots build/snapshots
+          SIM_ID=$(xcrun simctl list devices available iPhone -j | python3 -c "import sys,json; d=json.load(sys.stdin)['devices']; c=[x['udid'] for k,v in sorted(d.items(), reverse=True) for x in v if x.get('isAvailable')]; print(c[0])")
+          echo "Using Simulator UDID: $SIM_ID"
+          xcrun simctl boot "$SIM_ID" || true
+          TEST_RUNNER_AGAR_SNAPSHOT_DIR=/tmp/agar_snapshots xcodebuild test \
+            -project "Agar.io.xcodeproj" \
+            -scheme "Agar.io" \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=$SIM_ID" \
+            -resultBundlePath build/TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" | tee build/xctest.log
+          cp -R /tmp/agar_snapshots/* build/snapshots/ 2>/dev/null || true
+          if [ -d build/TestResults.xcresult ]; then
+            xcrun xcresulttool export attachments --path build/TestResults.xcresult --output-path build/snapshots/xcresult_attachments 2>/dev/null || true
+          fi
+
+      - name: Upload Test Logs & Simulator Snapshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SimulatorSnapshots-and-Logs
+          path: |
+            build/xctest.log
+            build/snapshots/
+            build/TestResults.xcresult
+
       - name: Archive iOS App
         run: |
           xcodebuild archive \

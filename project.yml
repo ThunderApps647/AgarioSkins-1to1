@@ -19,6 +19,7 @@ targets:
           - ".swiftpm/**"
           - "Package.swift"
           - "project.yml"
+          - "Tests/**"
           - "Resources/extracted-images-1766733943703.zip"
           - "Resources/AgarAssets/**"
       - path: Resources/AgarAssets
@@ -28,6 +29,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.agario.recreation
         PRODUCT_NAME: "Agar.io"
+        PRODUCT_MODULE_NAME: AgarioApp
+        ENABLE_TESTABILITY: YES
         TARGETED_DEVICE_FAMILY: "1,2"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: YES
@@ -42,6 +45,9 @@ targets:
         CODE_SIGNING_ALLOWED: NO
         CODE_SIGNING_REQUIRED: NO
         CODE_SIGN_IDENTITY: ""
+    scheme:
+      testTargets:
+        - AgarParityTests
     info:
       path: Info.plist
       properties:
@@ -58,3 +64,26 @@ targets:
           - Ubuntu-Medium.ttf
           - Ubuntu-Semibold.ttf
           - UbuntuSans-Bold.ttf
+  AgarParityTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "18.1"
+    sources:
+      - path: Tests/AgarParityTests
+        excludes:
+          - "Fixtures/**"
+      - path: Tests/AgarParityTests/Fixtures
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - target: Agar.io
+    settings:
+      base:
+        SWIFT_VERSION: "5.0"
+        SWIFT_UPCOMING_FEATURE_BARE_SLASH_REGEX_LITERALS: YES
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Agar.io.app/Agar.io"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""

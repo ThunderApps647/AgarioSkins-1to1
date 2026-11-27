@@ -1,0 +1,603 @@
+{
+  "metadata": {
+    "source": "agarskins.ipa (Payload/agar.io.app/agar.io + GameConfiguration.json + ValueMap.json)",
+    "constants": {
+      "arenaSideLength": 11180.0,
+      "offlineArenaSideLength": 7905.0,
+      "baseRadius": 31.6227766016837,
+      "minRadiusToShoot": 56.56854249,
+      "minRadiusToSplit": 60.0,
+      "shotMassBaseRadius": 40.0,
+      "virusBaseRadius": 100.01,
+      "virusSplitRadius": 141.421356237,
+      "velocityMultiplier": 106.06601717,
+      "inputFactorPow": -0.45,
+      "baseVelocityCompensation": 20.0,
+      "cellDeceleration": 0.87965,
+      "onSplitVelocity": 100.0,
+      "onShootFoodVelocity": 100.0,
+      "mitosisPositionFactor": 20.0,
+      "halfSizeForSplitting": 0.707106781186547,
+      "scaleFactorForEating": 0.866,
+      "eatMassRatio": 1.333411560144862,
+      "overlapRatioForEating": 0.5,
+      "percentageOfCellToSquash": 0.4,
+      "timeToMergeBackMs": 30000.0,
+      "cooldownForShootButtonMs": 60.0,
+      "cooldownForSplitButtonMs": 5.0,
+      "zoomMultiplier": 1.5,
+      "cameraPositionSnapRate": 0.315,
+      "cameraScaleSnapRate": 0.07,
+      "minDPadRadiusFactor": 0.6,
+      "joystickMaxRadius1x": 30.375
+    }
+  },
+  "massSpeedMergeVectors": [
+    {
+      "mass": 10.0,
+      "radius": 31.622776601683796,
+      "speed": 448.3387295758411,
+      "mergeTimerSec": 30.2
+    },
+    {
+      "mass": 18.0,
+      "radius": 42.426406871192846,
+      "speed": 392.7986108419828,
+      "mergeTimerSec": 30.36
+    },
+    {
+      "mass": 32.0,
+      "radius": 56.568542494923804,
+      "speed": 345.10202823244293,
+      "mergeTimerSec": 30.64
+    },
+    {
+      "mass": 36.0,
+      "radius": 60.0,
+      "speed": 336.0765375314367,
+      "mergeTimerSec": 30.72
+    },
+    {
+      "mass": 100.0,
+      "radius": 100.0,
+      "speed": 267.0584086862189,
+      "mergeTimerSec": 32.0
+    },
+    {
+      "mass": 134.0,
+      "radius": 115.75836902790226,
+      "speed": 250.0389561839772,
+      "mergeTimerSec": 32.68
+    },
+    {
+      "mass": 500.0,
+      "radius": 223.60679774997897,
+      "speed": 185.92509235145073,
+      "mergeTimerSec": 40.0
+    },
+    {
+      "mass": 2500.0,
+      "radius": 500.0,
+      "speed": 129.44037274823808,
+      "mergeTimerSec": 80.0
+    },
+    {
+      "mass": 10000.0,
+      "radius": 1000.0,
+      "speed": 94.75589910928265,
+      "mergeTimerSec": 230.0
+    },
+    {
+      "mass": 20000.0,
+      "radius": 1414.213562373095,
+      "speed": 81.07267593198475,
+      "mergeTimerSec": 430.0
+    }
+  ],
+  "splitAndEjectVectors": [
+    {
+      "mass": 10.0,
+      "radius": 31.622776601683796,
+      "canSplit": false,
+      "canEject": false,
+      "splitChildMass": 5.0,
+      "splitChildRadius": 22.360679774997884,
+      "splitImpulsePerSec": 2000.0,
+      "ejectImpulsePerSec": 2000.0,
+      "ejectPelletMass": 16.0
+    },
+    {
+      "mass": 31.9,
+      "radius": 56.480084985771754,
+      "canSplit": false,
+      "canEject": false,
+      "splitChildMass": 15.95,
+      "splitChildRadius": 39.93745109543169,
+      "splitImpulsePerSec": 2000.0,
+      "ejectImpulsePerSec": 2000.0,
+      "ejectPelletMass": 16.0
+    },
+    {
+      "mass": 32.0,
+      "radius": 56.568542494923804,
+      "canSplit": false,
+      "canEject": true,
+      "splitChildMass": 16.0,
+      "splitChildRadius": 39.99999999999997,
+      "splitImpulsePerSec": 2000.0,
+      "ejectImpulsePerSec": 2000.0,
+      "ejectPelletMass": 16.0
+    },
+    {
+      "mass": 35.9,
+      "radius": 59.916608715780974,
+      "canSplit": false,
+      "canEject": true,
+      "splitChildMass": 17.95,
+      "splitChildRadius": 42.36744032862969,
+      "splitImpulsePerSec": 2000.0,
+      "ejectImpulsePerSec": 2000.0,
+      "ejectPelletMass": 16.0
+    },
+    {
+      "mass": 36.0,
+      "radius": 60.0,
+      "canSplit": true,
+      "canEject": true,
+      "splitChildMass": 18.0,
+      "splitChildRadius": 42.426406871192825,
+      "splitImpulsePerSec": 2000.0,
+      "ejectImpulsePerSec": 2000.0,
+      "ejectPelletMass": 16.0
+    },
+    {
+      "mass": 100.0,
+      "radius": 100.0,
+      "canSplit": true,
+      "canEject": true,
+      "splitChildMass": 50.0,
+      "splitChildRadius": 70.7106781186547,
+      "splitImpulsePerSec": 2000.0,
+      "ejectImpulsePerSec": 2000.0,
+      "ejectPelletMass": 16.0
+    },
+    {
+      "mass": 1000.0,
+      "radius": 316.2277660168379,
+      "canSplit": true,
+      "canEject": true,
+      "splitChildMass": 500.0,
+      "splitChildRadius": 223.6067977499788,
+      "splitImpulsePerSec": 2000.0,
+      "ejectImpulsePerSec": 2000.0,
+      "ejectPelletMass": 16.0
+    }
+  ],
+  "virusVectors": [
+    {
+      "cellMass": 130.0,
+      "cellCount": 1,
+      "canPopVirus": false,
+      "popMinMass": 133.36782557910067,
+      "virusSplitMass": 199.99999999912458
+    },
+    {
+      "cellMass": 135.0,
+      "cellCount": 1,
+      "canPopVirus": true,
+      "popMinMass": 133.36782557910067,
+      "virusSplitMass": 199.99999999912458
+    },
+    {
+      "cellMass": 400.0,
+      "cellCount": 1,
+      "canPopVirus": true,
+      "popMinMass": 133.36782557910067,
+      "virusSplitMass": 199.99999999912458
+    },
+    {
+      "cellMass": 2000.0,
+      "cellCount": 10,
+      "canPopVirus": true,
+      "popMinMass": 133.36782557910067,
+      "virusSplitMass": 199.99999999912458
+    }
+  ],
+  "eatOverlapVectors": [
+    {
+      "eaterMass": 200.0,
+      "victimMass": 160.0,
+      "dist": 0.0,
+      "expectedEat": false
+    },
+    {
+      "eaterMass": 200.0,
+      "victimMass": 149.0,
+      "dist": 100.0,
+      "expectedEat": true
+    },
+    {
+      "eaterMass": 200.0,
+      "victimMass": 149.0,
+      "dist": 142.4213562373095,
+      "expectedEat": false
+    },
+    {
+      "eaterMass": 1000.0,
+      "victimMass": 740.0,
+      "dist": 315.7277660168379,
+      "expectedEat": true
+    }
+  ],
+  "impulseDecayVectors": [
+    {
+      "dt": 0.008333333333333333,
+      "factor": 0.9799416666666667
+    },
+    {
+      "dt": 0.016666666666666666,
+      "factor": 0.9598833333333333
+    },
+    {
+      "dt": 0.03333333333333333,
+      "factor": 0.9197666666666667
+    },
+    {
+      "dt": 0.05,
+      "factor": 0.87965
+    }
+  ],
+  "joystickVectors": [
+    {
+      "offsetX": 0.0,
+      "offsetY": 0.0,
+      "maxRadius": 30.375,
+      "expectedScale": 0.0,
+      "expectedStopped": true
+    },
+    {
+      "offsetX": 7.59375,
+      "offsetY": 0.0,
+      "maxRadius": 30.375,
+      "expectedScale": 0.0,
+      "expectedStopped": true
+    },
+    {
+      "offsetX": 17.92125,
+      "offsetY": 0.0,
+      "maxRadius": 30.375,
+      "expectedScale": 0.0,
+      "expectedStopped": true
+    },
+    {
+      "offsetX": 18.224999999999998,
+      "offsetY": 0.0,
+      "maxRadius": 30.375,
+      "expectedScale": 0.0,
+      "expectedStopped": true
+    },
+    {
+      "offsetX": 21.2625,
+      "offsetY": 0.0,
+      "maxRadius": 30.375,
+      "expectedScale": 0.25000000000000006,
+      "expectedStopped": false
+    },
+    {
+      "offsetX": 25.818749999999998,
+      "offsetY": 0.0,
+      "maxRadius": 30.375,
+      "expectedScale": 0.6249999999999999,
+      "expectedStopped": false
+    },
+    {
+      "offsetX": 30.375,
+      "offsetY": 0.0,
+      "maxRadius": 30.375,
+      "expectedScale": 1.0,
+      "expectedStopped": false
+    }
+  ],
+  "cameraZoomVectors": [
+    {
+      "viewportName": "iPhone15Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "totalRadius": 31.622776601683796,
+      "cellCount": 1,
+      "expectedZoom": 0.5998194345604252,
+      "expectedInputDist": 320.1623218979199,
+      "expectedWorldReach": 480.9338495547626
+    },
+    {
+      "viewportName": "iPhone15Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "totalRadius": 31.622776601683796,
+      "cellCount": 4,
+      "expectedZoom": 0.6890115977748121,
+      "expectedInputDist": 320.1623218979199,
+      "expectedWorldReach": 418.677233638072
+    },
+    {
+      "viewportName": "iPhone15Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "totalRadius": 31.622776601683796,
+      "cellCount": 16,
+      "expectedZoom": 0.7914664889378054,
+      "expectedInputDist": 320.1623218979199,
+      "expectedWorldReach": 364.4797015828866
+    },
+    {
+      "viewportName": "iPhone15Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "totalRadius": 100.0,
+      "cellCount": 1,
+      "expectedZoom": 0.3784604775978569,
+      "expectedInputDist": 320.1623218979199,
+      "expectedWorldReach": 762.2287841834606
+    },
+    {
+      "viewportName": "iPhone15Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "totalRadius": 100.0,
+      "cellCount": 4,
+      "expectedZoom": 0.43473692804805053,
+      "expectedInputDist": 320.1623218979199,
+      "expectedWorldReach": 663.5586974314314
+    },
+    {
+      "viewportName": "iPhone15Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "totalRadius": 100.0,
+      "cellCount": 16,
+      "expectedZoom": 0.49938159410525995,
+      "expectedInputDist": 320.1623218979199,
+      "expectedWorldReach": 577.661397828975
+    },
+    {
+      "viewportName": "iPhone15Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "totalRadius": 223.60679774997897,
+      "cellCount": 1,
+      "expectedZoom": 0.2743004576686747,
+      "expectedInputDist": 320.1623218979199,
+      "expectedWorldReach": 1051.6696623574394
+    },
+    {
+      "viewportName": "iPhone15Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "totalRadius": 223.60679774997897,
+      "cellCount": 4,
+      "expectedZoom": 0.31508848449894056,
+      "expectedInputDist": 320.1623218979199,
+      "expectedWorldReach": 915.5316169667135
+    },
+    {
+      "viewportName": "iPhone15Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "totalRadius": 223.60679774997897,
+      "cellCount": 16,
+      "expectedZoom": 0.3619416238224417,
+      "expectedInputDist": 320.1623218979199,
+      "expectedWorldReach": 797.016564865784
+    },
+    {
+      "viewportName": "iPhone15Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "totalRadius": 707.1067811865476,
+      "cellCount": 1,
+      "expectedZoom": 0.14228315507594363,
+      "expectedInputDist": 320.1623218979199,
+      "expectedWorldReach": 1666.7840885881837
+    },
+    {
+      "viewportName": "iPhone15Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "totalRadius": 707.1067811865476,
+      "cellCount": 4,
+      "expectedZoom": 0.19880739345574006,
+      "expectedInputDist": 320.1623218979199,
+      "expectedWorldReach": 1451.01982721346
+    },
+    {
+      "viewportName": "iPhone15Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "totalRadius": 707.1067811865476,
+      "cellCount": 16,
+      "expectedZoom": 0.2283697258238569,
+      "expectedInputDist": 320.1623218979199,
+      "expectedWorldReach": 1263.1861279345226
+    },
+    {
+      "viewportName": "iPhone15Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "totalRadius": 1414.213562373095,
+      "cellCount": 1,
+      "expectedZoom": 0.07114157753797182,
+      "expectedInputDist": 320.1623218979199,
+      "expectedWorldReach": 2548.1325448163875
+    },
+    {
+      "viewportName": "iPhone15Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "totalRadius": 1414.213562373095,
+      "cellCount": 4,
+      "expectedZoom": 0.11086199471751736,
+      "expectedInputDist": 320.1623218979199,
+      "expectedWorldReach": 1914.632140696479
+    },
+    {
+      "viewportName": "iPhone15Pro",
+      "w": 852.0,
+      "h": 393.0,
+      "totalRadius": 1414.213562373095,
+      "cellCount": 16,
+      "expectedZoom": 0.17275947902879793,
+      "expectedInputDist": 320.1623218979199,
+      "expectedWorldReach": 1666.784088588184
+    },
+    {
+      "viewportName": "iPhone16_9",
+      "w": 568.0,
+      "h": 320.0,
+      "totalRadius": 31.622776601683796,
+      "cellCount": 1,
+      "expectedZoom": 0.5290752378275554,
+      "expectedInputDist": 353.82992828951683,
+      "expectedWorldReach": 510.6695364744621
+    },
+    {
+      "viewportName": "iPhone16_9",
+      "w": 568.0,
+      "h": 320.0,
+      "totalRadius": 31.622776601683796,
+      "cellCount": 4,
+      "expectedZoom": 0.607747855362178,
+      "expectedInputDist": 353.82992828951683,
+      "expectedWorldReach": 444.5636526360135
+    },
+    {
+      "viewportName": "iPhone16_9",
+      "w": 568.0,
+      "h": 320.0,
+      "totalRadius": 31.622776601683796,
+      "cellCount": 16,
+      "expectedZoom": 0.6981189617075098,
+      "expectedInputDist": 353.82992828951683,
+      "expectedWorldReach": 387.0151382232641
+    },
+    {
+      "viewportName": "iPhone16_9",
+      "w": 568.0,
+      "h": 320.0,
+      "totalRadius": 100.0,
+      "cellCount": 1,
+      "expectedZoom": 0.33382390708990106,
+      "expectedInputDist": 353.82992828951683,
+      "expectedWorldReach": 809.3566719556472
+    },
+    {
+      "viewportName": "iPhone16_9",
+      "w": 568.0,
+      "h": 320.0,
+      "totalRadius": 100.0,
+      "cellCount": 4,
+      "expectedZoom": 0.3834629729328524,
+      "expectedInputDist": 353.82992828951683,
+      "expectedWorldReach": 704.585906678465
+    },
+    {
+      "viewportName": "iPhone16_9",
+      "w": 568.0,
+      "h": 320.0,
+      "totalRadius": 100.0,
+      "cellCount": 16,
+      "expectedZoom": 0.4404832862102401,
+      "expectedInputDist": 353.82992828951683,
+      "expectedWorldReach": 613.3776579494481
+    },
+    {
+      "viewportName": "iPhone16_9",
+      "w": 568.0,
+      "h": 320.0,
+      "totalRadius": 223.60679774997897,
+      "cellCount": 1,
+      "expectedZoom": 0.24194877910819276,
+      "expectedInputDist": 353.82992828951683,
+      "expectedWorldReach": 1116.6934069987408
+    },
+    {
+      "viewportName": "iPhone16_9",
+      "w": 568.0,
+      "h": 320.0,
+      "totalRadius": 223.60679774997897,
+      "cellCount": 4,
+      "expectedZoom": 0.27792616455512203,
+      "expectedInputDist": 353.82992828951683,
+      "expectedWorldReach": 972.1380744918217
+    },
+    {
+      "viewportName": "iPhone16_9",
+      "w": 568.0,
+      "h": 320.0,
+      "totalRadius": 223.60679774997897,
+      "cellCount": 16,
+      "expectedZoom": 0.3192533280351039,
+      "expectedInputDist": 353.82992828951683,
+      "expectedWorldReach": 846.295348350465
+    },
+    {
+      "viewportName": "iPhone16_9",
+      "w": 568.0,
+      "h": 320.0,
+      "totalRadius": 707.1067811865476,
+      "cellCount": 1,
+      "expectedZoom": 0.14150103024082347,
+      "expectedInputDist": 353.82992828951683,
+      "expectedWorldReach": 1769.8397788185118
+    },
+    {
+      "viewportName": "iPhone16_9",
+      "w": 568.0,
+      "h": 320.0,
+      "totalRadius": 707.1067811865476,
+      "cellCount": 4,
+      "expectedZoom": 0.175359554749265,
+      "expectedInputDist": 353.82992828951683,
+      "expectedWorldReach": 1540.735016394343
+    },
+    {
+      "viewportName": "iPhone16_9",
+      "w": 568.0,
+      "h": 320.0,
+      "totalRadius": 707.1067811865476,
+      "cellCount": 16,
+      "expectedZoom": 0.2014352320734932,
+      "expectedInputDist": 353.82992828951683,
+      "expectedWorldReach": 1341.2877364121587
+    },
+    {
+      "viewportName": "iPhone16_9",
+      "w": 568.0,
+      "h": 320.0,
+      "totalRadius": 1414.213562373095,
+      "cellCount": 1,
+      "expectedZoom": 0.07075051512041174,
+      "expectedInputDist": 353.82992828951683,
+      "expectedWorldReach": 2548.1325448163875
+    },
+    {
+      "viewportName": "iPhone16_9",
+      "w": 568.0,
+      "h": 320.0,
+      "totalRadius": 1414.213562373095,
+      "cellCount": 4,
+      "expectedZoom": 0.11025259074911892,
+      "expectedInputDist": 353.82992828951683,
+      "expectedWorldReach": 2033.0120425371406
+    },
+    {
+      "viewportName": "iPhone16_9",
+      "w": 568.0,
+      "h": 320.0,
+      "totalRadius": 1414.213562373095,
+      "cellCount": 16,
+      "expectedZoom": 0.15265935916633014,
+      "expectedInputDist": 353.82992828951683,
+      "expectedWorldReach": 1769.839778818512
+    }
+  ]
+}

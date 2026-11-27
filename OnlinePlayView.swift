@@ -494,6 +494,7 @@ struct OnlineGameView: View {
                                 emojiToggleCount += 1
                             }
                         )
+                        .equatable()
                         .zIndex(2)
                         .opacity(isLeavePopupPresented ? 0 : 1)
                         .allowsHitTesting(!isLeavePopupPresented)
@@ -605,20 +606,11 @@ struct OnlineGameView: View {
                     joystickBasePosition = value.startLocation
                     joystickIsDragging = true
                 }
-                let maxDistance: CGFloat = 65.0
-                var basePos = joystickBasePosition ?? value.startLocation
-                var dx = value.location.x - basePos.x
-                var dy = value.location.y - basePos.y
-                let distance = sqrt(dx * dx + dy * dy)
-                let followLimit = maxDistance * 1.35
-                if distance > followLimit && distance > 0.001 {
-                    let excess = distance - followLimit
-                    basePos.x += (dx / distance) * excess
-                    basePos.y += (dy / distance) * excess
-                    joystickBasePosition = basePos
-                    dx = value.location.x - basePos.x
-                    dy = value.location.y - basePos.y
-                }
+                let s = OriginalGameplay.uiScale(for: geometry.size)
+                let maxDistance: CGFloat = 30.375 * s
+                let basePos = joystickBasePosition ?? value.startLocation
+                let dx = value.location.x - basePos.x
+                let dy = value.location.y - basePos.y
                 let clampedDist = sqrt(dx * dx + dy * dy)
                 if clampedDist > maxDistance && clampedDist > 0.001 {
                     let ratio = maxDistance / clampedDist
@@ -626,7 +618,7 @@ struct OnlineGameView: View {
                 } else {
                     joystickOffset = CGSize(width: dx, height: dy)
                 }
-                agarJoystick.updateTouch(offset: joystickOffset)
+                agarJoystick.updateTouch(offset: joystickOffset, maxRadius: maxDistance)
                 lastJoystickDirection = agarJoystick.lastNonZeroDirection
                 sendInputNow()
             }
@@ -666,7 +658,7 @@ struct OnlineGameView: View {
                         playerCells: playerCells, playerCenter: playerCenter, zoomLevel: $zoomLevel)
         }
         if joystickIsDragging {
-            JoystickView(joystickOffset: $joystickOffset, joystickBasePosition: $joystickBasePosition)
+            JoystickView(joystickOffset: $joystickOffset, joystickBasePosition: $joystickBasePosition, uiScale: OriginalGameplay.uiScale(for: geometry.size))
         }
     }
 
@@ -794,21 +786,21 @@ struct OnlineGameView: View {
             VStack(spacing: 16) {
                 if let error = errorText {
                     Text("Couldn't join")
-                        .font(.custom("UbuntuSans-Bold", size: 24)).foregroundColor(.white)
+                        .font(.custom("OpenSans-Bold", size: 24)).foregroundColor(.white)
                     Text(error)
-                        .font(.custom("UbuntuSans-Bold", size: 15))
+                        .font(.custom("OpenSans-Bold", size: 15))
                         .foregroundColor(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
                     Button(action: { onExit() }) {
                         Text("Back")
-                            .font(.custom("UbuntuSans-Bold", size: 18)).foregroundColor(.white)
+                            .font(.custom("OpenSans-Bold", size: 18)).foregroundColor(.white)
                             .padding(.horizontal, 30).padding(.vertical, 12)
                             .background(Color.blue.cornerRadius(14))
                     }
                 } else {
                     ProgressView().scaleEffect(1.4).tint(.white)
                     Text("Joining \(host)…")
-                        .font(.custom("UbuntuSans-Bold", size: 18)).foregroundColor(.white)
+                        .font(.custom("OpenSans-Bold", size: 18)).foregroundColor(.white)
                 }
             }
             .padding(30)
@@ -821,22 +813,22 @@ struct OnlineGameView: View {
             Color.black.opacity(0.55).edgesIgnoringSafeArea(.all)
             VStack(spacing: 18) {
                 Text("You were eaten!")
-                    .font(.custom("UbuntuSans-Bold", size: 26)).foregroundColor(.white)
+                    .font(.custom("OpenSans-Bold", size: 26)).foregroundColor(.white)
                 Text("Score: \(highScore)")
-                    .font(.custom("UbuntuSans-Bold", size: 18)).foregroundColor(.white.opacity(0.85))
+                    .font(.custom("OpenSans-Bold", size: 18)).foregroundColor(.white.opacity(0.85))
                 HStack(spacing: 14) {
                     Button(action: {
                         connectionPhase = .connecting
                         net.sendRespawn()
                     }) {
                         Text("Respawn")
-                            .font(.custom("UbuntuSans-Bold", size: 18)).foregroundColor(.white)
+                            .font(.custom("OpenSans-Bold", size: 18)).foregroundColor(.white)
                             .padding(.horizontal, 28).padding(.vertical, 12)
                             .background(Color.blue.cornerRadius(14))
                     }
                     Button(action: { leaveMatch() }) {
                         Text("Leave")
-                            .font(.custom("UbuntuSans-Bold", size: 18)).foregroundColor(.white)
+                            .font(.custom("OpenSans-Bold", size: 18)).foregroundColor(.white)
                             .padding(.horizontal, 28).padding(.vertical, 12)
                             .background(Color.red.opacity(0.85).cornerRadius(14))
                     }

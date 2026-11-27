@@ -1,14 +1,16 @@
 import Foundation
 import CoreGraphics
 
-/// Direct clean-room port of `JoystickInput` (`0x10028dfd0`, `0x10028e158`, `0x10028df08`).
+/// Direct clean-room port of `JoystickInput` (`0x10028dfd0`, `0x10028e158`, `0x10028df08`)
+/// with `ValueMap.json` (`minDPadRadiusFactor = 0.6`) and `JoystickView` (`0x1000e2b1c`) geometry.
 struct AgarJoystickInput {
-    /// Touch-pad outer radius (screen points), matching `ControlsWidget`.
-    var maxRadius: CGFloat = 65.0
-    /// Inner deadzone before directional thrust kicks in (screen points).
-    var minRadius: CGFloat = 8.0
-    /// Floating-base follow threshold (`maxRadius * 1.35`).
-    var maxDetectionFactor: CGFloat = 1.35
+    /// Default outer radius (`0.5 * 82 - 0.25 * 42.5 = 30.375` design pt, scaled by `uiScale` at runtime).
+    var maxRadius: CGFloat = 30.375
+    /// Center deadzone factor (`minDPadRadiusFactor = 0.6`).
+    var minRadiusFactor: CGFloat = 0.6
+    var minRadius: CGFloat { maxRadius * minRadiusFactor }
+    /// Fixed-DPad mode detection factor (`maxDPadDetectionRadiusFactor = 1.7`).
+    var maxDetectionFactor: CGFloat = 1.7
     /// Decay duration (seconds) when `stopOnRelease` is active.
     var decayTime: TimeInterval = 0.25
 
@@ -31,13 +33,17 @@ struct AgarJoystickInput {
     }
 
     /// `JoystickInput::updateAxisWithTouchPosition:priority:` (`0x10028dfd0`)
-    mutating func updateTouch(offset: CGSize) {
+    mutating func updateTouch(offset: CGSize, maxRadius overrideMaxRadius: CGFloat? = nil) {
+        if let overrideMaxRadius {
+            maxRadius = max(1.0, overrideMaxRadius)
+        }
         wasDragging = true
         releaseTimer = 0.0
         let dx = offset.width
         let dy = offset.height
         let dist = hypot(dx, dy)
-        let rawMag = min(1.0, max(0.0, dist / max(1.0, maxRadius)))
+        let activeMax = max(1.0, maxRadius)
+        let rawMag = min(1.0, max(0.0, dist / activeMax))
 
         var dir = CGSize(width: dx, height: dy)
         if dist > 0.001 {
@@ -47,7 +53,7 @@ struct AgarJoystickInput {
             dir = lastNonZeroDirection
         }
 
-        // Tight low-throw angular damping (`rawMag < 0.20`): prevents center jitter while allowing crisp reversals (`0x102766790`)
+        // Low-throw angular blend (`rawMag < 0.20`, `0x102766790`)
         let curMag = hypot(axis.width, axis.height)
         if rawMag < 0.20 && curMag > 0.001 && dist > 0.001 {
             let newAngle = atan2(dir.height, dir.width)
@@ -59,16 +65,21 @@ struct AgarJoystickInput {
             dir = CGSize(width: cos(blended), height: sin(blended))
         }
 
-        // Smooth 0..1 curve between `minRadius` and `maxRadius`
-        let span = max(1.0, maxRadius - minRadius)
-        let mag = dist <= minRadius ? 0.0 : min(1.0, (dist - minRadius) / span)
+        // `minDPadRadiusFactor = 0.6`: smooth 0..1 curve between minRadius and maxRadius;
+        // inside deadzone emits 9e-5 vector so heading persists while `isStopped = true` (`0x10028e0ec`).
+        let deadzone = minRadius
+        let span = max(1.0, activeMax - deadzone)
+        let mag = dist <= deadzone ? 0.0 : min(1.0, (dist - deadzone) / span)
         scale = mag
 
         if mag > 0.001 {
             axis = CGSize(width: dir.width * mag, height: dir.height * mag)
             lastNonZeroDirection = dir
         } else {
-            axis = .zero
+            axis = CGSize(width: dir.width * 9e-5, height: dir.height * 9e-5)
+            if dist > 0.001 {
+                lastNonZeroDirection = dir
+            }
         }
         axisAtRelease = axis
     }

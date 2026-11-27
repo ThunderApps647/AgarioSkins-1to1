@@ -152,7 +152,8 @@ enum OriginalGameplay {
     static var ejectImpulsePerSecond: Double { onShootFoodVelocity * baseVelocityCompensation }
 
     static func impulseDecay(dt: Double) -> Double {
-        pow(cellDeceleration, dt * baseVelocityCompensation)
+        // Exact `agar.io` ARM64 (`0x10004c4c4`): factor = 1.0 - baseVelocityCompensation * (1.0 - cellDeceleration) * dt
+        return max(0.0, 1.0 - baseVelocityCompensation * (1.0 - cellDeceleration) * dt)
     }
 
     static func impulseDecay(dt: CGFloat) -> CGFloat {
@@ -191,6 +192,10 @@ struct MCFSFrame: View {
         switch name {
         case "mcfs-divider", "mcfs-leaderboard-party-outline":
             return (0, 0, 0, 0)
+        case "mcfs-leaderboard-collapsed":
+            return (0.10, 0.90, 0.90, 0.10)
+        case "mcfs-leaderboard-expanded":
+            return (0.80, 0.40, 0.10, 0.40)
         case "mcfs-leaderboard-content-float":
             return (0.10, 0.40, 0.80, 0.40)
         case "mcfs-red-timer-frame":

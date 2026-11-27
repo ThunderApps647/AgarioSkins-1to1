@@ -4825,23 +4825,13 @@ struct ContentView: View {
                                     joystickBasePosition = value.startLocation
                                     joystickIsDragging = true
                                 }
-                                let maxDistance: CGFloat = 65.0
-                                // Dynamic Floating D-Pad (`maxDPadDetectionRadiusFactor` = 1.7):
-                                // base follows once finger exceeds 1.35 * maxDistance so direction reversals
-                                // respond immediately without losing small/medium circle gestures.
-                                var basePos = joystickBasePosition ?? value.startLocation
-                                var dx = value.location.x - basePos.x
-                                var dy = value.location.y - basePos.y
-                                let distance = sqrt(dx * dx + dy * dy)
-                                let followLimit = maxDistance * 1.35
-                                if distance > followLimit && distance > 0.001 {
-                                    let excess = distance - followLimit
-                                    basePos.x += (dx / distance) * excess
-                                    basePos.y += (dy / distance) * excess
-                                    joystickBasePosition = basePos
-                                    dx = value.location.x - basePos.x
-                                    dy = value.location.y - basePos.y
-                                }
+                                // Retail `ControlsWidget` (`0x1000ebc84` / `0x1000e2b1c`): base stays anchored where
+                                // `touchesBegan` placed it (never chases finger on drag), and `_maxRadius = 0.5*82 - 0.25*42.5 = 30.375 * s`.
+                                let s = OriginalGameplay.uiScale(for: geometry.size)
+                                let maxDistance: CGFloat = 30.375 * s
+                                let basePos = joystickBasePosition ?? value.startLocation
+                                let dx = value.location.x - basePos.x
+                                let dy = value.location.y - basePos.y
                                 let clampedDist = sqrt(dx * dx + dy * dy)
                                 if clampedDist > maxDistance && clampedDist > 0.001 {
                                     let ratio = maxDistance / clampedDist
@@ -4849,7 +4839,7 @@ struct ContentView: View {
                                 } else {
                                     joystickOffset = CGSize(width: dx, height: dy)
                                 }
-                                agarJoystick.updateTouch(offset: joystickOffset)
+                                agarJoystick.updateTouch(offset: joystickOffset, maxRadius: maxDistance)
                                 lastJoystickDirection = agarJoystick.lastNonZeroDirection
                                 trackRecruitmentCircle(offset: joystickOffset, now: CACurrentMediaTime())
                                 trackForcedFeedCircle(offset: joystickOffset, now: CACurrentMediaTime())
@@ -4933,6 +4923,7 @@ struct ContentView: View {
                                 emojiToggleCount += 1
                             }
                         )
+                        .equatable()
                         .zIndex(2)
                         .opacity(isLeavePopupPresented ? 0 : 1)
                         .allowsHitTesting(!isLeavePopupPresented)
@@ -10399,9 +10390,6 @@ struct ContentView: View {
             ? flockCenter
             : CGPoint(x: flockCenter.x + unitDir.width * reach.worldReach,
                       y: flockCenter.y + unitDir.height * reach.worldReach)
-        let analogThrottle: CGFloat = (joystickIsDragging || stopOnRelease)
-            ? min(1.0, max(0.25, rawMag))
-            : 1.0
         let baseRadius = CGFloat(OriginalGameplay.baseRadius)
 
         var idToIndex = [UUID: Int]()
@@ -10471,7 +10459,7 @@ struct ContentView: View {
                     k = min(1.0, distToTarget / max(solidRadius, 1.0)) * dirMag
                     step = min(playerCells[i].cachedMovementSpeed * k * dt, distToTarget)
                 } else {
-                    k = min(1.0, (reach.inputDist * dirMag) / solidRadius) * analogThrottle
+                    k = min(1.0, (reach.inputDist * dirMag) / solidRadius)
                     step = playerCells[i].cachedMovementSpeed * k * dt
                 }
                 playerCells[i].position.x += (dirX / dirMag) * step
@@ -10484,7 +10472,8 @@ struct ContentView: View {
             let impulseDecay = OriginalGameplay.impulseDecay(dt: dt)
             playerCells[i].velocity.width *= impulseDecay
             playerCells[i].velocity.height *= impulseDecay
-            if abs(playerCells[i].velocity.width) < 0.5 && abs(playerCells[i].velocity.height) < 0.5 {
+            let stopSpeed = CGFloat(OriginalGameplay.minVelocityToMove * OriginalGameplay.baseVelocityCompensation)
+            if abs(playerCells[i].velocity.width) < stopSpeed && abs(playerCells[i].velocity.height) < stopSpeed {
                 playerCells[i].velocity = .zero
             }
             if playerCells[i].splitTimer > 0 {
@@ -11140,10 +11129,8 @@ struct ContentView: View {
         
         let joyX = Double(lastJoystickDirection.width)
         let joyY = Double(lastJoystickDirection.height)
-        let magnitude = sqrt(joyX * joyX + joyY * joyY)
-        let maxJoystickRadius: Double = 65.0
-        let isParallel = !centerAimUntilCursorMoves &&
-        magnitude > (maxJoystickRadius * 0.9)
+        let magnitude = Double(agarJoystick.scale)
+        let isParallel = !centerAimUntilCursorMoves && magnitude >= 0.9
         
         var minX: CGFloat = playerCells[0].position.x
         var maxX: CGFloat = playerCells[0].position.x
@@ -11164,9 +11151,9 @@ struct ContentView: View {
         let center = playerCenter
         var targetPoint = center
         
-        if !isParallel && !centerAimUntilCursorMoves {
+        if !isParallel && !centerAimUntilCursorMoves && (joyX * joyX + joyY * joyY) > 0.0001 {
             let convergenceScaling: Double = 15.0
-            var dist = magnitude * convergenceScaling
+            var dist = magnitude * 30.375 * convergenceScaling
             let minSafeDist = Double(flockRadius + 50)
             if dist < minSafeDist { dist = minSafeDist }
             let dirNorm = lastJoystickDirection.normalized()
@@ -11764,6 +11751,7 @@ struct TopBarHUD: View, Equatable {
                         ccbFile: "PauseButton.ccbi",
                         context: CCBIBindingContext(
                             actions: ["pauseButtonCallback": onPause],
+                            useImmediateTouch: true,
                             designScaleModifier: { _ in s }
                         )
                     )
@@ -11781,14 +11769,15 @@ struct TopBarHUD: View, Equatable {
 
                     HStack(spacing: 6 * s) {
                         HStack(spacing: 4 * s) {
-                            Image("token").resizable().aspectRatio(contentMode: .fit).frame(width: 15 * s, height: 15 * s)
-                            StrokedHUDText(text: "\(tokenCount)", fontSize: 13 * s, fill: .white)
+                            Image("token").resizable().aspectRatio(contentMode: .fit).frame(width: 14 * s, height: 14 * s)
+                            Text("\(tokenCount)")
+                                .font(.custom("OpenSans-Bold", size: 13.5 * s))
+                                .foregroundColor(Color(red: 0.5569, green: 0.5569, blue: 0.5569))
                         }
                         if showFPS {
                             Text("\(fps) FPS")
                                 .font(.custom("OpenSans-Bold", size: 11 * s))
-                                .foregroundColor(fps >= 100 ? Color(hex: 0x54C826) : (fps >= 55 ? .white : .orange))
-                                .shadow(color: .black.opacity(0.6), radius: 1)
+                                .foregroundColor(fps >= 100 ? Color(hex: 0x54C826) : Color(red: 0.5569, green: 0.5569, blue: 0.5569))
                         }
                     }
                     .offset(x: 50 * s, y: 27 * s)
@@ -11931,16 +11920,29 @@ struct LeaderboardHUDButton: View {
     private var currentWidth: CGFloat { expandedH ? expandedWidth : collapsedSide }
     private var currentHeight: CGFloat { expandedV ? expandedHeight : collapsedSide }
 
+    @ViewBuilder
+    private func hudSlice(_ plist: String, fallback: String) -> some View {
+        if let mcfs = CCBIAtlasStore.shared.mcfs(for: plist) {
+            let pair = mcfs.uiImageAndInsets(forUIScale: uiScale)
+            Image(uiImage: pair.0).resizable(capInsets: pair.1, resizingMode: .stretch)
+        } else {
+            MCFSFrame(name: fallback)
+        }
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             if expandedV {
                 VStack(spacing: 0) {
-                    MCFSFrame(name: "mcfs-leaderboard-expanded")
+                    hudSlice("FramedSprites/Bundle/MCFS_leaderboard_expanded_float.plist", fallback: "mcfs-leaderboard-expanded")
                         .frame(height: headerBottom + separatorHeight)
-                    MCFSFrame(name: "mcfs-leaderboard-content-float")
+                    hudSlice("FramedSprites/Bundle/MCFS_leaderboard_content_float.plist", fallback: "mcfs-leaderboard-content-float")
                 }
             } else {
-                MCFSFrame(name: expandedH ? "mcfs-leaderboard-expanded" : "mcfs-leaderboard-collapsed")
+                hudSlice(
+                    expandedH ? "FramedSprites/Bundle/MCFS_leaderboard_expanded_float.plist" : "FramedSprites/Bundle/MCFS_hud_button.plist",
+                    fallback: expandedH ? "mcfs-leaderboard-expanded" : "mcfs-hud-button"
+                )
             }
         }
         .overlay(
@@ -11968,8 +11970,8 @@ struct LeaderboardHUDButton: View {
         .overlay(rowsBlock, alignment: .topLeading)
         .frame(width: currentWidth, height: currentHeight)
         .animation(.easeInOut(duration: slideDuration), value: rows.count)
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-        .contentShape(RoundedRectangle(cornerRadius: cornerRadius))
+        .clipped()
+        .contentShape(Rectangle())
         .gesture(pressGesture)
         .frame(width: currentWidth, height: collapsedSide, alignment: .topTrailing)
     }
@@ -11996,7 +11998,7 @@ struct LeaderboardHUDButton: View {
         let rowColorPlayer = Color(hex: 0xFFE38A)
         return VStack(alignment: .leading, spacing: 0) {
             ForEach(rows, id: \.rank) { row in
-                let maxNameW = expandedWidth - (row.isPartyMember ? 46 : 30) * uiScale
+                let maxNameW = max(20, expandedWidth - (showPfpColumn ? 52 : 36) * uiScale)
                 let rowCtx = CCBIBindingContext(
                     labelOverrides: [
                         "_positionLabel": "\(row.rank).",
@@ -12021,8 +12023,8 @@ struct LeaderboardHUDButton: View {
                     context: rowCtx
                 )
                 .frame(width: expandedWidth, height: rowSlot)
-                .offset(x: showPfpColumn ? 0 : -10 * uiScale)
-                .shadow(color: Color.black.opacity(0.65), radius: 0.8, x: 0, y: 0.8)
+                .offset(x: showPfpColumn ? 4 * uiScale : -11 * uiScale)
+                .shadow(color: Color.black.opacity(0.45), radius: 0.5, x: 0, y: 0.7)
                 .transition(.identity)
             }
         }
@@ -12251,10 +12253,10 @@ struct ActionButtonsHUD: View, Equatable {
 
             let controlsCtx = CCBIBindingContext(
                 opacityOverrides: [
-                    "_splitButton": canSplit ? 1.0 : 0.45,
-                    "_alternativeSplitButton": canSplit ? 1.0 : 0.45,
-                    "_shootButton": canFeed ? (feedPressed ? 0.55 : 1.0) : 0.45,
-                    "_alternativeShootButton": canFeed ? (feedPressed ? 0.55 : 1.0) : 0.45
+                    "_splitButton": canSplit ? 1.0 : 0.50,
+                    "_alternativeSplitButton": canSplit ? 1.0 : 0.50,
+                    "_shootButton": canFeed ? (feedPressed ? 0.60 : 1.0) : 0.50,
+                    "_alternativeShootButton": canFeed ? (feedPressed ? 0.60 : 1.0) : 0.50
                 ],
                 replacingSlotViews: [
                     "_splitButton": splitSlot,
@@ -12349,12 +12351,18 @@ struct MinimapHUD: View {
     }
 }
 
-struct EmojiWidgetHUD: View {
+struct EmojiWidgetHUD: View, Equatable {
     let isOpen: Bool
     let toggleSeqID: Int
     let isOnCooldown: Bool
     let onToggle: () -> Void
     let onSelect: (String) -> Void
+
+    static func == (lhs: EmojiWidgetHUD, rhs: EmojiWidgetHUD) -> Bool {
+        lhs.isOpen == rhs.isOpen
+        && lhs.toggleSeqID == rhs.toggleSeqID
+        && lhs.isOnCooldown == rhs.isOnCooldown
+    }
 
     private let emotes = ["emoji-tongue", "emoji-scared"]
 
@@ -12382,6 +12390,7 @@ struct EmojiWidgetHUD: View {
                     }
                 }
                 .padding(.top, 2 * s)
+                .allowsHitTesting(isOpen)
             )
 
             CCBISceneView(
@@ -12391,6 +12400,7 @@ struct EmojiWidgetHUD: View {
                     activeSequenceName: seqName,
                     sequencePlayID: toggleSeqID,
                     heightOverrides: ["_selectorArea": 70],
+                    useImmediateTouch: true,
                     slotViews: ["_selector": selectorContent],
                     designScaleModifier: { _ in s }
                 )
@@ -13164,8 +13174,8 @@ struct MainMenu: View {
         }
     }
 
-    /// MenuShopSkins.ccbi full-screen 1:1 Skin Picker (GenericHeader + CoinsBar/DNABar + tabs + mcfs-gray body)
-    private func skinsModalOverlay(scale s: CGFloat, containerSize: CGSize) -> some View {
+    /// MenuShopSkins.ccbi full-screen 1:1 Skin Picker (GenericHeader + CoinsBar/DNABar + tabs + horizontal MCScrollList)
+    func skinsModalOverlay(scale s: CGFloat, containerSize: CGSize) -> some View {
         let filteredSkins: [String] = {
             let full = ["Dragon"] + availableSkins
             switch selectedSkinsTab {
@@ -13176,10 +13186,11 @@ struct MainMenu: View {
             }
         }()
         let tabNames = ["All Skins", "Owned", "Dual Skins"]
-        let minCard = max(78, 86 * s)
+        let isNarrowAspect = (containerSize.width / max(containerSize.height, 1)) < 1.55
+        let cardsPerScreen: CGFloat = isNarrowAspect ? 3.67 : 4.55
 
         let tabsSlot = AnyView(
-            HStack(spacing: 4 * s) {
+            HStack(spacing: 8 * s) {
                 ForEach(0..<tabNames.count, id: \.self) { idx in
                     let selected = selectedSkinsTab == idx
                     CCBISceneView(
@@ -13228,80 +13239,68 @@ struct MainMenu: View {
                     withAnimation { showSkinsModal = false }
                 }
             }
-            .padding(.horizontal, 10 * s)
+            .padding(.horizontal, 8 * s)
             .offset(y: 12 * s)
         )
 
         let tableSlot = AnyView(
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: minCard), spacing: 8 * s)], spacing: 8 * s) {
-                    ForEach(filteredSkins, id: \.self) { skin in
-                        let isSelected = selectedSkinName == skin
-                        let isDual = DualSkinCatalog.shared.isDual(skin)
-                        let cardTitle = skin == "Dragon" ? "Dragon" : "Skin #\(skin)"
-                        let skinPreview = AnyView(
-                            ZStack(alignment: .topTrailing) {
-                                SkinSelectorPreview(skinName: skin)
-                                    .frame(width: 44 * s, height: 44 * s)
-                                if isDual {
-                                    Text("DUAL")
-                                        .font(.custom("OpenSans-Bold", size: 7 * s))
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 4 * s)
-                                        .padding(.vertical, 1 * s)
-                                        .background(Capsule().fill(Color(hex: 0x9B4DFF)))
-                                        .offset(x: 4 * s, y: -2 * s)
+            GeometryReader { tableGeo in
+                let cardW = max(72 * s, tableGeo.size.width / cardsPerScreen)
+                let cardH = max(120 * s, tableGeo.size.height)
+                let skinSide = min(cardW * 0.68, cardH * 0.44)
+                ScrollView(.horizontal, showsIndicators: true) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(filteredSkins, id: \.self) { skin in
+                            let isSelected = selectedSkinName == skin
+                            let isDual = DualSkinCatalog.shared.isDual(skin)
+                            let cardTitle = skin == "Dragon" ? "Dragon" : "Skin #\(skin)"
+                            let skinPreview = AnyView(
+                                ZStack(alignment: .topTrailing) {
+                                    SkinSelectorPreview(skinName: skin)
+                                        .frame(width: skinSide, height: skinSide)
+                                    if isDual {
+                                        Text("DUAL")
+                                            .font(.custom("OpenSans-Bold", size: 8 * s))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 5 * s)
+                                            .padding(.vertical, 1.5 * s)
+                                            .background(Capsule().fill(Color(hex: 0x9B4DFF)))
+                                            .offset(x: 4 * s, y: -2 * s)
+                                    }
                                 }
-                            }
-                            .frame(width: 10 * s, height: 10 * s)
-                        )
-                        let cardCtx = CCBIBindingContext(
-                            actions: [
-                                "useButtonCallback": { selectedSkinName = skin },
-                                "cancelButtonCallback": { selectedSkinName = nil }
-                            ],
-                            labelOverrides: [
-                                "_normalTitle": cardTitle,
-                                "_blueTitle": cardTitle
-                            ],
-                            visibilityOverrides: [
-                                "_whiteNode": !isSelected,
-                                "_blueNode": isSelected,
-                                "_buyButton": false,
-                                "_useButton": !isSelected,
-                                "_cancelButton": isSelected,
-                                "_whiteblock": false
-                            ],
-                            replacingSlotViews: [
-                                "_skin": skinPreview,
-                                "_cancelButton": AnyView(
-                                    ZStack {
-                                        if let mcfs = CCBIAtlasStore.shared.mcfs(for: "FramedSprites/Bundle/MCFS_white_blue.plist") {
-                                            let pair = mcfs.uiImageAndInsets(forUIScale: s)
-                                            Image(uiImage: pair.0).resizable(capInsets: pair.1, resizingMode: .stretch)
-                                        }
-                                        Text("Using")
-                                            .font(.custom("OpenSans-Bold", size: 13 * s))
-                                            .foregroundColor(Color(hex: 0x08A9C8))
-                                    }
-                                    .contentShape(Rectangle())
-                                    .onTapGesture {
-                                        SoundManager.shared.play(.menuClick)
-                                        selectedSkinName = nil
-                                    }
-                                )
-                            ],
-                            designScaleModifier: { _ in s }
-                        )
-                        CCBISceneView(
-                            ccbFile: "MenuShopSkinsNode.ccbi",
-                            centerRoot: true,
-                            context: cardCtx
-                        )
-                        .frame(height: 155 * s)
+                                .frame(width: 10 * s, height: 10 * s)
+                            )
+                            let cardCtx = CCBIBindingContext(
+                                actions: [
+                                    "useButtonCallback": { selectedSkinName = skin },
+                                    "cancelButtonCallback": { selectedSkinName = nil }
+                                ],
+                                labelOverrides: [
+                                    "_normalTitle": cardTitle,
+                                    "_blueTitle": cardTitle
+                                ],
+                                visibilityOverrides: [
+                                    "_whiteNode": !isSelected,
+                                    "_blueNode": isSelected,
+                                    "_buyButton": false,
+                                    "_useButton": !isSelected,
+                                    "_cancelButton": isSelected,
+                                    "_whiteblock": false
+                                ],
+                                replacingSlotViews: [
+                                    "_skin": skinPreview
+                                ],
+                                designScaleModifier: { _ in s }
+                            )
+                            CCBISceneView(
+                                ccbFile: "MenuShopSkinsNode.ccbi",
+                                centerRoot: true,
+                                context: cardCtx
+                            )
+                            .frame(width: cardW, height: cardH)
+                        }
                     }
                 }
-                .padding(12 * s)
             }
         )
 
@@ -13322,6 +13321,9 @@ struct MainMenu: View {
                         labelOverrides: [
                             "_coinBar._barCurrencyValue": "\(coinsCount)",
                             "_dnaBar._barCurrencyValue": "\(dnaCount)"
+                        ],
+                        visibilityOverrides: [
+                            "_scrollbarNode": false
                         ],
                         slotViews: [
                             "_tabsNode": tabsSlot,
@@ -13671,83 +13673,87 @@ struct MainMenu: View {
 
                 // MenuSettings.ccbi + MenuSettingsNode_26.2.0.ccbi Light Settings
                 if showSettings {
-                    let settingsTableSlot = AnyView(
-                        ScrollView(showsIndicators: false) {
-                            VStack(alignment: .leading, spacing: 6 * s) {
-                                lightSettingToggle("Sound Effects", isOn: $soundEnabled, scale: s)
-                                lightSettingToggle("Dark Mode", isOn: $darkModeGrid, scale: s)
-                                lightSettingToggle("Show Mass", isOn: $showMassText, scale: s)
-                                lightSettingToggle("Show Skins", isOn: $showSkins, scale: s)
-                                lightSettingToggle("Show Level Badge", isOn: $showPlayerLevel, scale: s)
-                                lightSettingToggle("Show Arrow", isOn: $showArrow, scale: s)
-                                lightSettingToggle("Show Emoji Widget", isOn: $showEmojiWidget, scale: s)
-                                lightSettingToggle("Show Minimap", isOn: $showMinimap, scale: s)
-                                lightSettingToggle("Stop Movement on Release", isOn: $stopOnRelease, scale: s)
-                                lightSettingControlLayout(scale: s)
-
-                                Text("Offline Match")
-                                    .font(.custom("OpenSans-Bold", size: 14 * s))
-                                    .foregroundColor(Color(hex: 0x5A5F66))
-                                    .padding(.top, 8 * s)
-
-                                VStack(alignment: .leading, spacing: 8 * s) {
-                                    Text("Player Start Mass: \(Int(playerStartMass))").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
-                                    Slider(value: $playerStartMass, in: 10...5000, step: 10).accentColor(Color(hex: 0x00C8F8))
-
-                                    Text("Bot Start Mass: \(Int(botStartMass))").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
-                                    Slider(value: $botStartMass, in: 10...5000, step: 10).accentColor(Color(hex: 0x54C826))
-                                        .opacity(randomizeBotStartMass ? 0.4 : 1.0)
-                                        .disabled(randomizeBotStartMass)
-
-                                    lightSettingRowSwitch("Randomize Bot Start Mass", isOn: $randomizeBotStartMass, scale: s)
-
-                                    Text("Bot Count: \(targetBotCount)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
-                                    Slider(value: Binding(get: { Double(targetBotCount) }, set: { targetBotCount = Int($0) }), in: 0...100, step: 1).accentColor(Color(hex: 0xF26522))
-
-                                    Text("Feed Bot Count: \(feedBotCount)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
-                                    Slider(value: Binding(get: { Double(feedBotCount) }, set: { feedBotCount = Int($0) }), in: 0...50, step: 1).accentColor(.pink)
-
-                                    Text("Bot Skill: \(menuBotSkillLabel)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
-                                    Slider(value: $botSkill, in: 0.4...1.6, step: 0.1).accentColor(.red)
-                                }
-                                .padding(12 * s)
-                                .background(MCFSFrame(name: "mcfs-light-grey"))
-
-                                Text(buildStamp)
-                                    .font(.custom("Lato-Regular", size: 10 * s))
-                                    .foregroundColor(Color(hex: 0x9A9A9A))
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .padding(.top, 4 * s)
-                            }
-                            .padding(.horizontal, 10 * s)
-                            .padding(.vertical, 8 * s)
-                        }
-                    )
-
-                    ZStack {
-                        Color.white.edgesIgnoringSafeArea(.all)
-                        CCBISceneView(
-                            ccbFile: "MenuSettings.ccbi",
-                            context: CCBIBindingContext(
-                                actions: [
-                                    "backButtonCallback": { withAnimation { showSettings = false } },
-                                    "_backButton": { withAnimation { showSettings = false } }
-                                ],
-                                visibilityOverrides: [
-                                    "_menuHelp": false,
-                                    "_scrollbarNode": false
-                                ],
-                                slotViews: [
-                                    "_tableNode": settingsTableSlot
-                                ],
-                                designScaleModifier: { _ in s }
-                            )
-                        )
-                        .frame(width: max(1, geometry.size.width - sideInset * 2), height: geometry.size.height)
-                    }
-                    .zIndex(3)
+                    settingsModalOverlay(scale: s, sideInset: sideInset, containerSize: geometry.size)
+                        .zIndex(3)
                 }
             }
+        }
+    }
+
+    func settingsModalOverlay(scale s: CGFloat, sideInset: CGFloat, containerSize: CGSize) -> some View {
+        let settingsTableSlot = AnyView(
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 6 * s) {
+                    lightSettingToggle("Sound Effects", isOn: $soundEnabled, scale: s)
+                    lightSettingToggle("Dark Mode", isOn: $darkModeGrid, scale: s)
+                    lightSettingToggle("Show Mass", isOn: $showMassText, scale: s)
+                    lightSettingToggle("Show Skins", isOn: $showSkins, scale: s)
+                    lightSettingToggle("Show Level Badge", isOn: $showPlayerLevel, scale: s)
+                    lightSettingToggle("Show Arrow", isOn: $showArrow, scale: s)
+                    lightSettingToggle("Show Emoji Widget", isOn: $showEmojiWidget, scale: s)
+                    lightSettingToggle("Show Minimap", isOn: $showMinimap, scale: s)
+                    lightSettingToggle("Stop Movement on Release", isOn: $stopOnRelease, scale: s)
+                    lightSettingControlLayout(scale: s)
+
+                    Text("Offline Match")
+                        .font(.custom("OpenSans-Bold", size: 14 * s))
+                        .foregroundColor(Color(hex: 0x5A5F66))
+                        .padding(.top, 8 * s)
+
+                    VStack(alignment: .leading, spacing: 8 * s) {
+                        Text("Player Start Mass: \(Int(playerStartMass))").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
+                        Slider(value: $playerStartMass, in: 10...5000, step: 10).accentColor(Color(hex: 0x00C8F8))
+
+                        Text("Bot Start Mass: \(Int(botStartMass))").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
+                        Slider(value: $botStartMass, in: 10...5000, step: 10).accentColor(Color(hex: 0x54C826))
+                            .opacity(randomizeBotStartMass ? 0.4 : 1.0)
+                            .disabled(randomizeBotStartMass)
+
+                        lightSettingRowSwitch("Randomize Bot Start Mass", isOn: $randomizeBotStartMass, scale: s)
+
+                        Text("Bot Count: \(targetBotCount)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
+                        Slider(value: Binding(get: { Double(targetBotCount) }, set: { targetBotCount = Int($0) }), in: 0...100, step: 1).accentColor(Color(hex: 0xF26522))
+
+                        Text("Feed Bot Count: \(feedBotCount)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
+                        Slider(value: Binding(get: { Double(feedBotCount) }, set: { feedBotCount = Int($0) }), in: 0...50, step: 1).accentColor(.pink)
+
+                        Text("Bot Skill: \(menuBotSkillLabel)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
+                        Slider(value: $botSkill, in: 0.4...1.6, step: 0.1).accentColor(.red)
+                    }
+                    .padding(12 * s)
+                    .background(MCFSFrame(name: "mcfs-light-grey"))
+
+                    Text(buildStamp)
+                        .font(.custom("Lato-Regular", size: 10 * s))
+                        .foregroundColor(Color(hex: 0x9A9A9A))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.top, 4 * s)
+                }
+                .padding(.horizontal, 10 * s)
+                .padding(.vertical, 8 * s)
+            }
+        )
+
+        return ZStack {
+            Color.white.edgesIgnoringSafeArea(.all)
+            CCBISceneView(
+                ccbFile: "MenuSettings.ccbi",
+                context: CCBIBindingContext(
+                    actions: [
+                        "backButtonCallback": { withAnimation { showSettings = false } },
+                        "_backButton": { withAnimation { showSettings = false } }
+                    ],
+                    visibilityOverrides: [
+                        "_menuHelp": false,
+                        "_scrollbarNode": false
+                    ],
+                    slotViews: [
+                        "_tableNode": settingsTableSlot
+                    ],
+                    designScaleModifier: { _ in s }
+                )
+            )
+            .frame(width: max(1, containerSize.width - sideInset * 2), height: containerSize.height)
         }
     }
 
@@ -13934,6 +13940,8 @@ struct JoystickView: View {
     var body: some View {
         let baseImg = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/spritesheets/Bundle/All/Controls/game_joystick_bg.png")?.image
         let knobImg = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/spritesheets/Bundle/All/Controls/game_joystick.png")?.image
+        // Retail `JoystickView::createTexture` (`0x1000e2e64`): single offscreen render target
+        // (knob occludes base without stacking) drawn at opacity 50/255 (~19.6%) and _maxRadius = 0.5*82 - 0.25*42.5.
         ZStack {
             if let baseImg {
                 Image(uiImage: baseImg)
@@ -13956,7 +13964,8 @@ struct JoystickView: View {
                 Image("joystick-circle").resizable().scaledToFit().frame(width: 42.5 * uiScale).offset(joystickOffset)
             }
         }
-        .opacity(0.55)
+        .compositingGroup()
+        .opacity(50.0 / 255.0)
         .position(joystickBasePosition ?? .zero)
         .allowsHitTesting(false)
     }

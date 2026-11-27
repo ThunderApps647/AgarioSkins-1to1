@@ -57,7 +57,8 @@ enum CCBIPropValue {
 }
 
 final class CCBINode: Identifiable {
-    let id = UUID()
+    var id: String { stableID }
+    let stableID: String
     let cls: String
     let base: String
     let varName: String
@@ -67,7 +68,8 @@ final class CCBINode: Identifiable {
     var autoPlaySeqId: Int = -1
     var children: [CCBINode]
 
-    init(cls: String,
+    init(stableID: String = "0",
+         cls: String,
          base: String,
          varName: String,
          props: [String: CCBIPropValue],
@@ -75,6 +77,7 @@ final class CCBINode: Identifiable {
          sequences: [CCBISequence] = [],
          autoPlaySeqId: Int = -1,
          children: [CCBINode]) {
+        self.stableID = stableID
         self.cls = cls
         self.base = base
         self.varName = varName
@@ -87,6 +90,7 @@ final class CCBINode: Identifiable {
 
     func clone() -> CCBINode {
         CCBINode(
+            stableID: stableID,
             cls: cls,
             base: base,
             varName: varName,
@@ -310,7 +314,7 @@ final class CCBIBinaryReader {
         }
     }
 
-    private func readNode() -> CCBINode {
+    private func readNode(path: String = "0") -> CCBINode {
         let cls = readStr()
         let base = ver >= 12 ? readStr() : ""
         let at = readInt(signed: false)
@@ -374,8 +378,8 @@ final class CCBIBinaryReader {
         }
         if ver <= 17 { _ = readU8() }
         let nch = readInt(signed: false)
-        let children = (0..<nch).map { _ in readNode() }
-        return CCBINode(cls: cls, base: base, varName: an, props: props, animTracks: animTracks, children: children)
+        let children = (0..<nch).map { idx in readNode(path: "\(path)/\(idx)") }
+        return CCBINode(stableID: path, cls: cls, base: base, varName: an, props: props, animTracks: animTracks, children: children)
     }
 
     func parseRoot() -> CCBINode? {
@@ -563,6 +567,88 @@ final class CCBIAtlasStore: @unchecked Sendable {
         return root.clone()
     }
 
+    private func unpremultiplyCGImageIfNeeded(_ cgImg: CGImage) -> CGImage {
+        let w = cgImg.width, h = cgImg.height
+        guard w > 0, h > 0 else { return cgImg }
+        let bytesPerPixel = 4
+        let bytesPerRow = w * bytesPerPixel
+        var raw = [UInt8](repeating: 0, count: h * bytesPerRow)
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        // Render into straight or read raw PNG bytes via unpremultiplied bitmap when possible;
+        // CoreGraphics only supports premultipliedLast for CGBitmapContext output, so read directly from dataProvider!
+        guard let provider = cgImg.dataProvider,
+              let srcData = provider.data as Data?,
+              cgImg.bitsPerComponent == 8,
+              cgImg.bitsPerPixel == 32,
+              cgImg.alphaInfo == .last || cgImg.alphaInfo == .first || cgImg.alphaInfo == .premultipliedLast || cgImg.alphaInfo == .premultipliedFirst,
+              srcData.count >= h * cgImg.bytesPerRow else {
+            return cgImg
+        }
+        let srcBPR = cgImg.bytesPerRow
+        let isARGB = (cgImg.alphaInfo == .first || cgImg.alphaInfo == .premultipliedFirst)
+        var semiCount = 0
+        var straightCount = 0
+        let strideY = max(1, h / 128)
+        let strideX = max(1, w / 128)
+        srcData.withUnsafeBytes { ptr in
+            guard let base = ptr.bindMemory(to: UInt8.self).baseAddress else { return }
+            for y in stride(from: 0, to: h, by: strideY) {
+                let row = base + y * srcBPR
+                for x in stride(from: 0, to: w, by: strideX) {
+                    let px = row + x * 4
+                    let a = isARGB ? px[0] : px[3]
+                    if a > 8 && a < 225 {
+                        semiCount += 1
+                        let mx = isARGB ? max(px[1], px[2], px[3]) : max(px[0], px[1], px[2])
+                        if mx > a &+ 3 {
+                            straightCount += 1
+                        }
+                    }
+                }
+            }
+            // If PNG was exported premultiplied (< 5% of semi-transparent pixels exceed alpha),
+            // un-premultiply RGB in straight-alpha RGBA8888 buffer so UIGraphicsImageRenderer never double-darkens it.
+            guard semiCount >= 20 && Double(straightCount) / Double(semiCount) < 0.05 else {
+                raw.removeAll(keepingCapacity: false)
+                return
+            }
+            for y in 0..<h {
+                let sRow = base + y * srcBPR
+                let dOff = y * bytesPerRow
+                for x in 0..<w {
+                    let sp = sRow + x * 4
+                    let dp = dOff + x * 4
+                    let r = isARGB ? sp[1] : sp[0]
+                    let g = isARGB ? sp[2] : sp[1]
+                    let b = isARGB ? sp[3] : sp[2]
+                    let a = isARGB ? sp[0] : sp[3]
+                    if a == 0 || a == 255 {
+                        raw[dp] = r; raw[dp + 1] = g; raw[dp + 2] = b; raw[dp + 3] = a
+                    } else {
+                        let ai = Int(a)
+                        raw[dp]     = UInt8(min(255, (Int(r) * 255 + (ai >> 1)) / ai))
+                        raw[dp + 1] = UInt8(min(255, (Int(g) * 255 + (ai >> 1)) / ai))
+                        raw[dp + 2] = UInt8(min(255, (Int(b) * 255 + (ai >> 1)) / ai))
+                        raw[dp + 3] = a
+                    }
+                }
+            }
+        }
+        guard !raw.isEmpty,
+              let outProvider = CGDataProvider(data: Data(raw) as CFData),
+              let outCG = CGImage(
+                  width: w, height: h,
+                  bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: bytesPerRow,
+                  space: colorSpace,
+                  bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.last.rawValue),
+                  provider: outProvider,
+                  decode: nil, shouldInterpolate: true, intent: .defaultIntent
+              ) else {
+            return cgImg
+        }
+        return outCG
+    }
+
     private func ensureAtlasesLoadedLocked() {
         guard !atlasesLoaded else { return }
         atlasesLoaded = true
@@ -574,12 +660,13 @@ final class CCBIAtlasStore: @unchecked Sendable {
             let sheet = file.replacingOccurrences(of: "-ipadhd.plist", with: "")
             let pngURL = plistURL.deletingPathExtension().appendingPathExtension("png")
             guard let uiImg = UIImage(contentsOfFile: pngURL.path),
-                  let cgImg = uiImg.cgImage,
+                  let rawCG = uiImg.cgImage,
                   let data = try? Data(contentsOf: plistURL),
                   let raw = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
                   let rawFrames = raw["frames"] as? [String: [String: Any]] else {
                 continue
             }
+            let cgImg = unpremultiplyCGImageIfNeeded(rawCG)
             var parsedFrames: [String: AtlasFrameMeta] = [:]
             parsedFrames.reserveCapacity(rawFrames.count)
             for (fname, fdict) in rawFrames {
@@ -772,6 +859,7 @@ struct CCBIBindingContext {
     var subSceneSequenceNames: [String: String] = [:]
     var subSceneSequenceIDs: [String: Int] = [:]
     var heightOverrides: [String: CGFloat] = [:]
+    var useImmediateTouch: Bool = false
     var slotViews: [String: AnyView] = [:]
     var replacingSlotViews: [String: AnyView] = [:]
     var designScaleModifier: ((CGSize) -> CGFloat)? = nil
@@ -869,6 +957,86 @@ struct CCBIMenuItemButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.94 : 1.0)
             .brightness(configuration.isPressed ? -0.05 : 0)
             .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
+    }
+}
+
+private final class CCBIImmediateTapUIView: UIView {
+    var onPressChanged: ((Bool) -> Void)?
+    var onTap: (() -> Void)?
+    private var tracking = false
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        return bounds.contains(point)
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesBegan(touches, with: event)
+        guard !tracking else { return }
+        tracking = true
+        onPressChanged?(true)
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesMoved(touches, with: event)
+        guard tracking, let pt = touches.first?.location(in: self) else { return }
+        onPressChanged?(bounds.contains(pt))
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesEnded(touches, with: event)
+        guard tracking else { return }
+        tracking = false
+        onPressChanged?(false)
+        if let pt = touches.first?.location(in: self), bounds.contains(pt) {
+            onTap?()
+        }
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        super.touchesCancelled(touches, with: event)
+        guard tracking else { return }
+        tracking = false
+        onPressChanged?(false)
+    }
+}
+
+private struct CCBIImmediateTapSurface: UIViewRepresentable {
+    let onPressChanged: (Bool) -> Void
+    let onTap: () -> Void
+
+    func makeUIView(context: Context) -> CCBIImmediateTapUIView {
+        let v = CCBIImmediateTapUIView()
+        v.backgroundColor = .clear
+        v.isExclusiveTouch = false
+        v.isMultipleTouchEnabled = false
+        v.onPressChanged = onPressChanged
+        v.onTap = onTap
+        return v
+    }
+
+    func updateUIView(_ v: CCBIImmediateTapUIView, context: Context) {
+        v.onPressChanged = onPressChanged
+        v.onTap = onTap
+    }
+}
+
+private struct CCBIImmediateTapWrapper<Content: View>: View {
+    let action: () -> Void
+    let content: Content
+    @State private var isPressed = false
+
+    var body: some View {
+        content
+            .scaleEffect(isPressed ? 0.94 : 1.0)
+            .brightness(isPressed ? -0.05 : 0)
+            .animation(.easeOut(duration: 0.08), value: isPressed)
+            .contentShape(Rectangle())
+            .overlay(
+                CCBIImmediateTapSurface(
+                    onPressChanged: { isPressed = $0 },
+                    onTap: action
+                )
+            )
     }
 }
 
@@ -1062,7 +1230,7 @@ private struct CCBINodeRenderer: View {
                        alignment: isZeroContainer ? .center : .topLeading)
             let visual = Group {
                 if isClippingNode {
-                    rawVisual.clipped()
+                    rawVisual.clipShape(Rectangle()).clipped()
                 } else {
                     rawVisual
                 }
@@ -1089,14 +1257,25 @@ private struct CCBINodeRenderer: View {
             )
 
             if let handler = blockHandler ?? varTapHandler {
-                Button(action: {
-                    SoundManager.shared.play(.menuClick)
-                    handler()
-                }) {
-                    visual.contentShape(Rectangle())
+                if context.useImmediateTouch {
+                    CCBIImmediateTapWrapper(
+                        action: {
+                            SoundManager.shared.play(.menuClick)
+                            handler()
+                        },
+                        content: visual
+                    )
+                    .position(targetPos)
+                } else {
+                    Button(action: {
+                        SoundManager.shared.play(.menuClick)
+                        handler()
+                    }) {
+                        visual.contentShape(Rectangle())
+                    }
+                    .buttonStyle(CCBIMenuItemButtonStyle())
+                    .position(targetPos)
                 }
-                .buttonStyle(CCBIMenuItemButtonStyle())
-                .position(targetPos)
             } else {
                 visual.position(targetPos)
             }
@@ -1512,7 +1691,7 @@ private struct CCBINodeRenderer: View {
             return normTag
         }()
 
-        return node.children.compactMap { c in
+        let mapped: [FilteredChildEntry] = node.children.compactMap { c in
             if isSelected, activeTag != normTag {
                 if case let .int(tag) = c.props["name"] {
                     if tag != activeTag { return nil }
@@ -1525,6 +1704,10 @@ private struct CCBINodeRenderer: View {
             }
             return FilteredChildEntry(node: c, posOverride: nil, anchorOverride: nil, sizeOverride: nil, forceVisible: false)
         }
+        if case let .bool(inv) = node.props["invertTouchDetectionOrder"], inv {
+            return Array(mapped.reversed())
+        }
+        return mapped
     }
 
     @ViewBuilder

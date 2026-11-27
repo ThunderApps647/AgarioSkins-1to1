@@ -55,7 +55,7 @@ final class ArenaRenderBox {
     var showGrid: Bool = true
     var showSkins: Bool = true
     var showMassText: Bool = true
-    var showBoundaryOverlay: Bool = true
+    var showBoundaryOverlay: Bool = false
     var tokens: [Token] = []
     var foodManager: FoodManager?
     var massManager: EjectedMassManager?
@@ -80,7 +80,7 @@ final class ArenaRenderBox {
 private final class ArenaTextureCache {
     private let device: MTLDevice
     private var imageTextures: [String: MTLTexture] = [:]
-    private var labelTextures: [LabelCacheKey: (texture: MTLTexture, size: CGSize)] = [:]
+    private var labelTextures: [LabelCacheKey: (texture: MTLTexture, size: CGSize, fontSize: CGFloat)] = [:]
     private var labelOrder: [LabelCacheKey] = []
     private var width30Cache: [String: Float] = [:]
     private lazy var font30: UIFont = {
@@ -99,6 +99,7 @@ private final class ArenaTextureCache {
     struct LabelCacheKey: Hashable {
         let text: String
         let bucketPx: Int
+        let strokeKey: Int
         let strokeRGBA: UInt32
     }
 
@@ -162,10 +163,10 @@ private final class ArenaTextureCache {
         return (ri << 24) | (gi << 16) | (bi << 8) | ai
     }
 
-    func labelTexture(text: String, pixelHeight: CGFloat, strokeWidthPct: CGFloat = -10.0, strokeColor: UIColor = .black) -> (texture: MTLTexture, size: CGSize)? {
+    func labelTexture(text: String, pixelHeight: CGFloat, strokeWidthPct: CGFloat = -6.7, strokeColor: UIColor = .black) -> (texture: MTLTexture, size: CGSize, fontSize: CGFloat)? {
         guard !text.isEmpty else { return nil }
         let quantized = max(12, min(140, Int((pixelHeight / 6.0).rounded() * 6.0)))
-        let key = LabelCacheKey(text: text, bucketPx: quantized, strokeRGBA: rgbaKey(strokeColor))
+        let key = LabelCacheKey(text: text, bucketPx: quantized, strokeKey: Int((strokeWidthPct * 10).rounded()), strokeRGBA: rgbaKey(strokeColor))
         if let hit = labelTextures[key] {
             return hit
         }
@@ -205,7 +206,7 @@ private final class ArenaTextureCache {
             labelTextures.removeValue(forKey: old)
         }
         labelOrder.append(key)
-        let res = (tex, size)
+        let res = (tex, size, fontSize)
         labelTextures[key] = res
         return res
     }
@@ -516,17 +517,92 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
     func draw(in view: MTKView) {
         guard let drawable = view.currentDrawable,
               let passDesc = view.currentRenderPassDescriptor,
-              let cmdBuf = commandQueue.makeCommandBuffer(),
-              let enc = cmdBuf.makeRenderCommandEncoder(descriptor: passDesc) else {
+              let cmdBuf = commandQueue.makeCommandBuffer() else {
             return
         }
-
-        let drawW = Float(view.drawableSize.width)
-        let drawH = Float(view.drawableSize.height)
-        guard drawW > 0 && drawH > 0 else {
-            enc.endEncoding(); cmdBuf.commit(); return
+        guard renderFrame(
+            passDesc: passDesc,
+            drawableSize: view.drawableSize,
+            boundsSize: view.bounds.size,
+            contentScale: view.contentScaleFactor,
+            commandBuffer: cmdBuf
+        ) else {
+            return
         }
-        let scale = max(Float(1.0), Float(view.contentScaleFactor))
+        cmdBuf.present(drawable)
+        cmdBuf.commit()
+    }
+
+    func renderOffscreenSnapshot(size: CGSize, scale: CGFloat = 2.0) -> UIImage? {
+        let w = max(1, Int((size.width * scale).rounded()))
+        let h = max(1, Int((size.height * scale).rounded()))
+        let desc = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: w, height: h, mipmapped: false)
+        desc.usage = [.renderTarget, .shaderRead]
+        #if targetEnvironment(simulator)
+        desc.storageMode = .shared
+        #endif
+        guard let tex = device.makeTexture(descriptor: desc),
+              let cmdBuf = commandQueue.makeCommandBuffer() else {
+            return nil
+        }
+        let pass = MTLRenderPassDescriptor()
+        pass.colorAttachments[0].texture = tex
+        pass.colorAttachments[0].loadAction = .clear
+        pass.colorAttachments[0].storeAction = .store
+        pass.colorAttachments[0].clearColor = MTLClearColor(red: 1, green: 1, blue: 1, alpha: 1)
+
+        guard renderFrame(
+            passDesc: pass,
+            drawableSize: CGSize(width: w, height: h),
+            boundsSize: size,
+            contentScale: scale,
+            commandBuffer: cmdBuf
+        ) else {
+            return nil
+        }
+        cmdBuf.commit()
+        cmdBuf.waitUntilCompleted()
+
+        let bpr = w * 4
+        var bytes = [UInt8](repeating: 0, count: bpr * h)
+        tex.getBytes(&bytes, bytesPerRow: bpr, from: MTLRegionMake2D(0, 0, w, h), mipmapLevel: 0)
+        // Swap BGRA -> RGBA for CGImage creation
+        for i in stride(from: 0, to: bytes.count, by: 4) {
+            let b = bytes[i]
+            bytes[i] = bytes[i + 2]
+            bytes[i + 2] = b
+            bytes[i + 3] = 255
+        }
+        let cs = CGColorSpaceCreateDeviceRGB()
+        guard let provider = CGDataProvider(data: Data(bytes) as CFData),
+              let cg = CGImage(
+                  width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: bpr,
+                  space: cs, bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                  provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent
+              ) else {
+            return nil
+        }
+        return UIImage(cgImage: cg, scale: scale, orientation: .up)
+    }
+
+    @discardableResult
+    private func renderFrame(
+        passDesc: MTLRenderPassDescriptor,
+        drawableSize: CGSize,
+        boundsSize: CGSize,
+        contentScale: CGFloat,
+        commandBuffer cmdBuf: MTLCommandBuffer
+    ) -> Bool {
+        guard let enc = cmdBuf.makeRenderCommandEncoder(descriptor: passDesc) else {
+            return false
+        }
+
+        let drawW = Float(drawableSize.width)
+        let drawH = Float(drawableSize.height)
+        guard drawW > 0 && drawH > 0 else {
+            enc.endEncoding(); cmdBuf.commit(); return false
+        }
+        let scale = max(Float(1.0), Float(contentScale))
         let ptZoom = Float(max(0.01, box.zoom))
         let zoomPx = ptZoom * scale
         let camX = Float(box.cameraPos.x)
@@ -543,7 +619,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         )
 
         // 1. Background + Infinite 50u Grid (`OptimizedArenaBackground::draw` 0x10030e108)
-        let uiScale = max(Float(0.5), min(Float(view.bounds.height) / 320.0, Float(view.bounds.width) / 480.0))
+        let uiScale = max(Float(0.5), min(Float(boundsSize.height) / 320.0, Float(boundsSize.width) / 480.0))
         let cocosZoom = ptZoom / uiScale
         let intensity = min(Float(0.85), max(Float(0.10), (50.0 * 50.0 * cocosZoom * cocosZoom) / 5000.0 + 0.10))
         let gridGray = box.darkMode ? intensity : (1.0 - intensity)
@@ -571,7 +647,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 arenaMin: SIMD2<Float>(0, 0),
                 arenaMax: SIMD2<Float>(Float(box.worldSize), Float(box.worldSize)),
                 zoom: zoomPx,
-                fadeWidth: 2.0 * Float(view.bounds.width) / max(0.01, ptZoom),
+                fadeWidth: 2.0 * Float(boundsSize.width) / max(0.01, ptZoom),
                 minAlpha: 0.35,
                 borderLineWidth: 5.0,
                 easePower: 0.75,
@@ -604,14 +680,15 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
             appendDiskFan(cx: sx, cy: sy, radius: foodPxR, count: foodSegs, color: col)
         }
 
-        // 4. Ejected Mass (`SoftBodyCellView`: outer r+5 fill then inner r-5 fill, zero overlap halo)
+        // 4. Ejected Mass (`SoftBodyCellView`: rigid polygon r=40, scale=1+5/r -> outer r+5=45, inner r*(r-5)/(r+5)=31.111)
         if let mm = box.massManager {
             var visMass: [EjectedMass] = []
             mm.forEachVisibleMass(in: worldVisible) { visMass.append($0) }
             visMass.sort { $0.zIndex < $1.zIndex }
-            let rOut = (Float(OriginalGameplay.shotMassBaseRadiusCGFloat) + 5.0) * zoomPx
-            let rIn = max(1.0, (Float(OriginalGameplay.shotMassBaseRadiusCGFloat) - 5.0) * zoomPx)
-            let segs = rOut > 18 ? 16 : 12
+            let shotR = Float(OriginalGameplay.shotMassBaseRadiusCGFloat)
+            let rOut = (shotR + 5.0) * zoomPx
+            let rIn = max(1.0, (shotR * (shotR - 5.0) / (shotR + 5.0)) * zoomPx)
+            let segs = min(64, max(10, Int(floor(shotR * cocosZoom))))
             for m in visMass {
                 guard let st = mm.renderStyle(for: m.styleID) else { continue }
                 let sx = Float(m.renderPosition.x) * zoomPx + screenOffX
@@ -636,10 +713,12 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 }
             case .ejected(let sid):
                 if let st = box.massManager?.renderStyle(for: sid) {
-                    let ro = (Float(OriginalGameplay.shotMassBaseRadiusCGFloat) + 5.0) * sc * zoomPx
-                    let ri = max(1.0, (Float(OriginalGameplay.shotMassBaseRadiusCGFloat) - 5.0) * sc * zoomPx)
-                    appendDiskFan(cx: sx, cy: sy, radius: ro, count: 12, color: rgba(st.borderColor, alphaMultiplier: a))
-                    appendDiskFan(cx: sx, cy: sy, radius: ri, count: 12, color: rgba(st.color, alphaMultiplier: a))
+                    let shotR = Float(OriginalGameplay.shotMassBaseRadiusCGFloat)
+                    let ro = (shotR + 5.0) * sc * zoomPx
+                    let ri = max(1.0, (shotR * (shotR - 5.0) / (shotR + 5.0)) * sc * zoomPx)
+                    let segs = min(64, max(10, Int(floor(shotR * cocosZoom))))
+                    appendDiskFan(cx: sx, cy: sy, radius: ro, count: segs, color: rgba(st.borderColor, alphaMultiplier: a))
+                    appendDiskFan(cx: sx, cy: sy, radius: ri, count: segs, color: rgba(st.color, alphaMultiplier: a))
                 }
             case .token:
                 break
@@ -797,22 +876,25 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                         let clamped = LeagueBadge.clamp(lvl)
                         let digitPx = hPx * (clamped >= 100 ? 0.32 : 0.40)
                         let stCol = LeagueBadge.strokeColor(forAsset: asset)
-                        if let dlbl = texCache.labelTexture(text: "\(clamped)", pixelHeight: CGFloat(digitPx), strokeWidthPct: -10.5, strokeColor: stCol) {
-                            let dH = min(hPx * 0.52, digitPx * 1.25)
-                            let dW = dH * Float(dlbl.size.width / max(1.0, dlbl.size.height))
+                        if let dlbl = texCache.labelTexture(text: "\(clamped)", pixelHeight: CGFloat(digitPx), strokeWidthPct: -8.0, strokeColor: stCol) {
+                            let sr = digitPx / Float(max(1.0, dlbl.fontSize))
+                            let dW = Float(dlbl.size.width) * sr
+                            let dH = Float(dlbl.size.height) * sr
                             drawQuad(enc: enc, texture: dlbl.texture, centerX: cx, centerY: cy, width: dW, height: dH, alpha: 1.0, viewportSize: vpPx)
                         }
                     }
 
                     func drawNameAndBadge(text: String, lvl: Int?, cx: Float, cy: Float, targetFontPx: Float) {
-                        guard let lbl = texCache.labelTexture(text: text, pixelHeight: CGFloat(targetFontPx), strokeWidthPct: -10.0, strokeColor: .black) else {
+                        guard let lbl = texCache.labelTexture(text: text, pixelHeight: CGFloat(targetFontPx), strokeWidthPct: -6.7, strokeColor: .black) else {
                             if let lvl { drawBadge(lvl: lvl, cx: cx, cy: cy, hPx: screenSolidR * 1.3) }
                             return
                         }
-                        let aspect = Float(lbl.size.width / max(1.0, lbl.size.height))
-                        let textH = targetFontPx * 1.28
-                        let textW = min(screenSolidR * 1.90, textH * aspect)
-                        let finalH = textW / max(0.05, aspect)
+                        let sr = targetFontPx / Float(max(1.0, lbl.fontSize))
+                        let rawW = Float(lbl.size.width) * sr
+                        let rawH = Float(lbl.size.height) * sr
+                        let fitScale = rawW > screenSolidR * 2.15 ? (screenSolidR * 2.15 / max(1.0, rawW)) : 1.0
+                        let textW = rawW * fitScale
+                        let finalH = rawH * fitScale
                         if let lvl {
                             let bH = targetFontPx * 1.1475
                             let bW = bH * badgeAspect
@@ -826,10 +908,10 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                     }
 
                     func drawMassNumber(_ px: Float, cx: Float, cy: Float) {
-                        guard let mlbl = texCache.labelTexture(text: "\(massInt)", pixelHeight: CGFloat(px), strokeWidthPct: -10.5, strokeColor: .black) else { return }
-                        let aspect = Float(mlbl.size.width / max(1.0, mlbl.size.height))
-                        let w = min(screenSolidR * 1.25, px * 1.28 * aspect)
-                        let h = w / max(0.05, aspect)
+                        guard let mlbl = texCache.labelTexture(text: "\(massInt)", pixelHeight: CGFloat(px), strokeWidthPct: -6.7, strokeColor: .black) else { return }
+                        let sr = px / Float(max(1.0, mlbl.fontSize))
+                        let w = Float(mlbl.size.width) * sr
+                        let h = Float(mlbl.size.height) * sr
                         drawQuad(enc: enc, texture: mlbl.texture, centerX: cx, centerY: cy, width: w, height: h, alpha: 1.0, viewportSize: vpPx)
                     }
 
@@ -882,7 +964,6 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         }
 
         enc.endEncoding()
-        cmdBuf.present(drawable)
-        cmdBuf.commit()
+        return true
     }
 }

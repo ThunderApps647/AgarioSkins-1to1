@@ -1024,7 +1024,7 @@ final class SrvWorld {
 
         let joy = input.lastDirection
         let magnitude = (joy.x * joy.x + joy.y * joy.y).squareRoot()
-        let isParallel = !input.centerAim && magnitude > 65.0 * 0.9
+        let isParallel = !input.centerAim && (magnitude <= 1.01 ? magnitude >= 0.9 : magnitude > 65.0 * 0.9)
 
         guard let centre = ownerCentre(ownerID) else { return }
         var targetPoint = centre
