@@ -11996,6 +11996,9 @@ struct LeaderboardHUDButton: View {
         .clipped()
         .contentShape(Rectangle())
         .gesture(pressGesture)
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityIdentifier("hud.leaderboard")
         .frame(width: currentWidth, height: collapsedSide, alignment: .topTrailing)
     }
 
@@ -12230,6 +12233,7 @@ struct ActionButtonsHUD: View, Equatable {
                 )
                 .allowsHitTesting(canSplit)
                 .accessibilityLabel("Split cell")
+                .accessibilityIdentifier("hud.split")
                 .accessibilityAddTraits(.isButton)
             )
 
@@ -12271,6 +12275,7 @@ struct ActionButtonsHUD: View, Equatable {
                 )
                 .allowsHitTesting(canFeed)
                 .accessibilityLabel("Eject mass")
+                .accessibilityIdentifier("hud.feed")
                 .accessibilityAddTraits(.isButton)
             )
 
@@ -12312,6 +12317,7 @@ struct ActionButtonsHUD: View, Equatable {
                     .allowsHitTesting(canFeed)
                     .position(x: macroX, y: shootCenterY)
                     .accessibilityLabel("Fast eject")
+                    .accessibilityIdentifier("hud.macro")
                     .accessibilityAddTraits(.isButton)
             }
         }
@@ -13593,6 +13599,7 @@ struct MainMenu: View {
                                             .frame(width: 120 * s, height: 80 * s)
                                         }
                                         .buttonStyle(CCBIMenuItemButtonStyle())
+                                        .accessibilityIdentifier("menu.playOnline")
                                     }
                                 )
                             ]

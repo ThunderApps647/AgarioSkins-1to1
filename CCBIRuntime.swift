@@ -879,38 +879,83 @@ enum CCBIAnimationEvaluator {
         let t = min(1.0, max(0.0, rawT))
         let p = max(1.0, opt > 0 ? opt : 2.0)
         switch type {
-        case 0: return t >= 1.0 ? 1.0 : 0.0
-        case 1: return t
-        case 2: return pow(t, p)
-        case 3: return 1.0 - pow(1.0 - t, p)
-        case 4: return t < 0.5 ? 0.5 * pow(2.0 * t, p) : 1.0 - 0.5 * pow(2.0 - 2.0 * t, p)
-        case 6:
+        case 0: // CCEaseInstant
+            return t >= 1.0 ? 1.0 : 0.0
+        case 1: // Linear
+            return t
+        case 2: // CCEaseIn
+            return pow(t, p)
+        case 3: // CCEaseOut
+            return 1.0 - pow(1.0 - t, p)
+        case 4: // CCEaseInOut
+            return t < 0.5 ? 0.5 * pow(2.0 * t, p) : 1.0 - 0.5 * pow(2.0 - 2.0 * t, p)
+        case 5: // CCEaseElasticIn (agar.io 0x100a93610)
+            if t == 0 || t == 1 { return t }
+            let period = opt > 0 ? opt : 0.3
+            let s = period / 4.0
+            let u = t - 1.0
+            return -pow(2.0, 10.0 * u) * sin((u - s) * (2.0 * .pi) / period)
+        case 6: // CCEaseElasticOut
             if t == 0 || t == 1 { return t }
             let period = opt > 0 ? opt : 0.3
             let s = period / 4.0
             return pow(2.0, -10.0 * t) * sin((t - s) * (2.0 * .pi) / period) + 1.0
-        case 9:
+        case 7: // CCEaseElasticInOut
+            if t == 0 || t == 1 { return t }
+            let period = opt > 0 ? opt : 0.45
+            let s = period / 4.0
+            let u = t * 2.0 - 1.0
+            if u < 0 {
+                return -0.5 * pow(2.0, 10.0 * u) * sin((u - s) * (2.0 * .pi) / period)
+            }
+            return pow(2.0, -10.0 * u) * sin((u - s) * (2.0 * .pi) / period) * 0.5 + 1.0
+        case 8: // CCEaseBounceIn
+            return 1.0 - ease(1.0 - t, type: 9, opt: opt)
+        case 9: // CCEaseBounceOut
             let n1 = 7.5625, d1 = 2.75
             if t < 1.0 / d1 { return n1 * t * t }
             if t < 2.0 / d1 { let u = t - 1.5 / d1; return n1 * u * u + 0.75 }
             if t < 2.5 / d1 { let u = t - 2.25 / d1; return n1 * u * u + 0.9375 }
             let u = t - 2.625 / d1; return n1 * u * u + 0.984375
-        case 11:
+        case 10: // CCEaseBounceInOut
+            return t < 0.5 ? 0.5 * ease(t * 2.0, type: 8, opt: opt) : 0.5 * ease(t * 2.0 - 1.0, type: 9, opt: opt) + 0.5
+        case 11: // CCEaseBackIn
             let s = 1.70158
             return t * t * ((s + 1.0) * t - s)
-        case 12:
+        case 12: // CCEaseBackOut
             let s = 1.70158
             let u = t - 1.0
             return 1.0 + u * u * ((s + 1.0) * u + s)
-        case 13:
+        case 13: // CCEaseBackInOut
             let s = 1.70158 * 1.525
             if t < 0.5 { let u = 2.0 * t; return 0.5 * (u * u * ((s + 1.0) * u - s)) }
             let u = 2.0 * t - 2.0
             return 0.5 * (u * u * ((s + 1.0) * u + s) + 2.0)
-        case 14: return 1.0 - cos(t * .pi * 0.5)
-        case 15: return sin(t * .pi * 0.5)
-        case 16: return -0.5 * (cos(.pi * t) - 1.0)
-        default: return t
+        case 14: // CCEaseExponentialIn
+            return t <= 0 ? 0.0 : pow(2.0, 10.0 * (t - 1.0))
+        case 15: // CCEaseExponentialOut
+            return t >= 1 ? 1.0 : 1.0 - pow(2.0, -10.0 * t)
+        case 16: // CCEaseExponentialInOut
+            if t <= 0 { return 0.0 }
+            if t >= 1 { return 1.0 }
+            return t < 0.5 ? 0.5 * pow(2.0, 20.0 * t - 10.0) : 1.0 - 0.5 * pow(2.0, -20.0 * t + 10.0)
+        case 17: // CCEasePolynomialIn
+            let deg = max(1.0, round(opt > 0 ? opt : 2.0))
+            return pow(t, deg)
+        case 18: // CCEasePolynomialOut (agar.io 0x100a93200)
+            let deg = max(1.0, round(opt > 0 ? opt : 2.0))
+            return 1.0 - pow(1.0 - t, deg)
+        case 19: // CCEasePolynomialInOut
+            let deg = max(1.0, round(opt > 0 ? opt : 2.0))
+            return t < 0.5 ? 0.5 * pow(2.0 * t, deg) : 1.0 - 0.5 * pow(2.0 - 2.0 * t, deg)
+        case 20: // CCEaseSineIn
+            return 1.0 - cos(t * .pi * 0.5)
+        case 21: // CCEaseSineOut
+            return sin(t * .pi * 0.5)
+        case 22: // CCEaseSineInOut
+            return -0.5 * (cos(.pi * t) - 1.0)
+        default:
+            return t
         }
     }
 
@@ -1048,6 +1093,7 @@ private struct CCBIScenePlayerView: View {
     let context: CCBIBindingContext
     let seqName: String?
     let seqPlayID: Int
+    var explicitAnimTime: Double? = nil
 
     @State private var animStartDate: Date = Date()
     @State private var isTimelinePaused: Bool = true
@@ -1068,7 +1114,8 @@ private struct CCBIScenePlayerView: View {
 
     private func restartTimelineIfNeeded() {
         animStartDate = Date()
-        if let seq = activeSequence, seq.duration > 0,
+        if explicitAnimTime == nil,
+           let seq = activeSequence, seq.duration > 0,
            CCBIAnimationEvaluator.hasTracks(in: root, seqId: seq.seqId) {
             isTimelinePaused = false
             let dur = seq.duration
@@ -1084,7 +1131,18 @@ private struct CCBIScenePlayerView: View {
     }
 
     var body: some View {
-        if let seq = activeSequence, seq.duration > 0,
+        if let fixedT = explicitAnimTime, let seq = activeSequence {
+            CCBINodeRenderer(
+                node: root,
+                parentDesignSize: designSize,
+                scaleFactor: scaleFactor,
+                context: context,
+                positionOverride: centerRoot ? (designSize.width * 0.5, designSize.height * 0.5) : nil,
+                anchorOverride: centerRoot ? CGPoint(x: 0.5, y: 0.5) : nil,
+                activeSeqId: seq.seqId,
+                animTime: min(seq.duration, max(0, fixedT))
+            )
+        } else if let seq = activeSequence, seq.duration > 0,
            CCBIAnimationEvaluator.hasTracks(in: root, seqId: seq.seqId) {
             TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: isTimelinePaused)) { tlCtx in
                 let t = isTimelinePaused
@@ -1123,6 +1181,7 @@ struct CCBISceneView: View {
     let ccbFile: String
     var centerRoot: Bool = false
     var context: CCBIBindingContext
+    var explicitAnimTime: Double? = nil
 
     var body: some View {
         GeometryReader { geo in
@@ -1136,7 +1195,8 @@ struct CCBISceneView: View {
                     centerRoot: centerRoot,
                     context: context,
                     seqName: context.activeSequenceName,
-                    seqPlayID: context.sequencePlayID
+                    seqPlayID: context.sequencePlayID,
+                    explicitAnimTime: explicitAnimTime
                 )
                 .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
             }
@@ -1257,6 +1317,8 @@ private struct CCBINodeRenderer: View {
             )
 
             if let handler = blockHandler ?? varTapHandler {
+                let accName = resolveBlockSelector() ?? (!node.varName.isEmpty ? node.varName : node.stableID)
+                let accID = "ccbi.\(accName)"
                 if context.useImmediateTouch {
                     CCBIImmediateTapWrapper(
                         action: {
@@ -1265,6 +1327,9 @@ private struct CCBINodeRenderer: View {
                         },
                         content: visual
                     )
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityIdentifier(accID)
                     .position(targetPos)
                 } else {
                     Button(action: {
@@ -1274,6 +1339,7 @@ private struct CCBINodeRenderer: View {
                         visual.contentShape(Rectangle())
                     }
                     .buttonStyle(CCBIMenuItemButtonStyle())
+                    .accessibilityIdentifier(accID)
                     .position(targetPos)
                 }
             } else {

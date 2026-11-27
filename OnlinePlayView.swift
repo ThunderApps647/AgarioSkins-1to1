@@ -128,6 +128,7 @@ struct ServerBrowserView: View {
                         .padding(.horizontal, 36).padding(.vertical, 12)
                         .background(Color.black.opacity(0.45)).cornerRadius(18)
                 }
+                .accessibilityIdentifier("online.close")
                 .padding(.bottom, 40)
             }
 
@@ -170,7 +171,7 @@ struct ServerBrowserView: View {
                 Spacer()
                 Button(action: { discovery.scan() }) {
                     Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 16, weight: .bold))
+                        .font(.custom("OpenSans-Bold", size: 16))
                         .foregroundColor(.white)
                         .padding(8)
                         .background(Color.blue.clipShape(Circle()))

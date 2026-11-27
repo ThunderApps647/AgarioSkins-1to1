@@ -48,6 +48,7 @@ targets:
     scheme:
       testTargets:
         - AgarParityTests
+        - AgarUITests
     info:
       path: Info.plist
       properties:
@@ -84,6 +85,23 @@ targets:
         GENERATE_INFOPLIST_FILE: YES
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Agar.io.app/Agar.io"
         BUNDLE_LOADER: "$(TEST_HOST)"
+        CODE_SIGNING_ALLOWED: NO
+        CODE_SIGNING_REQUIRED: NO
+        CODE_SIGN_IDENTITY: ""
+  AgarUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    deploymentTarget: "18.1"
+    sources:
+      - path: Tests/AgarUITests
+    dependencies:
+      - target: Agar.io
+    settings:
+      base:
+        SWIFT_VERSION: "5.0"
+        SWIFT_UPCOMING_FEATURE_BARE_SLASH_REGEX_LITERALS: YES
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Agar.io
         CODE_SIGNING_ALLOWED: NO
         CODE_SIGNING_REQUIRED: NO
         CODE_SIGN_IDENTITY: ""
