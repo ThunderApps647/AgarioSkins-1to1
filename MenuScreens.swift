@@ -723,7 +723,8 @@ struct PotionsModalView: View {
                     HStack(spacing: 8 * s) {
                         ForEach(potionStore.slots) { slot in
                             potionCCBICard(slot: slot, scale: s)
-                                .frame(maxWidth: .infinity, height: 210 * s)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 210 * s)
                         }
                     }
                     .padding(.horizontal, max(12 * s, sideInset + 10))
