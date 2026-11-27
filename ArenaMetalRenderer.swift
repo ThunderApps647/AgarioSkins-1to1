@@ -704,7 +704,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         // 5. All Arena Entities Sorted by zOrder = Int(stateRadius) (Tokens, EjectedMass, Cells, Viruses)
         enum RenderEntity {
             case token(Token)
-            case ejected(EjectedMass, style: EjectedMassManager.RenderStyle)
+            case ejected(EjectedMass, style: EjectedMassStyle)
             case cell(PlayerCell, isLocal: Bool)
             case virus(Virus)
             var zOrder: Int {
