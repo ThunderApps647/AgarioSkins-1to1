@@ -17,22 +17,31 @@ enum AgarPhysicsCore {
         return 30.0 + Double(mass) * 0.02
     }
 
-    /// Computes focal world cursor outside clusterExtent + 600/zoom so split packs converge cleanly without folding.
+    /// Computes `agar.io.bin` inputDistance & world cursor reach (`inputDistance / arenaZoom`).
+    static func worldCursorReach(cells: [PlayerCell], viewportSize: CGSize) -> (inputDist: CGFloat, worldReach: CGFloat) {
+        let totalRadius = cells.reduce(CGFloat(0)) { $0 + $1.cachedSolidRadius }
+        let inputDist = OriginalGameplay.inputDistance(for: viewportSize)
+        let arenaZoom = OriginalGameplay.arenaZoomForInput(
+            totalRadius: max(totalRadius, CGFloat(OriginalGameplay.baseRadius)),
+            cellCount: max(cells.count, 1),
+            viewportSize: viewportSize
+        )
+        return (inputDist, inputDist / max(arenaZoom, 0.05))
+    }
+
+    /// Computes world cursor along `directionNorm` at `worldReach` (`0x10004ff70`).
     static func steerTarget(
         flockCenter: CGPoint,
         directionNorm: CGSize,
         cells: [PlayerCell],
-        zoom: CGFloat
+        viewportSize: CGSize
     ) -> CGPoint? {
-        guard hypot(directionNorm.width, directionNorm.height) > 0.001 else { return nil }
-        let safeZoom = max(zoom, 0.05)
-        let clusterExtent = cells.reduce(CGFloat(0)) { best, cell in
-            max(best, hypot(cell.position.x - flockCenter.x, cell.position.y - flockCenter.y) + cell.cachedVisualRadius)
-        }
-        let focalDistance = max(clusterExtent + 600.0 / safeZoom, 800.0 / safeZoom)
+        let mag = hypot(directionNorm.width, directionNorm.height)
+        guard mag > 0.001 else { return nil }
+        let reach = worldCursorReach(cells: cells, viewportSize: viewportSize).worldReach
         return CGPoint(
-            x: flockCenter.x + directionNorm.width * focalDistance,
-            y: flockCenter.y + directionNorm.height * focalDistance
+            x: flockCenter.x + directionNorm.width * reach,
+            y: flockCenter.y + directionNorm.height * reach
         )
     }
 
@@ -65,61 +74,90 @@ enum AgarPhysicsCore {
         return (dx * dx + dy * dy) <= (bigRadius * bigRadius)
     }
 
-    /// `Arena_selfCollision` (`0x10004e5e0`): single-pass mass-ratio pushout `overlap * (rB^2 / (rA^2 + rB^2))`.
-    static func resolveSelfCollisions(cells: inout [PlayerCell]) {
+    /// `Arena_selfCollision` (`0x10004e5e0` + `0x10004bf14`): 2-pass simultaneous Jacobi
+    /// accumulation using `cachedSolidRadius` + wall squash clamp `[0.4 * r, worldSize - 0.4 * r]`.
+    static func resolveSelfCollisions(cells: inout [PlayerCell], worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength) {
         guard cells.count > 1 else { return }
         var groups: [UUID: [Int]] = [:]
         var radii = [CGFloat](repeating: 0, count: cells.count)
         groups.reserveCapacity(min(cells.count, 64))
         for i in cells.indices {
             groups[cells[i].ownerID, default: []].append(i)
-            radii[i] = cells[i].cachedVisualRadius
+            radii[i] = cells[i].cachedSolidRadius
         }
 
+        let squashFactor = OriginalGameplay.percentageOfCellToSquash
         for (_, indices) in groups {
-            guard indices.count > 1 else { continue }
-            for i in 0..<indices.count {
-                for j in (i + 1)..<indices.count {
-                    let idx1 = indices[i]
-                    let idx2 = indices[j]
-                    guard cells[idx1].mergeTimer > 0 || cells[idx2].mergeTimer > 0 else { continue }
-                    if cells[idx1].immuneToCellID == cells[idx2].id || cells[idx2].immuneToCellID == cells[idx1].id {
-                        continue
+            let groupCount = indices.count
+            guard groupCount > 1 else { continue }
+            var pushX = [CGFloat](repeating: 0, count: groupCount)
+            var pushY = [CGFloat](repeating: 0, count: groupCount)
+
+            for _ in 0..<2 {
+                var anyOverlap = false
+                for i in 0..<groupCount {
+                    pushX[i] = 0
+                    pushY[i] = 0
+                }
+                for i in 0..<(groupCount - 1) {
+                    let idxA = indices[i]
+                    if cells[idxA].isMerging { continue }
+                    let rA = radii[idxA]
+                    for j in (i + 1)..<groupCount {
+                        let idxB = indices[j]
+                        if cells[idxB].isMerging { continue }
+                        guard cells[idxA].mergeTimer > 0 || cells[idxB].mergeTimer > 0 else { continue }
+                        if cells[idxA].immuneToCellID == cells[idxB].id || cells[idxB].immuneToCellID == cells[idxA].id {
+                            continue
+                        }
+
+                        let rB = radii[idxB]
+                        let totalRadius = rA + rB
+                        let dx = cells[idxA].position.x - cells[idxB].position.x
+                        if dx < -totalRadius || dx > totalRadius { continue }
+                        let dy = cells[idxA].position.y - cells[idxB].position.y
+                        if dy < -totalRadius || dy > totalRadius { continue }
+
+                        let distSq = dx * dx + dy * dy
+                        guard distSq < (totalRadius * totalRadius) else { continue }
+
+                        var dist = sqrt(distSq)
+                        var nx: CGFloat
+                        var ny: CGFloat
+                        if dist < 0.0001 {
+                            let theta = Double((idxA * 73 + idxB * 137) % 360) * .pi / 180.0
+                            nx = CGFloat(cos(theta))
+                            ny = CGFloat(sin(theta))
+                            dist = 0.1
+                        } else {
+                            nx = dx / dist
+                            ny = dy / dist
+                        }
+
+                        let overlap = totalRadius - dist
+                        let rA2 = rA * rA
+                        let rB2 = rB * rB
+                        let denom = rA2 + rB2
+                        guard denom > 0 else { continue }
+                        let pushA = overlap * (rB2 / denom)
+                        let pushB = overlap * (rA2 / denom)
+
+                        pushX[i] += nx * pushA
+                        pushY[i] += ny * pushA
+                        pushX[j] -= nx * pushB
+                        pushY[j] -= ny * pushB
+                        anyOverlap = true
                     }
-
-                    let r1 = radii[idx1]
-                    let r2 = radii[idx2]
-                    let totalRadius = r1 + r2
-                    let dx = cells[idx2].position.x - cells[idx1].position.x
-                    if dx < -totalRadius || dx > totalRadius { continue }
-                    let dy = cells[idx2].position.y - cells[idx1].position.y
-                    if dy < -totalRadius || dy > totalRadius { continue }
-
-                    let distSq = dx * dx + dy * dy
-                    guard distSq < (totalRadius * totalRadius) else { continue }
-
-                    var dist = sqrt(distSq)
-                    var nx = dx
-                    var ny = dy
-                    if dist < 0.0001 {
-                        dist = 1.0
-                        nx = 1.0
-                        ny = 0.0
-                    } else {
-                        nx /= dist
-                        ny /= dist
+                }
+                if !anyOverlap { break }
+                for i in 0..<groupCount {
+                    let idx = indices[i]
+                    if pushX[i] != 0 || pushY[i] != 0 {
+                        let minPos = squashFactor * radii[idx]
+                        let maxPos = max(minPos, worldSize - minPos)
+                        cells[idx].position.x = min(maxPos, max(minPos, cells[idx].position.x + pushX[i]))
+                        cells[idx].position.y = min(maxPos, max(minPos, cells[idx].position.y + pushY[i]))
                     }
-
-                    let overlap = totalRadius - dist
-                    let denom = r1 * r1 + r2 * r2
-                    guard denom > 0 else { continue }
-                    let push1 = overlap * ((r2 * r2) / denom)
-                    let push2 = overlap * ((r1 * r1) / denom)
-
-                    cells[idx1].position.x -= nx * push1
-                    cells[idx1].position.y -= ny * push1
-                    cells[idx2].position.x += nx * push2
-                    cells[idx2].position.y += ny * push2
                 }
             }
         }

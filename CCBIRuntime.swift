@@ -433,7 +433,8 @@ final class CCBIAtlasStore: @unchecked Sendable {
     }
 
     func localize(_ key: String, localizedFlag: Bool = true) -> String {
-        guard localizedFlag else {
+        let shouldLookup = localizedFlag || (key.contains("_") && !key.contains(" ") && !key.contains("\n"))
+        guard shouldLookup else {
             return key.replacingOccurrences(of: "\\n", with: "\n")
         }
         lock.lock()
@@ -864,6 +865,7 @@ private struct CCBINodeRenderer: View {
             node.cls == "CCHybridMenu" || node.base == "CCHybridMenu" ||
             node.cls == "CCMenu" || node.base == "CCMenu" ||
             node.cls == "MCAlignmentNode" || node.base == "MCAlignmentNode" ||
+            node.cls == "MCAlignmentNodeStatic" || node.base == "MCAlignmentNodeStatic" ||
             node.cls == "MCSpineNode" || node.base == "MCSpineNode"
         ) {
             return CGPoint(x: 0.5, y: 0.5)
@@ -953,7 +955,8 @@ private struct CCBINodeRenderer: View {
                 }
             }
         }
-        if node.cls == "MCAlignmentNode" || node.base == "MCAlignmentNode" {
+        if node.cls == "MCAlignmentNode" || node.base == "MCAlignmentNode" ||
+           node.cls == "MCAlignmentNodeStatic" || node.base == "MCAlignmentNodeStatic" {
             let gap = alignmentSpacing(node)
             let visibleChildren = node.children.filter { childIsVisible($0) }
             if !visibleChildren.isEmpty {
@@ -965,7 +968,7 @@ private struct CCBINodeRenderer: View {
                     var maxW: CGFloat = 0
                     var totalH: CGFloat = 0
                     for c in visibleChildren {
-                        let cs = resolveContentSize(node: c, parentSize: parentSize, subRoot: nil)
+                        let cs = measureTightChildSize(child: c, parentSize: parentSize)
                         maxW = max(maxW, cs.width)
                         totalH += cs.height
                     }
@@ -975,7 +978,7 @@ private struct CCBINodeRenderer: View {
                     var totalW: CGFloat = 0
                     var maxH: CGFloat = 0
                     for c in visibleChildren {
-                        let cs = resolveContentSize(node: c, parentSize: parentSize, subRoot: nil)
+                        let cs = measureTightChildSize(child: c, parentSize: parentSize)
                         totalW += cs.width
                         maxH = max(maxH, cs.height)
                     }
@@ -1033,25 +1036,77 @@ private struct CCBINodeRenderer: View {
         }
     }
 
+    private func measureTightChildSize(child: CCBINode, parentSize: CGSize) -> CGSize {
+        if child.cls == "MCLabelTTF" || child.base == "MCLabelTTF" || child.cls == "CCLabelTTF" {
+            var rawText: String = {
+                if let ov = childContext.scopedLookup(childContext.labelOverrides, varName: child.varName) {
+                    return ov
+                }
+                if case let .strBool(s, loc) = child.props["string"] {
+                    return CCBIAtlasStore.shared.localize(s, localizedFlag: loc)
+                }
+                if case let .str(s) = child.props["string"] {
+                    return CCBIAtlasStore.shared.localize(s, localizedFlag: true)
+                }
+                return ""
+            }()
+            while rawText.hasSuffix("\n") || rawText.hasSuffix("\r") { rawText.removeLast() }
+            if rawText.isEmpty { return .zero }
+
+            let fontName: String = {
+                if case let .str(fn) = child.props["fontName"], !fn.isEmpty {
+                    let base = URL(fileURLWithPath: fn).deletingPathExtension().lastPathComponent
+                    return base.lowercased() == "lato-heavy" ? "Lato-Heavy" : base
+                }
+                return "OpenSans-Bold"
+            }()
+            let fontSizeDesign: CGFloat = {
+                if case let .fltInt(sz, _) = child.props["fontSize"] { return sz }
+                if case let .float(sz) = child.props["fontSize"] { return sz }
+                return 14.0
+            }()
+            var reqW: CGFloat = 0
+            if case let .size(rw, _, wu, _, _) = child.props["requestedDimensions"] {
+                let w = evalDim(rw, unit: wu, parent: parentSize.width)
+                if w > 1.0 { reqW = w }
+            }
+            let uiFont = UIFont(name: fontName, size: max(7, fontSizeDesign))
+                ?? UIFont.systemFont(ofSize: max(7, fontSizeDesign), weight: .bold)
+            let rect = (rawText as NSString).boundingRect(
+                with: CGSize(width: reqW > 0 ? reqW : 10000, height: 10000),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                attributes: [.font: uiFont],
+                context: nil
+            )
+            let w = reqW > 0 ? min(reqW, ceil(rect.width) + 2) : (ceil(rect.width) + 2)
+            return CGSize(width: w, height: ceil(rect.height) + 2)
+        }
+        return resolveContentSize(node: child, parentSize: parentSize, subRoot: nil)
+    }
+
     private func filteredNormalChildren(designSize: CGSize) -> [(node: CCBINode, posOverride: (CGFloat, CGFloat)?, anchorOverride: CGPoint?)] {
-        if node.cls == "MCAlignmentNode" || node.base == "MCAlignmentNode" {
+        if node.cls == "MCAlignmentNode" || node.base == "MCAlignmentNode" ||
+           node.cls == "MCAlignmentNodeStatic" || node.base == "MCAlignmentNodeStatic" {
             let gap = alignmentSpacing(node)
+            let visibleChildren = node.children.filter { childIsVisible($0) }
+            guard !visibleChildren.isEmpty else { return [] }
+            let sizes = visibleChildren.map { measureTightChildSize(child: $0, parentSize: designSize) }
             var out: [(CCBINode, (CGFloat, CGFloat)?, CGPoint?)] = []
             let isVertical: Bool = {
                 if case let .int(d) = node.props["direction"], d == 1 { return true }
                 return false
             }()
             if isVertical {
-                var curY: CGFloat = 0
-                for c in node.children where childIsVisible(c) {
-                    let cs = resolveContentSize(node: c, parentSize: parentDesignSize, subRoot: nil)
+                let totalH = sizes.reduce(CGFloat(0)) { $0 + $1.height } + gap * CGFloat(max(0, visibleChildren.count - 1))
+                var curY = max(CGFloat(0), (designSize.height - totalH) * 0.5)
+                for (c, cs) in zip(visibleChildren, sizes) {
                     out.append((c, (designSize.width * 0.5, curY + cs.height * 0.5), CGPoint(x: 0.5, y: 0.5)))
                     curY += cs.height + gap
                 }
             } else {
-                var curX: CGFloat = 0
-                for c in node.children where childIsVisible(c) {
-                    let cs = resolveContentSize(node: c, parentSize: parentDesignSize, subRoot: nil)
+                let totalW = sizes.reduce(CGFloat(0)) { $0 + $1.width } + gap * CGFloat(max(0, visibleChildren.count - 1))
+                var curX = max(CGFloat(0), (designSize.width - totalW) * 0.5)
+                for (c, cs) in zip(visibleChildren, sizes) {
                     out.append((c, (curX + cs.width * 0.5, designSize.height * 0.5), CGPoint(x: 0.5, y: 0.5)))
                     curX += cs.width + gap
                 }
@@ -1170,7 +1225,7 @@ private struct CCBINodeRenderer: View {
     }
 
     private func resolveLabelTextAndFont() -> (text: String, fontName: String, fontSizeDesign: CGFloat) {
-        let rawKey: String = {
+        var rawKey: String = {
             if let ov = context.scopedLookup(context.labelOverrides, varName: node.varName) {
                 return ov
             }
@@ -1182,6 +1237,9 @@ private struct CCBINodeRenderer: View {
             }
             return ""
         }()
+        while rawKey.hasSuffix("\n") || rawKey.hasSuffix("\r") {
+            rawKey.removeLast()
+        }
 
         let fontName: String = {
             if case let .str(fn) = node.props["fontName"], !fn.isEmpty {
@@ -1298,8 +1356,10 @@ private struct CCBINodeRenderer: View {
         }()
 
         let req = requestedLabelDimensions(parentDesignSize: parentDesignSize)
-        let singleLine = isSingleLineLabel() || (req.width > 0 && req.height > 0 && spec.text.count <= 24)
+        let hasExplicitNewline = spec.text.contains("\n")
+        let singleLine = !hasExplicitNewline && (isSingleLineLabel() || (req.width > 0 && req.height > 0 && spec.text.count <= 24))
         let autoShrink = (req.width > 1.0 && req.height > 1.0) || singleLine
+        let constrainHeight = (req.width > 1.0 && req.height > 1.0 && !singleLine)
         return CCBILabelView(
             text: spec.text,
             fontName: spec.fontName,
@@ -1308,7 +1368,8 @@ private struct CCBINodeRenderer: View {
             outlineColor: outlineColor,
             outlineWidth: outlinePx,
             alignment: align,
-            constrainWidth: (req.width > 0 && !isSingleLineLabel()) || designSize.width > 0,
+            constrainWidth: (req.width > 0 && !singleLine) || designSize.width > 0,
+            constrainHeight: constrainHeight,
             singleLine: singleLine,
             autoShrink: autoShrink
         )
@@ -1329,6 +1390,7 @@ private struct CCBILabelView: View {
     let outlineWidth: CGFloat
     let alignment: TextAlignment
     let constrainWidth: Bool
+    var constrainHeight: Bool = false
     var singleLine: Bool = false
     var autoShrink: Bool = false
 
@@ -1339,7 +1401,7 @@ private struct CCBILabelView: View {
             .lineLimit(singleLine ? 1 : nil)
             .minimumScaleFactor(autoShrink ? 0.45 : 1.0)
             .allowsTightening(autoShrink)
-            .fixedSize(horizontal: !constrainWidth, vertical: true)
+            .fixedSize(horizontal: !constrainWidth, vertical: !constrainHeight)
 
         if let oc = outlineColor, outlineWidth > 0 {
             let d = outlineWidth

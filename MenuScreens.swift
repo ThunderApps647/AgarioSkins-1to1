@@ -113,10 +113,28 @@ struct ShopModalView: View {
     var onOpenSkins: (() -> Void)? = nil
     let onClose: () -> Void
 
-    @State private var selectedSection: ShopTab? = nil
+    @State private var selectedSection: ShopTab?
     @State private var statusMessage: String = ""
     @State private var showLeftBoostInfo = false
     @State private var showRightBoostInfo = false
+
+    init(
+        coins: Binding<Int>,
+        dna: Binding<Int>,
+        activeStartBoost: Binding<Int>,
+        initialSection: ShopTab? = nil,
+        onOpenPotions: (() -> Void)? = nil,
+        onOpenSkins: (() -> Void)? = nil,
+        onClose: @escaping () -> Void
+    ) {
+        self._coins = coins
+        self._dna = dna
+        self._activeStartBoost = activeStartBoost
+        self._selectedSection = State(initialValue: initialSection)
+        self.onOpenPotions = onOpenPotions
+        self.onOpenSkins = onOpenSkins
+        self.onClose = onClose
+    }
 
     private struct CurrencyTierSpec {
         let rowVar: String
@@ -657,6 +675,7 @@ struct QuestsModalView: View {
 struct PotionsModalView: View {
     @Binding var coins: Int
     @Binding var dna: Int
+    var onOpenShopSection: ((ShopTab) -> Void)? = nil
     let onClose: () -> Void
 
     @ObservedObject private var potionStore = PotionStore.shared
@@ -684,8 +703,12 @@ struct PotionsModalView: View {
                             "helpButtonCallback": {
                                 withAnimation(.easeInOut(duration: 0.16)) { showHelpModal = true }
                             },
-                            "coinBarCallback": {},
-                            "DNABarCallback": {}
+                            "coinBarCallback": {
+                                if let openShop = onOpenShopSection { openShop(.coins) } else { onClose() }
+                            },
+                            "DNABarCallback": {
+                                if let openShop = onOpenShopSection { openShop(.dna) } else { onClose() }
+                            }
                         ],
                         labelOverrides: [
                             "_coinBar._barCurrencyValue": "\(coins)",
@@ -715,7 +738,7 @@ struct PotionsModalView: View {
                 }
 
                 if showHelpModal {
-                    PotionsHelpOverlayView(s: s, containerSize: geometry.size) {
+                    PotionsHelpOverlayView(s: s, containerSize: geometry.size, onOpenShopSection: onOpenShopSection) {
                         withAnimation(.easeInOut(duration: 0.15)) { showHelpModal = false }
                     }
                     .zIndex(6)
@@ -819,6 +842,7 @@ struct PotionsModalView: View {
 private struct PotionsHelpOverlayView: View {
     let s: CGFloat
     let containerSize: CGSize
+    var onOpenShopSection: ((ShopTab) -> Void)? = nil
     let onClose: () -> Void
 
     @State private var selectedTab: Int = 0
@@ -834,12 +858,21 @@ private struct PotionsHelpOverlayView: View {
                         "backButtonCallback": onClose,
                         "howToGetPotionsButtonCallback": { selectedTab = 0 },
                         "rewardsButtonCallback": { selectedTab = 1 },
-                        "mysterySkinsButtonCallback": { selectedTab = 2 }
+                        "mysterySkinsButtonCallback": { selectedTab = 2 },
+                        "shopButtonCallback": {
+                            onClose()
+                            onOpenShopSection?(.coins)
+                        }
+                    ],
+                    labelOverrides: [
+                        "_classicInfoLabel": "Stay in top 5 for 60 seconds",
+                        "_newUserFlowInfoLabel": "Stay in top 3 to win"
                     ],
                     visibilityOverrides: [
                         "_howToNode": selectedTab == 0,
                         "_rewardsNode": selectedTab == 1,
                         "_mysteryNode": selectedTab == 2,
+                        "_newUserFlowInfoLabel": false,
                         "_probabilitiesButtonContainer": false
                     ],
                     slotViews: [
@@ -863,12 +896,25 @@ private struct PotionsHelpOverlayView: View {
                             }
                         ),
                         "_tableContainer": AnyView(
-                            VStack(spacing: 4 * s) {
+                            VStack(spacing: 5 * s) {
                                 ForEach([PotionTier.common, .rare, .exotic, .epic, .legendary], id: \.rawValue) { t in
-                                    HStack {
-                                        Text(t.rawValue).font(.custom("OpenSans-Bold", size: 10.5 * s)).foregroundColor(t.badgeColor)
-                                        Spacer()
-                                        Text("\(Int(t.brewDurationSeconds / 60))m").font(.custom("Lato-Regular", size: 10 * s)).foregroundColor(Color(hex: 0x5A5F66))
+                                    HStack(spacing: 0) {
+                                        Text(t.rawValue)
+                                            .font(.custom("OpenSans-Bold", size: 10 * s))
+                                            .foregroundColor(t.badgeColor)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                        Text("x\(t.skinPieceCount)")
+                                            .font(.custom("OpenSans-Bold", size: 10 * s))
+                                            .foregroundColor(Color(hex: 0x3D4347))
+                                            .frame(width: 72 * s, alignment: .center)
+                                        Text("\(t.rewardCoinsRange.lowerBound)–\(t.rewardCoinsRange.upperBound)")
+                                            .font(.custom("Lato-Regular", size: 9.5 * s))
+                                            .foregroundColor(Color(hex: 0x5A5F66))
+                                            .frame(width: 82 * s, alignment: .center)
+                                        Text("+\(Int(t.brewDurationSeconds / 60))")
+                                            .font(.custom("OpenSans-Bold", size: 10 * s))
+                                            .foregroundColor(Color(hex: 0x08A9C8))
+                                            .frame(width: 64 * s, alignment: .trailing)
                                     }
                                     .padding(.horizontal, 10 * s)
                                 }
@@ -973,6 +1019,8 @@ struct GiftsNewsModalView: View {
     @Binding var dna: Int
     let onClose: () -> Void
     @State private var giftClaimed = false
+    @State private var showSendGiftTab = false
+    @State private var giftStatusText = ""
 
     var body: some View {
         GeometryReader { geometry in
@@ -1021,36 +1069,85 @@ struct GiftsNewsModalView: View {
                             giftClaimed = true
                         }
                     },
-                    "requestGiftsButtonPressed": onClose,
-                    "sendGiftTabButtonCallback": {}
+                    "requestGiftsButtonPressed": {
+                        withAnimation(.easeInOut(duration: 0.14)) { showSendGiftTab = true }
+                    },
+                    "sendGiftTabButtonCallback": {
+                        giftStatusText = ""
+                        withAnimation(.easeInOut(duration: 0.14)) { showSendGiftTab = true }
+                    }
                 ]
 
-                ZStack {
+                let sendGiftActions: [String: () -> Void] = [
+                    "backButtonCallback": onClose,
+                    "inboxTabButtonCallback": {
+                        giftStatusText = ""
+                        withAnimation(.easeInOut(duration: 0.14)) { showSendGiftTab = false }
+                    },
+                    "sendCoinsButtonCallback": {
+                        coins += 100
+                        giftStatusText = "Sent Coins gift & earned +100 Coins!"
+                    },
+                    "requestGiftsButtonCallback": {
+                        giftStatusText = "Gift request broadcast to friends!"
+                    }
+                ]
+
+                ZStack(alignment: .bottom) {
                     Color.black.opacity(0.65).edgesIgnoringSafeArea(.all)
                         .onTapGesture { onClose() }
 
-                    CCBISceneView(
-                        ccbFile: "MenuGiftCenterInbox.ccbi",
-                        context: CCBIBindingContext(
-                            actions: inboxActions,
-                            labelOverrides: [
-                                "_inboxCountLabel": giftClaimed ? "0" : "1"
-                            ],
-                            visibilityOverrides: [
-                                "_inboxBadge": !giftClaimed,
-                                "_emptyInboxNode": giftClaimed,
-                                "_tableNode": !giftClaimed,
-                                "_acceptAllButton": !giftClaimed,
-                                "_requestGiftsButton": giftClaimed,
-                                "_inviteFriendsButton": false
-                            ],
-                            slotViews: [
-                                "_tableNode": giftClaimed ? AnyView(EmptyView()) : giftNodeRow
-                            ],
-                            designScaleModifier: { _ in s }
+                    if showSendGiftTab {
+                        CCBISceneView(
+                            ccbFile: "MenuGiftCenterSendGift.ccbi",
+                            context: CCBIBindingContext(
+                                actions: sendGiftActions,
+                                labelOverrides: [
+                                    "_inboxCountLabel": giftClaimed ? "0" : "1"
+                                ],
+                                visibilityOverrides: [
+                                    "_inboxBadge": !giftClaimed,
+                                    "_sendRequestMenu": true,
+                                    "_noFriendsMenu": false
+                                ],
+                                designScaleModifier: { _ in s }
+                            )
                         )
-                    )
-                    .frame(width: geometry.size.width, height: geometry.size.height)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                    } else {
+                        CCBISceneView(
+                            ccbFile: "MenuGiftCenterInbox.ccbi",
+                            context: CCBIBindingContext(
+                                actions: inboxActions,
+                                labelOverrides: [
+                                    "_inboxCountLabel": giftClaimed ? "0" : "1"
+                                ],
+                                visibilityOverrides: [
+                                    "_inboxBadge": !giftClaimed,
+                                    "_emptyInboxNode": giftClaimed,
+                                    "_tableNode": !giftClaimed,
+                                    "_acceptAllButton": !giftClaimed,
+                                    "_requestGiftsButton": giftClaimed,
+                                    "_inviteFriendsButton": false
+                                ],
+                                slotViews: [
+                                    "_tableNode": giftClaimed ? AnyView(EmptyView()) : giftNodeRow
+                                ],
+                                designScaleModifier: { _ in s }
+                            )
+                        )
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                    }
+
+                    if !giftStatusText.isEmpty {
+                        Text(giftStatusText)
+                            .font(.custom("OpenSans-Bold", size: 12 * s))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14 * s)
+                            .padding(.vertical, 6 * s)
+                            .background(Capsule().fill(Color(hex: 0x43A81D).opacity(0.92)))
+                            .padding(.bottom, 12 * s)
+                    }
                 }
             } else {
                 AgarModalContainer(dismissOnBackdrop: true, onClose: onClose) { triggerClose in
@@ -1172,6 +1269,293 @@ struct MatchResultsModalView: View {
                     checkedAward = true
                     awardedTier = PotionStore.shared.awardPostMatchPotion(score: highScore, survivalSeconds: survivalSeconds)
                 }
+            }
+        }
+    }
+}
+
+// MARK: - MenuLeagues.ccbi + MenuLeaguesNode.ccbi (Native 1:1 Leagues)
+struct LeaguesModalView: View {
+    let playerName: String
+    let playerLevel: Int
+    let playerSkinName: String?
+    let trophies: Int
+    let onClose: () -> Void
+
+    @State private var selectedTab: Int = 0
+    @State private var infoBanner: String = ""
+
+    private struct LeagueRow: Identifiable {
+        let id = UUID()
+        let rank: Int
+        let name: String
+        let level: Int
+        let skinName: String?
+        let trophies: Int
+        let isPlayer: Bool
+    }
+
+    private var tierTitle: String {
+        let lvl = LeagueBadge.clamp(playerLevel)
+        if lvl >= 100 { return "Legend League" }
+        if lvl >= 75 { return "Diamond League" }
+        if lvl >= 50 { return "Gold League" }
+        if lvl >= 25 { return "Silver League" }
+        return "Bronze League"
+    }
+
+    private var standings: [LeagueRow] {
+        let display = playerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Guest" : playerName
+        let playerTrophies = max(trophies, playerLevel * 12)
+        let pool: [(String, Int, String?, Int)] = selectedTab == 0 ? [
+            ("Vortex", max(10, playerLevel + 18), "12", playerTrophies + 680),
+            ("Nebula", max(8, playerLevel + 12), "42", playerTrophies + 430),
+            ("Kraken", max(6, playerLevel + 7), "88", playerTrophies + 220),
+            ("Titan", max(5, playerLevel + 3), "105", playerTrophies + 95),
+            ("Orbit", max(3, playerLevel - 2), "210", max(10, playerTrophies - 45)),
+            ("Pulse", max(2, playerLevel - 5), "77", max(10, playerTrophies - 110)),
+            ("Drift", max(1, playerLevel - 9), nil, max(10, playerTrophies - 185))
+        ] : (selectedTab == 1 ? [
+            ("Apex", 112, "33", playerTrophies + 1240),
+            ("Nova", 98, "14", playerTrophies + 890),
+            ("Cobra", 81, "19", playerTrophies + 510),
+            ("Zephyr", max(15, playerLevel + 4), "65", playerTrophies + 180),
+            ("Blaze", max(10, playerLevel - 1), "120", max(15, playerTrophies - 30))
+        ] : [
+            ("Jumbo", 148, "1", playerTrophies + 4850),
+            ("Sirius", 142, "7", playerTrophies + 3620),
+            ("WunWun", 136, "25", playerTrophies + 2910),
+            ("Typhoon", 124, "54", playerTrophies + 1740),
+            ("Spectre", max(20, playerLevel + 8), "91", playerTrophies + 410)
+        ])
+
+        var combined: [(String, Int, String?, Int, Bool)] = pool.map { ($0.0, $0.1, $0.2, $0.3, false) }
+        combined.append((display, playerLevel, playerSkinName, playerTrophies, true))
+        combined.sort { $0.3 > $1.3 }
+        return combined.enumerated().map { idx, item in
+            LeagueRow(rank: idx + 1, name: item.0, level: item.1, skinName: item.2, trophies: item.3, isPlayer: item.4)
+        }
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let sideInset = max(geometry.safeAreaInsets.leading, geometry.safeAreaInsets.trailing)
+            let sceneW = max(1, geometry.size.width - sideInset * 2)
+            let s = OriginalGameplay.uiScale(for: CGSize(width: sceneW, height: geometry.size.height))
+
+            let tableRows = AnyView(
+                ScrollView(showsIndicators: false) {
+                    LazyVStack(spacing: 4 * s) {
+                        ForEach(standings) { row in
+                            CCBISceneView(
+                                ccbFile: "MenuLeaguesNode.ccbi",
+                                centerRoot: true,
+                                context: CCBIBindingContext(
+                                    labelOverrides: [
+                                        "_nameLabel": row.name,
+                                        "_winningsLabel": "\(row.trophies)",
+                                        "_otherPositionLabel": "\(row.rank)"
+                                    ],
+                                    visibilityOverrides: [
+                                        "_normalSlot": !row.isPlayer,
+                                        "_userSlot": row.isPlayer,
+                                        "_avatarNormalSlotFrame": !row.isPlayer,
+                                        "_avatarUserSlotFrame": row.isPlayer,
+                                        "_goldBadge": row.rank == 1,
+                                        "_silverBadge": row.rank == 2,
+                                        "_bronzeBadge": row.rank == 3,
+                                        "_otherPositionBadge": row.rank > 3
+                                    ],
+                                    slotViews: [
+                                        "_leagueBadgeRootNode": AnyView(
+                                            Image(LeagueBadge.assetName(forLevel: row.level))
+                                                .resizable()
+                                                .scaledToFit()
+                                                .frame(width: 22 * s, height: 22 * s)
+                                        )
+                                    ],
+                                    replacingSlotViews: [
+                                        "_playerAvatar": AnyView(
+                                            Group {
+                                                if let sk = row.skinName {
+                                                    SkinSelectorPreview(skinName: sk)
+                                                        .frame(width: 30 * s, height: 30 * s)
+                                                        .clipShape(Circle())
+                                                } else {
+                                                    Image("menu-profile-guest")
+                                                        .resizable()
+                                                        .scaledToFill()
+                                                        .frame(width: 30 * s, height: 30 * s)
+                                                        .clipShape(Circle())
+                                                }
+                                            }
+                                        )
+                                    ],
+                                    designScaleModifier: { _ in s }
+                                )
+                            )
+                            .frame(height: 39 * s)
+                        }
+                    }
+                    .padding(.top, 38 * s)
+                    .padding(.horizontal, 6 * s)
+                    .padding(.bottom, 8 * s)
+                }
+            )
+
+            ZStack(alignment: .bottom) {
+                Color.white.edgesIgnoringSafeArea(.all)
+
+                CCBISceneView(
+                    ccbFile: "MenuLeagues.ccbi",
+                    context: CCBIBindingContext(
+                        actions: [
+                            "backButtonCallback": onClose,
+                            "_backButton": onClose,
+                            "myLeagueButtonCallback": { selectedTab = 0; infoBanner = "" },
+                            "countryButtonCallback": { selectedTab = 1; infoBanner = "" },
+                            "worldButtonCallback": { selectedTab = 2; infoBanner = "" },
+                            "helpButtonCallback": { infoBanner = "Earn trophies from Mystery Potions and matches to climb weekly League tiers." },
+                            "previousLeagueResultsCallback": { infoBanner = "Last Week: Rank #\(max(1, 14 - playerLevel % 12)) · +\(max(50, playerLevel * 50)) Coins" },
+                            "morePrizesCallback": { infoBanner = "Top 3 weekly finishers win 200,000 / 150,000 / 100,000 Coins!" }
+                        ],
+                        labelOverrides: [
+                            "_leagueName": tierTitle,
+                            "_leagueTimer": "4d 12h left",
+                            "_firstPrizeAmountLabel": "200000",
+                            "_secondPrizeAmountLabel": "150000",
+                            "_thirdPrizeAmountLabel": "100000"
+                        ],
+                        visibilityOverrides: [
+                            "_leagueTabFourButtons": false,
+                            "_leagueTabThreeButtons": true,
+                            "_myLeagueInfoBar": selectedTab == 0,
+                            "_countryInfoBar": selectedTab == 1,
+                            "_worldInfoBar": selectedTab == 2,
+                            "_friendsInfoBar": false,
+                            "_friendsTableArea": false,
+                            "_loadingAnim": false,
+                            "_pleaseWait": false,
+                            "_upperDescriptionLabel": false,
+                            "_middleDescriptionLabel": false,
+                            "_greyBackground": true
+                        ],
+                        slotViews: [
+                            "_leagueBadgeRootNode": AnyView(
+                                Image(LeagueBadge.assetName(forLevel: playerLevel))
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 28 * s, height: 28 * s)
+                            ),
+                            "_tableArea": tableRows
+                        ],
+                        designScaleModifier: { _ in s }
+                    )
+                )
+                .frame(width: sceneW, height: geometry.size.height)
+
+                if !infoBanner.isEmpty {
+                    Text(infoBanner)
+                        .font(.custom("OpenSans-Bold", size: 11.5 * s))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14 * s)
+                        .padding(.vertical, 6 * s)
+                        .background(Capsule().fill(Color(hex: 0x08A9C8).opacity(0.94)))
+                        .padding(.bottom, 10 * s)
+                        .onTapGesture { infoBanner = "" }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - MenuProfile.ccbi (Native 1:1 Player Profile & Stats)
+struct ProfileModalView: View {
+    let playerName: String
+    let playerLevel: Int
+    let playerSkinName: String?
+    let coins: Int
+    let dna: Int
+    let trophies: Int
+    let totalGames: Int
+    let totalMass: Int
+    let highestMass: Int
+    let longestTimeSec: Int
+    let totalCellsEaten: Int
+    let onOpenQuests: () -> Void
+    let onClose: () -> Void
+
+    var body: some View {
+        GeometryReader { geometry in
+            let sideInset = max(geometry.safeAreaInsets.leading, geometry.safeAreaInsets.trailing)
+            let sceneW = max(1, geometry.size.width - sideInset * 2)
+            let s = OriginalGameplay.uiScale(for: CGSize(width: sceneW, height: geometry.size.height))
+
+            let display = playerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Guest" : playerName
+            let lvl = LeagueBadge.clamp(playerLevel)
+            let xpNeeded = max(100, lvl * 75)
+            let xpCurr = min(xpNeeded, max(10, (totalMass + coins) % xpNeeded))
+            let avgMass = totalGames > 0 ? max(10, totalMass / totalGames) : max(10, highestMass)
+            let timeStr = String(format: "%dm %02ds", longestTimeSec / 60, longestTimeSec % 60)
+
+            ZStack {
+                Color.white.edgesIgnoringSafeArea(.all)
+
+                CCBISceneView(
+                    ccbFile: "MenuProfile.ccbi",
+                    context: CCBIBindingContext(
+                        actions: [
+                            "backButtonCallback": onClose,
+                            "_backButton": onClose,
+                            "achievementsButtonCallback": onOpenQuests
+                        ],
+                        labelOverrides: [
+                            "_nameLabel": display,
+                            "_idLabel": "ID: AGAR-\(max(1000, coins + dna + lvl * 37))",
+                            "_cashLabel": "\(coins)",
+                            "_dnaLabel": "\(dna)",
+                            "_levelLabel": "\(lvl)",
+                            "_experiencePointsLabel": "\(xpCurr)/\(xpNeeded)",
+                            "_numberOfTrophiesLabel": "\(max(trophies, lvl * 12))",
+                            "_totalGamesValue": "\(totalGames)",
+                            "_totalMassValue": "\(totalMass)",
+                            "_averageMassValue": "\(avgMass)",
+                            "_highestMassValue": "\(highestMass)",
+                            "_longestTimeValue": timeStr,
+                            "_totalCellsEatenValue": "\(totalCellsEaten)"
+                        ],
+                        visibilityOverrides: [
+                            "_playGamesAchievementsButton": true
+                        ],
+                        slotViews: [
+                            "_leagueBadgeRootNode": AnyView(
+                                Image(LeagueBadge.assetName(forLevel: lvl))
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 22 * s, height: 22 * s)
+                            )
+                        ],
+                        replacingSlotViews: [
+                            "_playerAvatar": AnyView(
+                                Group {
+                                    if let sk = playerSkinName {
+                                        SkinSelectorPreview(skinName: sk)
+                                            .frame(width: 86 * s, height: 86 * s)
+                                            .cornerRadius(6 * s)
+                                    } else {
+                                        Image("menu-profile-guest")
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 86 * s, height: 86 * s)
+                                            .cornerRadius(6 * s)
+                                    }
+                                }
+                            )
+                        ],
+                        designScaleModifier: { _ in s }
+                    )
+                )
+                .frame(width: sceneW, height: geometry.size.height)
             }
         }
     }

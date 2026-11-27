@@ -623,16 +623,17 @@ struct OnlineGameView: View {
                 joystickIsDragging = false
                 joystickBasePosition = nil
                 let isTap = value.translation.width.magnitude < 5 && value.translation.height.magnitude < 5
-                if isTap {
+                if isTap && !stopOnRelease {
                     let playerScreenCenter = CGPoint(x: geometry.size.width / 2,
                                                      y: (geometry.size.height + geometry.safeAreaInsets.top - geometry.safeAreaInsets.bottom) / 2)
                     let tapDir = CGSize(width: value.startLocation.x - playerScreenCenter.x,
                                         height: value.startLocation.y - playerScreenCenter.y)
                     let mag = hypot(tapDir.width, tapDir.height)
                     if mag > 0.001 {
-                        agarJoystick.lastNonZeroDirection = CGSize(width: tapDir.width / mag, height: tapDir.height / mag)
+                        let norm = CGSize(width: tapDir.width / mag, height: tapDir.height / mag)
+                        agarJoystick.lastNonZeroDirection = norm
+                        lastJoystickDirection = norm
                     }
-                    lastJoystickDirection = tapDir
                 } else {
                     lastJoystickDirection = agarJoystick.lastNonZeroDirection
                 }

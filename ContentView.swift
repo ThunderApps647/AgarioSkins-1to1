@@ -4630,7 +4630,6 @@ struct ContentView: View {
     /// Set by the popup's No action and cleared only by the next world pointer gesture.
     @State private var centerAimUntilCursorMoves = false
     
-    @State private var anchorPoint: CGPoint? = nil
     @State private var lastFrameTimestamp: CFTimeInterval = 0
     @State private var frameCount: Int = 0
     @State private var fps: Int = 60
@@ -4846,7 +4845,6 @@ struct ContentView: View {
                                 lastJoystickDirection = agarJoystick.lastNonZeroDirection
                                 trackRecruitmentCircle(offset: joystickOffset, now: CACurrentMediaTime())
                                 trackForcedFeedCircle(offset: joystickOffset, now: CACurrentMediaTime())
-                                anchorPoint = nil
                             }
                             .onEnded { value in
                                 finishRecruitmentCircleAttempt()
@@ -4855,18 +4853,18 @@ struct ContentView: View {
                                 joystickIsDragging = false
                                 joystickBasePosition = nil
                                 let isTap = value.translation.width.magnitude < 5 && value.translation.height.magnitude < 5
-                                if isTap {
+                                if isTap && !stopOnRelease {
                                     let playerScreenCenter = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
                                     let tapDir = CGSize(width: value.startLocation.x - playerScreenCenter.x, height: value.startLocation.y - playerScreenCenter.y)
                                     let mag = hypot(tapDir.width, tapDir.height)
                                     if mag > 0.001 {
-                                        agarJoystick.lastNonZeroDirection = CGSize(width: tapDir.width / mag, height: tapDir.height / mag)
+                                        let norm = CGSize(width: tapDir.width / mag, height: tapDir.height / mag)
+                                        agarJoystick.lastNonZeroDirection = norm
+                                        lastJoystickDirection = norm
                                     }
-                                    lastJoystickDirection = tapDir
                                 } else {
                                     lastJoystickDirection = agarJoystick.lastNonZeroDirection
                                 }
-                                anchorPoint = stopOnRelease ? playerCenter : nil
                                 joystickOffset = .zero
                             }
                         )
@@ -9859,10 +9857,21 @@ struct ContentView: View {
             
             // Dual-width skins: a player cell directly swallowing another player's/bot's
             // cell this frame arms the artwork swap (accepted only while the swap is idle).
-            for eaterID in eaterByVictimID.values where snapshotsByID[eaterID]?.isPlayer == true {
-                triggerDualSkinSwap(now: CACurrentMediaTime())
-                SoundManager.shared.play(.eatCell)
-                break
+            var playerEatsCount = 0
+            for (victimID, eaterID) in eaterByVictimID {
+                if snapshotsByID[eaterID]?.isPlayer == true {
+                    if snapshotsByID[victimID]?.isPlayer == false {
+                        playerEatsCount += 1
+                    }
+                    if playerEatsCount == 1 {
+                        triggerDualSkinSwap(now: CACurrentMediaTime())
+                        SoundManager.shared.play(.eatCell)
+                    }
+                }
+            }
+            if playerEatsCount > 0 {
+                let prevEats = UserDefaults.standard.integer(forKey: "macro.totalCellsEaten")
+                UserDefaults.standard.set(prevEats + playerEatsCount, forKey: "macro.totalCellsEaten")
             }
             
             for (terminalID, mass) in terminalGains {
@@ -9907,6 +9916,15 @@ struct ContentView: View {
                 isDeathSequencePending = true
                 SoundManager.shared.play(.gameOver)
                 matchSurvivalSeconds = max(0, Int(CACurrentMediaTime() - matchStartTime))
+                let ud = UserDefaults.standard
+                ud.set(ud.integer(forKey: "macro.totalGames") + 1, forKey: "macro.totalGames")
+                ud.set(ud.integer(forKey: "macro.totalMass") + highScore, forKey: "macro.totalMass")
+                if highScore > ud.integer(forKey: "macro.highestMass") {
+                    ud.set(highScore, forKey: "macro.highestMass")
+                }
+                if matchSurvivalSeconds > ud.integer(forKey: "macro.longestTimeSec") {
+                    ud.set(matchSurvivalSeconds, forKey: "macro.longestTimeSec")
+                }
                 joystickIsDragging = false
                 joystickOffset = .zero
                 joystickBasePosition = nil
@@ -10331,35 +10349,30 @@ struct ContentView: View {
     private func movePlayer(dt: CGFloat) {
         let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
         agarJoystick.step(dt: dt, isDragging: joystickIsDragging, stopOnRelease: stopOnRelease)
-        var globalDirectionNorm: CGSize = .zero
-        var inputScale: CGFloat = 0
 
-        if joystickIsDragging {
-            let axisMag = hypot(agarJoystick.axis.width, agarJoystick.axis.height)
-            inputScale = min(1.0, agarJoystick.scale)
-            if axisMag > 0.001 {
-                globalDirectionNorm = CGSize(width: agarJoystick.axis.width / axisMag,
-                                             height: agarJoystick.axis.height / axisMag)
-            }
-        } else if lastJoystickDirection != .zero {
-            globalDirectionNorm = lastJoystickDirection.normalized()
-        }
+        let rawAxis: CGSize = {
+            if centerAimUntilCursorMoves { return .zero }
+            if joystickIsDragging || stopOnRelease { return agarJoystick.axis }
+            return lastJoystickDirection.normalized()
+        }()
+        let magSq = rawAxis.width * rawAxis.width + rawAxis.height * rawAxis.height
+        let isStopped = centerAimUntilCursorMoves || magSq < 0.01
 
-        // Virtual world cursor well outside clusterExtent so multi-cell packs never fold backwards
         let flockCenter = playerCenter
-        let focalWorldCursor = AgarPhysicsCore.steerTarget(
-            flockCenter: flockCenter,
-            directionNorm: globalDirectionNorm,
-            cells: playerCells,
-            zoom: zoomLevel
-        )
-        
+        let reach = AgarPhysicsCore.worldCursorReach(cells: playerCells, viewportSize: UIScreen.main.bounds.size)
+        let worldCursor = isStopped
+            ? flockCenter
+            : CGPoint(x: flockCenter.x + rawAxis.width * reach.worldReach,
+                      y: flockCenter.y + rawAxis.height * reach.worldReach)
+        let baseRadius = CGFloat(OriginalGameplay.baseRadius)
+
         var idToIndex = [UUID: Int]()
         if playerCells.contains(where: { $0.splitImmunityTimer <= 0 && $0.immuneToCellID != nil }) {
             idToIndex.reserveCapacity(playerCells.count)
             for i in playerCells.indices { idToIndex[playerCells[i].id] = i }
         }
-        
+
+        let cellCount = playerCells.count
         for i in playerCells.indices {
             if playerCells[i].splitImmunityTimer > 0 {
                 playerCells[i].splitImmunityTimer -= dt
@@ -10367,69 +10380,92 @@ struct ContentView: View {
             } else if let targetID = playerCells[i].immuneToCellID {
                 if let tIdx = idToIndex[targetID] {
                     let targetCell = playerCells[tIdx]
-                    let r1 = playerCells[i].cachedVisualRadius
-                    let r2 = targetCell.cachedVisualRadius
+                    let r1 = playerCells[i].cachedSolidRadius
+                    let r2 = targetCell.cachedSolidRadius
                     let dx = playerCells[i].position.x - targetCell.position.x
                     let dy = playerCells[i].position.y - targetCell.position.y
-                    let distSq = dx*dx + dy*dy
+                    let distSq = dx * dx + dy * dy
                     let totalR = r1 + r2
                     if distSq > totalR * totalR { playerCells[i].immuneToCellID = nil }
-                } else { playerCells[i].immuneToCellID = nil }
+                } else {
+                    playerCells[i].immuneToCellID = nil
+                }
             }
-            
-            let distanceThisFrame = playerCells[i].cachedMovementSpeed * dt
-            
-            if joystickIsDragging {
-                if inputScale > 0.001, let target = focalWorldCursor {
-                    let vx = target.x - playerCells[i].position.x
-                    let vy = target.y - playerCells[i].position.y
-                    let dist = sqrt(vx * vx + vy * vy)
-                    if dist > 1.0 {
-                        let k = min(1.0, dist / max(playerCells[i].cachedVisualRadius, CGFloat(OriginalGameplay.baseRadius)))
-                        let step = distanceThisFrame * inputScale * k
-                        playerCells[i].position.x += (vx / dist) * step
-                        playerCells[i].position.y += (vy / dist) * step
+
+            let solidRadius = max(playerCells[i].cachedSolidRadius, 1.0)
+            var dirX: CGFloat = 0
+            var dirY: CGFloat = 0
+            var distToTarget: CGFloat = 0
+
+            if isStopped {
+                let dx = flockCenter.x - playerCells[i].position.x
+                let dy = flockCenter.y - playerCells[i].position.y
+                let distSq = dx * dx + dy * dy
+                if distSq >= 0.01 {
+                    let dist = sqrt(distSq)
+                    distToTarget = dist
+                    let ux = dx / dist
+                    let uy = dy / dist
+                    if playerCells[i].mergeTimer <= 0 && playerCells[i].canMerge {
+                        let scale = max(dist - baseRadius, 0) / dist
+                        dirX = ux * scale
+                        dirY = uy * scale
+                    } else {
+                        dirX = ux
+                        dirY = uy
                     }
                 }
-            } else if let anchor = anchorPoint {
-                let directionToAnchor = CGSize(width: anchor.x - playerCells[i].position.x, height: anchor.y - playerCells[i].position.y)
-                let distanceToAnchor = sqrt(directionToAnchor.width * directionToAnchor.width + directionToAnchor.height * directionToAnchor.height)
-                if distanceToAnchor > 1 {
-                    let normalizedDirection = directionToAnchor.normalized()
-                    let travelDistance = min(distanceThisFrame, distanceToAnchor)
-                    playerCells[i].position.x += normalizedDirection.width * travelDistance
-                    playerCells[i].position.y += normalizedDirection.height * travelDistance
-                }
-            } else if let target = focalWorldCursor {
-                let vx = target.x - playerCells[i].position.x
-                let vy = target.y - playerCells[i].position.y
-                let dist = sqrt(vx * vx + vy * vy)
-                if dist > 1.0 {
-                    let k = min(1.0, dist / max(playerCells[i].cachedVisualRadius, CGFloat(OriginalGameplay.baseRadius)))
-                    let step = distanceThisFrame * k
-                    playerCells[i].position.x += (vx / dist) * step
-                    playerCells[i].position.y += (vy / dist) * step
+            } else {
+                let vx = worldCursor.x - playerCells[i].position.x
+                let vy = worldCursor.y - playerCells[i].position.y
+                let dist = hypot(vx, vy)
+                if dist > 0.001 {
+                    distToTarget = dist
+                    dirX = vx / dist
+                    dirY = vy / dist
                 }
             }
-            
+
+            let dirMag = hypot(dirX, dirY)
+            if dirMag > 0.0001 {
+                let k = min(1.0, (reach.inputDist * dirMag) / solidRadius)
+                var step = playerCells[i].cachedMovementSpeed * k * dt
+                if isStopped && cellCount == 1 {
+                    step = min(step, distToTarget)
+                }
+                playerCells[i].position.x += (dirX / dirMag) * step
+                playerCells[i].position.y += (dirY / dirMag) * step
+            }
+
             playerCells[i].position.x += playerCells[i].velocity.width * dt
             playerCells[i].position.y += playerCells[i].velocity.height * dt
 
             let impulseDecay = OriginalGameplay.impulseDecay(dt: dt)
             playerCells[i].velocity.width *= impulseDecay
             playerCells[i].velocity.height *= impulseDecay
+            if abs(playerCells[i].velocity.width) < 0.5 && abs(playerCells[i].velocity.height) < 0.5 {
+                playerCells[i].velocity = .zero
+            }
             if playerCells[i].splitTimer > 0 {
                 playerCells[i].splitTimer -= dt
             }
-            
-            let visualRadius = playerCells[i].cachedVisualRadius
-            let hardPhysicsRadius = visualRadius * OriginalGameplay.percentageOfCellToSquash
-            
-            if playerCells[i].position.x < hardPhysicsRadius { playerCells[i].position.x = hardPhysicsRadius; playerCells[i].velocity.width = 0 }
-            else if playerCells[i].position.x > worldSize - hardPhysicsRadius { playerCells[i].position.x = worldSize - hardPhysicsRadius; playerCells[i].velocity.width = 0 }
-            
-            if playerCells[i].position.y < hardPhysicsRadius { playerCells[i].position.y = hardPhysicsRadius; playerCells[i].velocity.height = 0 }
-            else if playerCells[i].position.y > worldSize - hardPhysicsRadius { playerCells[i].position.y = worldSize - hardPhysicsRadius; playerCells[i].velocity.height = 0 }
+
+            let hardPhysicsRadius = solidRadius * OriginalGameplay.percentageOfCellToSquash
+            if playerCells[i].position.x < hardPhysicsRadius {
+                playerCells[i].position.x = hardPhysicsRadius
+                playerCells[i].velocity.width = 0
+            } else if playerCells[i].position.x > worldSize - hardPhysicsRadius {
+                playerCells[i].position.x = worldSize - hardPhysicsRadius
+                playerCells[i].velocity.width = 0
+            }
+
+            if playerCells[i].position.y < hardPhysicsRadius {
+                playerCells[i].position.y = hardPhysicsRadius
+                playerCells[i].velocity.height = 0
+            } else if playerCells[i].position.y > worldSize - hardPhysicsRadius {
+                playerCells[i].position.y = worldSize - hardPhysicsRadius
+                playerCells[i].velocity.height = 0
+            }
         }
     }
     
@@ -10945,7 +10981,6 @@ struct ContentView: View {
     // created, and the `firstIndex(where:)` UUID scans that ran inside a nested loop.
     private func handleCellMerging(cells: inout [PlayerCell], dt: CGFloat) {
         guard cells.count > 1 else {
-            if anchorPoint != nil { anchorPoint = playerCenter }
             return
         }
         
@@ -10963,7 +10998,6 @@ struct ContentView: View {
         }
         
         if groups.isEmpty && !hasMerging {
-            if anchorPoint != nil { anchorPoint = playerCenter }
             return
         }
         
@@ -11053,8 +11087,6 @@ struct ContentView: View {
                 i -= 1
             }
         }
-        
-        if anchorPoint != nil { anchorPoint = playerCenter }
     }
     
     
@@ -11157,7 +11189,6 @@ struct ContentView: View {
         joystickBasePosition = nil
         lastJoystickDirection = .zero
         agarJoystick.reset()
-        anchorPoint = nil
         resetLobbyTeamState()
         viruses.removeAll()
         tokens.removeAll()
@@ -11376,7 +11407,6 @@ struct ContentView: View {
         joystickOffset = .zero
         joystickBasePosition = nil
         agarJoystick.reset()
-        anchorPoint = stopOnRelease ? playerCenter : nil
         // Do not reuse the pre-popup gesture recognizers. A fresh session ensures feed's normal
         // timer and macro's immediate press begin from this touch-down, with no stale hold state.
         ejectControlSession &+= 1
@@ -11400,7 +11430,6 @@ struct ContentView: View {
         joystickOffset = .zero
         joystickBasePosition = nil
         agarJoystick.reset()
-        anchorPoint = nil
         showModMenu = false
         isFeedingHeld = false
         feedHoldStartTime = nil
@@ -12611,11 +12640,18 @@ struct MainMenu: View {
     @AppStorage("macro.coins") private var coinsCount: Int = 1000
     @AppStorage("macro.dna") private var dnaCount: Int = 50
     @AppStorage("macro.activeStartBoost") private var activeStartBoost: Int = 0
+    @AppStorage("macro.trophies") private var trophiesCount: Int = 0
+    @AppStorage("macro.totalGames") private var totalGamesCount: Int = 0
+    @AppStorage("macro.totalMass") private var totalMassAccumulated: Int = 0
+    @AppStorage("macro.highestMass") private var highestEverMass: Int = 0
+    @AppStorage("macro.longestTimeSec") private var longestTimeSec: Int = 0
+    @AppStorage("macro.totalCellsEaten") private var totalCellsEatenCount: Int = 0
     @ObservedObject private var potionStore = PotionStore.shared
     @State private var showSkinDrawer: Bool = false
     @State private var showSkinsModal: Bool = false
     @State private var selectedSkinsTab: Int = 0
     @State private var activeInfoTab: String? = nil
+    @State private var requestedShopSection: ShopTab? = nil
     /// Injected by ContentView; opens the PLAY ONLINE server browser.
     var onPlayOnline: () -> Void = {}
     let availableSkins = (1...387).map { String($0) }
@@ -13047,34 +13083,54 @@ struct MainMenu: View {
         let minCard = max(78, 86 * s)
 
         let tabsSlot = AnyView(
-            HStack(spacing: 6 * s) {
+            HStack(spacing: 4 * s) {
                 ForEach(0..<tabNames.count, id: \.self) { idx in
                     let selected = selectedSkinsTab == idx
-                    Button(action: {
+                    CCBISceneView(
+                        ccbFile: "MenuShopSkinsTab_26.2.0.ccbi",
+                        centerRoot: true,
+                        context: CCBIBindingContext(
+                            labelOverrides: [
+                                "_tabLabelWhite": tabNames[idx],
+                                "_tabLabelGrey": tabNames[idx]
+                            ],
+                            visibilityOverrides: [
+                                "_whiteTabNode": selected,
+                                "_greyTabNode": !selected
+                            ],
+                            designScaleModifier: { _ in s }
+                        )
+                    )
+                    .frame(height: 30.4 * s)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
                         SoundManager.shared.play(.menuClick)
                         selectedSkinsTab = idx
-                    }) {
-                        Text(tabNames[idx])
-                            .font(.custom("OpenSans-Bold", size: 12 * s))
-                            .foregroundColor(selected ? .white : Color(hex: 0x5A5F66))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 28 * s)
                     }
-                    .buttonStyle(MCFSBevelStyle(frameAsset: selected ? "mcfs-light-blue" : "mcfs-white-grey-tab", showShadow: selected))
                 }
 
-                Button(action: {
+                CCBISceneView(
+                    ccbFile: "MenuShopSkinsTab_26.2.0.ccbi",
+                    centerRoot: true,
+                    context: CCBIBindingContext(
+                        labelOverrides: [
+                            "_tabLabelWhite": "No Skin",
+                            "_tabLabelGrey": "No Skin"
+                        ],
+                        visibilityOverrides: [
+                            "_whiteTabNode": selectedSkinName == nil,
+                            "_greyTabNode": selectedSkinName != nil
+                        ],
+                        designScaleModifier: { _ in s }
+                    )
+                )
+                .frame(height: 30.4 * s)
+                .contentShape(Rectangle())
+                .onTapGesture {
                     SoundManager.shared.play(.menuClick)
                     selectedSkinName = nil
                     withAnimation { showSkinsModal = false }
-                }) {
-                    Text("No Skin")
-                        .font(.custom("OpenSans-Bold", size: 11.5 * s))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12 * s)
-                        .frame(height: 28 * s)
                 }
-                .buttonStyle(MCFSBevelStyle(frameAsset: selectedSkinName == nil ? "mcfs-green" : "mcfs-orange"))
             }
             .padding(.horizontal, 10 * s)
         )
@@ -13163,8 +13219,8 @@ struct MainMenu: View {
                         actions: [
                             "backButtonCallback": { withAnimation { showSkinsModal = false } },
                             "_backButton": { withAnimation { showSkinsModal = false } },
-                            "coinBarCallback": { showSkinsModal = false; activeInfoTab = "Shop" },
-                            "DNABarCallback": { showSkinsModal = false; activeInfoTab = "Shop" }
+                            "coinBarCallback": { showSkinsModal = false; requestedShopSection = .coins; activeInfoTab = "Shop" },
+                            "DNABarCallback": { showSkinsModal = false; requestedShopSection = .dna; activeInfoTab = "Shop" }
                         ],
                         labelOverrides: [
                             "_coinBar._barCurrencyValue": "\(coinsCount)",
@@ -13252,26 +13308,26 @@ struct MainMenu: View {
                             "_leaguesButtonNode.pressedCallback": { activeInfoTab = "Leagues" },
                             "_mysteryPotionsButtonNode.pressedCallback": { activeInfoTab = "Potions" },
                             "_dailyQuestButtonNode.pressedCallback": { activeInfoTab = "Quests" },
-                            "_freeCoinsButtonNode.pressedCallback": { activeInfoTab = "Gifts" },
+                            "_freeCoinsButtonNode.pressedCallback": { requestedShopSection = .coins; activeInfoTab = "Shop" },
                             "_leaguesButton": { activeInfoTab = "Leagues" },
                             "_mysteryPotionsButton": { activeInfoTab = "Potions" },
                             "_dailyQuestButton": { activeInfoTab = "Quests" },
                             "_dailyQuestButtonNode": { activeInfoTab = "Quests" },
-                            "_freeCoinsButtonNode": { activeInfoTab = "Gifts" },
+                            "_freeCoinsButtonNode": { requestedShopSection = .coins; activeInfoTab = "Shop" },
                             "skinsButtonCallback": { showSkinsModal = true },
                             "settingsButtonCallback": { showSettings = true },
-                            "shopButtonCallback": { activeInfoTab = "Shop" },
-                            "xpButtonCallback": { activeInfoTab = "Shop" },
-                            "massButtonCallback": { activeInfoTab = "Shop" },
+                            "shopButtonCallback": { requestedShopSection = nil; activeInfoTab = "Shop" },
+                            "xpButtonCallback": { requestedShopSection = .xp; activeInfoTab = "Shop" },
+                            "massButtonCallback": { requestedShopSection = .boosts; activeInfoTab = "Shop" },
                             "newsfeedButtonCallback": { activeInfoTab = "News" },
                             "giftCenterButtonCallback": { activeInfoTab = "Gifts" },
                             "partyModeButtonCallback": {
                                 partyJoinCode = ""
                                 withAnimation { showPartyMenu = true }
                             },
-                            "profileButtonCallback": { activeInfoTab = "Leagues" },
-                            "coinBarCallback": { activeInfoTab = "Shop" },
-                            "DNABarCallback": { activeInfoTab = "Shop" }
+                            "profileButtonCallback": { activeInfoTab = "Profile" },
+                            "coinBarCallback": { requestedShopSection = .coins; activeInfoTab = "Shop" },
+                            "DNABarCallback": { requestedShopSection = .dna; activeInfoTab = "Shop" }
                         ],
                         labelOverrides: [
                             "_coinBar._barCurrencyValue": "\(coinsCount)",
@@ -13420,16 +13476,20 @@ struct MainMenu: View {
                             coins: $coinsCount,
                             dna: $dnaCount,
                             activeStartBoost: $activeStartBoost,
+                            initialSection: requestedShopSection,
                             onOpenPotions: {
+                                requestedShopSection = nil
                                 withAnimation { activeInfoTab = "Potions" }
                             },
                             onOpenSkins: {
+                                requestedShopSection = nil
                                 withAnimation {
                                     activeInfoTab = nil
                                     showSkinsModal = true
                                 }
                             }
                         ) {
+                            requestedShopSection = nil
                             withAnimation { activeInfoTab = nil }
                         }
                         .zIndex(2)
@@ -13439,7 +13499,44 @@ struct MainMenu: View {
                         }
                         .zIndex(2)
                     case "Potions":
-                        PotionsModalView(coins: $coinsCount, dna: $dnaCount) {
+                        PotionsModalView(
+                            coins: $coinsCount,
+                            dna: $dnaCount,
+                            onOpenShopSection: { section in
+                                requestedShopSection = section
+                                withAnimation { activeInfoTab = "Shop" }
+                            }
+                        ) {
+                            withAnimation { activeInfoTab = nil }
+                        }
+                        .zIndex(2)
+                    case "Leagues":
+                        LeaguesModalView(
+                            playerName: playerName,
+                            playerLevel: playerLevel,
+                            playerSkinName: selectedSkinName,
+                            trophies: trophiesCount
+                        ) {
+                            withAnimation { activeInfoTab = nil }
+                        }
+                        .zIndex(2)
+                    case "Profile":
+                        ProfileModalView(
+                            playerName: playerName,
+                            playerLevel: playerLevel,
+                            playerSkinName: selectedSkinName,
+                            coins: coinsCount,
+                            dna: dnaCount,
+                            trophies: trophiesCount,
+                            totalGames: totalGamesCount,
+                            totalMass: totalMassAccumulated,
+                            highestMass: highestEverMass,
+                            longestTimeSec: longestTimeSec,
+                            totalCellsEaten: totalCellsEatenCount,
+                            onOpenQuests: {
+                                withAnimation { activeInfoTab = "Quests" }
+                            }
+                        ) {
                             withAnimation { activeInfoTab = nil }
                         }
                         .zIndex(2)
@@ -13453,86 +13550,80 @@ struct MainMenu: View {
                     }
                 }
 
-                // GenericHeader.ccbi + MenuSettingsNode_26.2.0.ccbi Light Settings
+                // MenuSettings.ccbi + MenuSettingsNode_26.2.0.ccbi Light Settings
                 if showSettings {
+                    let settingsTableSlot = AnyView(
+                        ScrollView(showsIndicators: false) {
+                            VStack(alignment: .leading, spacing: 6 * s) {
+                                lightSettingToggle("Sound Effects", isOn: $soundEnabled, scale: s)
+                                lightSettingToggle("Dark Mode", isOn: $darkModeGrid, scale: s)
+                                lightSettingToggle("Show Mass", isOn: $showMassText, scale: s)
+                                lightSettingToggle("Show Skins", isOn: $showSkins, scale: s)
+                                lightSettingToggle("Show Level Badge", isOn: $showPlayerLevel, scale: s)
+                                lightSettingToggle("Show Arrow", isOn: $showArrow, scale: s)
+                                lightSettingToggle("Show Emoji Widget", isOn: $showEmojiWidget, scale: s)
+                                lightSettingToggle("Show Minimap", isOn: $showMinimap, scale: s)
+                                lightSettingToggle("Stop Movement on Release", isOn: $stopOnRelease, scale: s)
+
+                                Text("Offline Match")
+                                    .font(.custom("OpenSans-Bold", size: 14 * s))
+                                    .foregroundColor(Color(hex: 0x5A5F66))
+                                    .padding(.top, 8 * s)
+
+                                VStack(alignment: .leading, spacing: 8 * s) {
+                                    Text("Player Start Mass: \(Int(playerStartMass))").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
+                                    Slider(value: $playerStartMass, in: 10...5000, step: 10).accentColor(Color(hex: 0x00C8F8))
+
+                                    Text("Bot Start Mass: \(Int(botStartMass))").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
+                                    Slider(value: $botStartMass, in: 10...5000, step: 10).accentColor(Color(hex: 0x54C826))
+                                        .opacity(randomizeBotStartMass ? 0.4 : 1.0)
+                                        .disabled(randomizeBotStartMass)
+
+                                    lightSettingRowSwitch("Randomize Bot Start Mass", isOn: $randomizeBotStartMass, scale: s)
+
+                                    Text("Bot Count: \(targetBotCount)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
+                                    Slider(value: Binding(get: { Double(targetBotCount) }, set: { targetBotCount = Int($0) }), in: 0...100, step: 1).accentColor(Color(hex: 0xF26522))
+
+                                    Text("Feed Bot Count: \(feedBotCount)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
+                                    Slider(value: Binding(get: { Double(feedBotCount) }, set: { feedBotCount = Int($0) }), in: 0...50, step: 1).accentColor(.pink)
+
+                                    Text("Bot Skill: \(menuBotSkillLabel)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
+                                    Slider(value: $botSkill, in: 0.4...1.6, step: 0.1).accentColor(.red)
+                                }
+                                .padding(12 * s)
+                                .background(MCFSFrame(name: "mcfs-light-grey"))
+
+                                Text(buildStamp)
+                                    .font(.custom("Lato-Regular", size: 10 * s))
+                                    .foregroundColor(Color(hex: 0x9A9A9A))
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                                    .padding(.top, 4 * s)
+                            }
+                            .padding(.horizontal, 10 * s)
+                            .padding(.vertical, 8 * s)
+                        }
+                    )
+
                     ZStack {
                         Color.white.edgesIgnoringSafeArea(.all)
-                        VStack(spacing: 0) {
-                            ZStack {
-                                CCBISceneView(
-                                    ccbFile: "GenericHeader.ccbi",
-                                    context: CCBIBindingContext(
-                                        actions: [
-                                            "backButtonCallback": { withAnimation { showSettings = false } },
-                                            "_backButton": { withAnimation { showSettings = false } }
-                                        ],
-                                        designScaleModifier: { _ in s }
-                                    )
-                                )
-                                .frame(height: 40 * s)
-
-                                Text("Settings")
-                                    .font(.custom("OpenSans-Bold", size: 19 * s))
-                                    .foregroundColor(Color(hex: 0x5A5F66))
-                            }
-                            .frame(height: 40 * s)
-                            .background(Color.white)
-
-                            ScrollView {
-                                VStack(alignment: .leading, spacing: 7 * s) {
-                                    Text("Options")
-                                        .font(.custom("OpenSans-Bold", size: 14 * s))
-                                        .foregroundColor(Color(hex: 0x5A5F66))
-                                        .padding(.top, 8 * s)
-
-                                    lightSettingToggle("Sound Effects", isOn: $soundEnabled, scale: s)
-                                    lightSettingToggle("Dark Mode", isOn: $darkModeGrid, scale: s)
-                                    lightSettingToggle("Show Mass", isOn: $showMassText, scale: s)
-                                    lightSettingToggle("Show Skins", isOn: $showSkins, scale: s)
-                                    lightSettingToggle("Show Level Badge", isOn: $showPlayerLevel, scale: s)
-                                    lightSettingToggle("Show Arrow", isOn: $showArrow, scale: s)
-                                    lightSettingToggle("Show Emoji Widget", isOn: $showEmojiWidget, scale: s)
-                                    lightSettingToggle("Show Minimap", isOn: $showMinimap, scale: s)
-                                    lightSettingToggle("Stop Movement on Release", isOn: $stopOnRelease, scale: s)
-
-                                    Text("Offline Match")
-                                        .font(.custom("OpenSans-Bold", size: 14 * s))
-                                        .foregroundColor(Color(hex: 0x5A5F66))
-                                        .padding(.top, 8 * s)
-
-                                    VStack(alignment: .leading, spacing: 8 * s) {
-                                        Text("Player Start Mass: \(Int(playerStartMass))").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
-                                        Slider(value: $playerStartMass, in: 10...5000, step: 10).accentColor(Color(hex: 0x00C8F8))
-
-                                        Text("Bot Start Mass: \(Int(botStartMass))").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
-                                        Slider(value: $botStartMass, in: 10...5000, step: 10).accentColor(Color(hex: 0x54C826))
-                                            .opacity(randomizeBotStartMass ? 0.4 : 1.0)
-                                            .disabled(randomizeBotStartMass)
-
-                                        lightSettingRowSwitch("Randomize Bot Start Mass", isOn: $randomizeBotStartMass, scale: s)
-
-                                        Text("Bot Count: \(targetBotCount)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
-                                        Slider(value: Binding(get: { Double(targetBotCount) }, set: { targetBotCount = Int($0) }), in: 0...100, step: 1).accentColor(Color(hex: 0xF26522))
-
-                                        Text("Feed Bot Count: \(feedBotCount)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
-                                        Slider(value: Binding(get: { Double(feedBotCount) }, set: { feedBotCount = Int($0) }), in: 0...50, step: 1).accentColor(.pink)
-
-                                        Text("Bot Skill: \(menuBotSkillLabel)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
-                                        Slider(value: $botSkill, in: 0.4...1.6, step: 0.1).accentColor(.red)
-                                    }
-                                    .padding(12 * s)
-                                    .background(MCFSFrame(name: "mcfs-light-grey"))
-
-                                    Text(buildStamp)
-                                        .font(.custom("Lato-Regular", size: 10 * s))
-                                        .foregroundColor(Color(hex: 0x9A9A9A))
-                                        .frame(maxWidth: .infinity, alignment: .center)
-                                        .padding(.top, 4 * s)
-                                }
-                                .padding(.horizontal, 16 * s)
-                                .padding(.bottom, 20 * s)
-                            }
-                        }
+                        CCBISceneView(
+                            ccbFile: "MenuSettings.ccbi",
+                            context: CCBIBindingContext(
+                                actions: [
+                                    "backButtonCallback": { withAnimation { showSettings = false } },
+                                    "_backButton": { withAnimation { showSettings = false } }
+                                ],
+                                visibilityOverrides: [
+                                    "_menuHelp": false,
+                                    "_scrollbarNode": false
+                                ],
+                                slotViews: [
+                                    "_tableNode": settingsTableSlot
+                                ],
+                                designScaleModifier: { _ in s }
+                            )
+                        )
+                        .frame(width: max(1, geometry.size.width - sideInset * 2), height: geometry.size.height)
                     }
                     .zIndex(3)
                 }
@@ -13567,24 +13658,52 @@ struct MainMenu: View {
     }
 
     private func lightSettingToggle(_ title: String, isOn: Binding<Bool>, scale s: CGFloat) -> some View {
-        Button(action: {
+        let toggleAction = {
             SoundManager.shared.play(.menuClick)
             withAnimation(.easeInOut(duration: 0.15)) { isOn.wrappedValue.toggle() }
-        }) {
-            HStack {
-                Text(title)
-                    .font(.custom("Lato-Regular", size: 13.5 * s))
-                    .foregroundColor(Color(hex: 0x5A5F66))
-                Spacer()
-                Image(isOn.wrappedValue ? "menu-slider-on" : "menu-slider-off")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(height: 23 * s)
-            }
-            .padding(.horizontal, 14 * s)
-            .padding(.vertical, 9 * s)
-            .background(MCFSFrame(name: "mcfs-light-grey"))
         }
+        return CCBISceneView(
+            ccbFile: "MenuSettingsNode_26.2.0.ccbi",
+            context: CCBIBindingContext(
+                actions: [
+                    "toggleSwipeCallback:": toggleAction
+                ],
+                labelOverrides: [
+                    "_leftLabel": title
+                ],
+                visibilityOverrides: [
+                    "_leftSmallLabel": false,
+                    "_rightLabel": false,
+                    "_titleLabel": false,
+                    "_firstTitleLabel": false,
+                    "_hint": false,
+                    "_leftToggle": false,
+                    "_centerToggle": false,
+                    "_rightToggle": false,
+                    "_greenButton": false,
+                    "_facebookLoginButton": false,
+                    "_googleButton": false,
+                    "_appleButton": false,
+                    "_orangeButton": false,
+                    "_instagramButton": false,
+                    "_facebookButton": false,
+                    "_youtubeButton": false,
+                    "_blueButton": false
+                ],
+                replacingSlotViews: [
+                    "_toggleSwipe": AnyView(
+                        Image(isOn.wrappedValue ? "menu-slider-on" : "menu-slider-off")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 74.5 * s, height: 36 * s)
+                    )
+                ],
+                designScaleModifier: { _ in s }
+            )
+        )
+        .frame(height: 46 * s)
+        .contentShape(Rectangle())
+        .onTapGesture { toggleAction() }
     }
 }
 

@@ -79,6 +79,30 @@ enum OriginalGameplay {
         return cocosZoom * screenScale * customZoomMultiplier
     }
 
+    /// Screen-normalised input distance (`0x1000b5550` + `0x10003f470`): `sqrt(500000 / aspect) / 1.5`.
+    static func inputDistance(for viewportSize: CGSize) -> CGFloat {
+        let w = max(viewportSize.width, 1)
+        let h = max(viewportSize.height, 1)
+        let aspect = max(w, h) / min(w, h)
+        let normH = CGFloat(sqrt(500_000.0 / Double(aspect)))
+        return normH / CGFloat(maxMagnitudeFactor)
+    }
+
+    /// Arena zoom in the normalised `normH` space used for `worldReach = inputDistance / arenaZoom`.
+    static func arenaZoomForInput(totalRadius: CGFloat, cellCount: Int, viewportSize: CGSize) -> CGFloat {
+        let w = max(viewportSize.width, 1)
+        let h = max(viewportSize.height, 1)
+        let aspect = max(w, h) / min(w, h)
+        let normH = CGFloat(sqrt(500_000.0 / Double(aspect)))
+        let rEff = max(totalRadius, CGFloat(baseRadius))
+        let n = CGFloat(max(1, cellCount))
+        let scaleFactor = pow(n, 0.1)
+        let maxScaleFactor = pow(n, 0.32)
+        let minZoom = max(minZoomValue, (0.37 * normH * maxScaleFactor) / rEff)
+        let q = normH / (42.0 * rEff)
+        return min(pow(max(q, 0.0001), 0.4) * scaleFactor, minZoom)
+    }
+
     /// `BaseArenaView::calcPlayerCellsMassCenter` (`0x100375878`): weights by cell radius, not mass.
     static func radiusWeightedCenter(positionsAndRadii: [(CGPoint, CGFloat)]) -> CGPoint {
         var totalR: CGFloat = 0
