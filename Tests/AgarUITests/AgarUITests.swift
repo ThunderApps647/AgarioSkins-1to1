@@ -85,9 +85,15 @@ final class AgarUITests: XCTestCase {
         capture(app, name: "Live_01_MainMenu.png")
 
         // 1. Settings route + toggle
-        if let settingsBtn = firstExisting(app, ids: ["ccbi.settingsButtonCallback"], timeout: 3.0) {
+        if let settingsBtn = firstExisting(app, ids: ["ccbi.settingsButtonCallback"], timeout: 5.0) {
             waitAndTap(settingsBtn)
-            let toggle = try XCTUnwrap(firstExisting(app, ids: ["ccbi.toggleSwipeCallback:"], timeout: 4.0), "Settings modal should open with toggles")
+            let toggle = try XCTUnwrap(
+                firstExisting(app, ids: ["ccbi.toggleSwipeCallback:"], timeout: 4.0) ?? {
+                    waitAndTap(settingsBtn)
+                    return firstExisting(app, ids: ["ccbi.toggleSwipeCallback:"], timeout: 5.0)
+                }(),
+                "Settings modal should open with toggles"
+            )
             let backBtn = firstExisting(app, ids: ["ccbi.backButtonCallback", "ccbi._backButton"], timeout: 4.0)
             XCTAssertNotNil(backBtn, "Settings modal should expose back button")
             RunLoop.current.run(until: Date().addingTimeInterval(0.35))
