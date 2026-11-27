@@ -35,7 +35,7 @@ def compute_ssim(img1: np.ndarray, img2: np.ndarray) -> float:
     return float(np.mean(num / np.maximum(den, 1e-12)))
 
 
-def audit_pair(sim_path: str, ref_path: str, out_heatmap: str, ssim_threshold: float = 0.70):
+def audit_pair(sim_path: str, ref_path: str, out_heatmap: str, ssim_threshold: float = 0.92):
     sim = Image.open(sim_path).convert("RGB")
     ref = Image.open(ref_path).convert("RGBA")
     # Composite ref over white background if transparent

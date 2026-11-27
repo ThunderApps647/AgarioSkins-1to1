@@ -10568,7 +10568,7 @@ struct ContentView: View {
                     name: cells[index].name, skinName: cells[index].skinName, isBot: cells[index].isBot,
                     isFeedBot: cells[index].isFeedBot, aiSkillTier: cells[index].aiSkillTier
                 )
-                newCell.splitImmunityTimer = 0.12
+                newCell.splitImmunityTimer = 0.2
                 newCell.immuneToCellID = cells[index].id
                 // Font lineage: ONLY the new piece coming out of an at/above-threshold
                 // cell is born at the half ratio. The splitting cell itself keeps
@@ -10761,7 +10761,7 @@ struct ContentView: View {
                 if popped { return }
                 if c.mass < popThreshold { return }
                 if poppedCellIDs.contains(c.id) { return }
-                let triggerRadius = c.radius
+                let triggerRadius = c.solidRadius
                 let dx = c.x - virus.position.x
                 if dx < -triggerRadius || dx > triggerRadius { return }
                 let dy = c.y - virus.position.y
@@ -10838,11 +10838,9 @@ struct ContentView: View {
                 botCells[action.cellIndex].mergeTimer = 30.0 + Double(pieceMass) * 0.02
                 botCells[action.cellIndex].canMerge = false
                 botCells[action.cellIndex].refreshCachedRadii()
-                let childCount = max(1, massList.count - 1)
-                let basePhase = Double.random(in: 0..<(2 * Double.pi))
                 for k in 1..<massList.count {
-                    let sectorAngle = basePhase + (2.0 * Double.pi * Double(k - 1)) / Double(childCount)
-                    let angle = sectorAngle + Double.random(in: -0.32...0.32)
+                    // AgarCell::eatVirus draws an independent uniform angle for every child.
+                    let angle = Double.random(in: 0..<(2 * Double.pi))
                     let direction = CGSize(width: CGFloat(cos(angle)), height: CGFloat(sin(angle)))
                     let childMass = massList[k]
                     let childRadius = OriginalGameplay.radius(forMass: childMass)
@@ -10866,15 +10864,14 @@ struct ContentView: View {
                         isFeedBot: botCells[action.cellIndex].isFeedBot,
                         aiSkillTier: botCells[action.cellIndex].aiSkillTier
                     )
-                    newCell.splitImmunityTimer = 0.12
+                    newCell.splitImmunityTimer = 0.2
                     newCell.immuneToCellID = botCells[action.cellIndex].id
                     newCell.massFontHalved = poppedHalvesFont
                     newCell.massFontScale = poppedHalvesFont ? 0.5 : 1.0
                     newCell.aiAggression = botCells[action.cellIndex].aiAggression
                     newCell.aiCaution = botCells[action.cellIndex].aiCaution
-                    let impulseScale = CGFloat.random(in: 0.85...1.15)
-                    newCell.velocity.width += direction.width * impulse * impulseScale
-                    newCell.velocity.height += direction.height * impulse * impulseScale
+                    newCell.velocity.width += direction.width * impulse
+                    newCell.velocity.height += direction.height * impulse
                     botCells.append(newCell)
                 }
             } else {
@@ -10888,11 +10885,9 @@ struct ContentView: View {
                 playerCells[action.cellIndex].mergeTimer = 30.0 + Double(pieceMass) * 0.02
                 playerCells[action.cellIndex].canMerge = false
                 playerCells[action.cellIndex].refreshCachedRadii()
-                let childCount = max(1, massList.count - 1)
-                let basePhase = Double.random(in: 0..<(2 * Double.pi))
                 for k in 1..<massList.count {
-                    let sectorAngle = basePhase + (2.0 * Double.pi * Double(k - 1)) / Double(childCount)
-                    let angle = sectorAngle + Double.random(in: -0.32...0.32)
+                    // AgarCell::eatVirus draws an independent uniform angle for every child.
+                    let angle = Double.random(in: 0..<(2 * Double.pi))
                     let direction = CGSize(width: CGFloat(cos(angle)), height: CGFloat(sin(angle)))
                     let childMass = massList[k]
                     let childRadius = OriginalGameplay.radius(forMass: childMass)
@@ -10913,13 +10908,12 @@ struct ContentView: View {
                         name: playerCells[action.cellIndex].name,
                         skinName: playerCells[action.cellIndex].skinName
                     )
-                    newCell.splitImmunityTimer = 0.12
+                    newCell.splitImmunityTimer = 0.2
                     newCell.immuneToCellID = playerCells[action.cellIndex].id
                     newCell.massFontHalved = poppedHalvesFont
                     newCell.massFontScale = poppedHalvesFont ? 0.5 : 1.0
-                    let impulseScale = CGFloat.random(in: 0.85...1.15)
-                    newCell.velocity.width += direction.width * impulse * impulseScale
-                    newCell.velocity.height += direction.height * impulse * impulseScale
+                    newCell.velocity.width += direction.width * impulse
+                    newCell.velocity.height += direction.height * impulse
                     playerCells.append(newCell)
                 }
             }
@@ -12975,6 +12969,8 @@ struct MainMenu: View {
                     Image(icon).resizable().scaledToFit().frame(width: 21 * s, height: 21 * s)
                     menuStrokedText(label, size: 7.5 * s)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.55)
+                        .frame(width: 36 * s)
                 }
                 .frame(width: 40 * s, height: 40 * s)
                 .background(

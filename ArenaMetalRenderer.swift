@@ -430,6 +430,23 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         }
     }
 
+    private func appendScaledFan(cx: Float, cy: Float, verts: [CGPoint], zoomPx: Float, scale: Float, color: SIMD4<Float>) {
+        let n = verts.count
+        guard n >= 6 else { return }
+        let center = SolidVertex(pixelPos: SIMD2<Float>(cx, cy), color: color)
+        var pts = [SIMD2<Float>](repeating: .zero, count: n)
+        for i in 0..<n {
+            pts[i] = SIMD2<Float>(cx + Float(verts[i].x) * scale * zoomPx,
+                                  cy + Float(verts[i].y) * scale * zoomPx)
+        }
+        for i in 0..<n {
+            let next = (i + 1) % n
+            solidBuf.append(center)
+            solidBuf.append(SolidVertex(pixelPos: pts[i], color: color))
+            solidBuf.append(SolidVertex(pixelPos: pts[next], color: color))
+        }
+    }
+
     private func appendVirusFan(cx: Float, cy: Float, radiusWorld: Float, zoomPx: Float, pointCount: Int, radiusOffsetWorld: Float, spikeDeltaWorld: Float, color: SIMD4<Float>) {
         let count = max(12, pointCount & ~1)
         let ring = trigRing(count: count)
@@ -476,7 +493,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         solidBuf.removeAll(keepingCapacity: true)
     }
 
-    private func drawTexturedFan(enc: MTLRenderCommandEncoder, texture: MTLTexture, cx: Float, cy: Float, verts: [CGPoint], zoomPx: Float, radiusOffsetWorld: Float, fallbackRadiusPx: Float, baseRadiusWorld: Float, isPartyCell: Bool = false, alpha: Float, viewportSize: SIMD2<Float>) {
+    private func drawTexturedFan(enc: MTLRenderCommandEncoder, texture: MTLTexture, cx: Float, cy: Float, verts: [CGPoint], zoomPx: Float, radiusOffsetWorld: Float, fallbackRadiusPx: Float, baseRadiusWorld: Float, alpha: Float, viewportSize: SIMD2<Float>) {
         var tv: [TexVertex] = []
         let tint = SIMD4<Float>(alpha, alpha, alpha, alpha) // premultiplied alpha
         if verts.count >= 8 && baseRadiusWorld > 1 {
@@ -485,10 +502,10 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
             let center = TexVertex(pixelPos: SIMD2<Float>(cx, cy), texCoord: SIMD2<Float>(0.5, 0.5), tint: tint)
             var pxPts = [SIMD2<Float>](repeating: .zero, count: n)
             var uvs = [SIMD2<Float>](repeating: .zero, count: n)
-            // SoftBodyCellView::scale = (5.0 / r) + 1.0, shrinkGLForPartyCell = 1.0 - (6.0 / (r * scale))
-            let cellScale = (5.0 / baseRadiusWorld) + 1.0
-            let partyScale = isPartyCell ? max(Float(0.5), 1.0 - 6.0 / (baseRadiusWorld * cellScale)) : 1.0
-            let uvScale = (cellScale * partyScale) / max(1.0, baseRadiusWorld)
+            // Mirrors SoftBodyCellView::calcTexCoordsInto:vertexArray: (0x1003a5354):
+            // texCoord = vertex / (2 * radius) + 0.5.  The old (5/r + 1) factor sampled
+            // outside the skin and relied on clampToEdge, visibly stretching every skin.
+            let uvScale = 1.0 / max(1.0, baseRadiusWorld)
             for i in 0..<n {
                 let v = verts[i]
                 let vx = Float(v.x)
@@ -882,66 +899,97 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 let sy = Float(c.position.y) * zoomPx + screenOffY
                 let rW = Float(c.cachedVisualRadius)
                 let segCount = max(20, min(64, Int(rW * ptZoom * 0.85)))
+                // SoftBodyCellView::drawOutlineWithVertices (0x1003a5064):
+                //   outline at (r + 10) / r, body fill at (r + 5) / r.
+                // drawFillingWithVertices (0x1003a528c) then paints an inner disc at (r - 10) / r.
                 let hasBorder = rW > 18.0
-                let outerOff: Float = hasBorder ? 5.0 : 0.0
-                let innerOff: Float = hasBorder ? -5.0 : 0.0
+                let borderOff: Float = hasBorder ? 10.0 : 0.0
+                let bodyOff: Float = hasBorder ? 5.0 : 0.0
                 let isTeammate = box.teammateOwnerID == c.ownerID || box.teammateOwnerIDs.contains(c.ownerID)
                 let showPartyBorder = isTeammate || (isLocal && box.localPlayerInParty)
 
                 let borderSIMD: SIMD4<Float> = showPartyBorder ? partyRingCol : rgba(c.borderColor)
                 let fillSIMD = rgba(c.color)
+                let skinTex: MTLTexture? = {
+                    guard box.showSkins, let sName = c.skinName else { return nil }
+                    return texCache.skinTexture(name: sName)
+                }()
 
+                // drawOutlineWithVertices: (r+10)/r opaque rim, then (r+5)/r body
+                // colour at alpha 0x83.  The inner (r-10)/r disc is drawFilling,
+                // applied after the skin below.
+                let bodyBandSIMD = SIMD4<Float>(fillSIMD.x, fillSIMD.y, fillSIMD.z, 0x83 / 255.0)
                 if c.deformedVertices.count >= 8 {
                     if hasBorder {
                         appendDeformedFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
-                                          radiusOffsetWorld: outerOff, isVirus: false, virusSpikeDeltaWorld: 0, color: borderSIMD)
+                                          radiusOffsetWorld: borderOff, isVirus: false, virusSpikeDeltaWorld: 0, color: borderSIMD)
                     }
                     appendDeformedFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
-                                      radiusOffsetWorld: innerOff, isVirus: false, virusSpikeDeltaWorld: 0, color: fillSIMD)
+                                      radiusOffsetWorld: bodyOff, isVirus: false, virusSpikeDeltaWorld: 0, color: bodyBandSIMD)
                 } else {
                     if hasBorder {
-                        appendDiskFan(cx: sx, cy: sy, radius: (rW + outerOff) * zoomPx, count: segCount, color: borderSIMD)
+                        appendDiskFan(cx: sx, cy: sy, radius: (rW + borderOff) * zoomPx, count: segCount, color: borderSIMD)
                     }
-                    appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW + innerOff) * zoomPx), count: segCount, color: fillSIMD)
+                    appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW + bodyOff) * zoomPx), count: segCount, color: bodyBandSIMD)
                 }
                 flushSolid(enc: enc, viewportSize: vpPx)
 
-                // Skin texture + Dual-Skin swap fade mapped onto exact inner soft-body fan
-                if box.showSkins, let sName = c.skinName, let skinTex = texCache.skinTexture(name: sName) {
+                // Skin is drawn on the untrimmed soft-body polygon.  The real client applies the
+                // +5 edge expansion with a GL scale on the vertices, never by shrinking the UVs.
+                if let skinTex {
                     let skinAlpha: Float = showPartyBorder ? 0.96 : 1.0
-                    let rFallback = max(1.5, (rW + innerOff) * zoomPx)
+                    let rFallback = max(1.5, rW * zoomPx)
                     drawTexturedFan(enc: enc, texture: skinTex, cx: sx, cy: sy,
                                     verts: c.deformedVertices, zoomPx: zoomPx,
-                                    radiusOffsetWorld: innerOff, fallbackRadiusPx: rFallback,
-                                    baseRadiusWorld: Float(c.cachedVisualRadius), isPartyCell: showPartyBorder, alpha: skinAlpha, viewportSize: vpPx)
+                                    radiusOffsetWorld: 0, fallbackRadiusPx: rFallback,
+                                    baseRadiusWorld: rW, alpha: skinAlpha, viewportSize: vpPx)
 
                     let altSince: TimeInterval? = isLocal
                         ? box.dualSkinSwapShowingSince
                         : box.dualSkinSwapShowingSinceByOwner[c.ownerID]
-                    if let since = altSince, DualSkinCatalog.shared.isDual(sName),
+                    if let since = altSince, let sName = c.skinName, DualSkinCatalog.shared.isDual(sName),
                        let altTex = texCache.skinTexture(name: sName, isAlternate: true) {
                         let age = nowTS - since
                         let fade = age < 0.14 ? Float(age / 0.14) : 1.0
                         drawTexturedFan(enc: enc, texture: altTex, cx: sx, cy: sy,
                                         verts: c.deformedVertices, zoomPx: zoomPx,
-                                        radiusOffsetWorld: innerOff, fallbackRadiusPx: rFallback,
-                                        baseRadiusWorld: Float(c.cachedVisualRadius), isPartyCell: showPartyBorder, alpha: min(1.0, max(0.0, fade)), viewportSize: vpPx)
+                                        radiusOffsetWorld: 0, fallbackRadiusPx: rFallback,
+                                        baseRadiusWorld: rW, alpha: min(1.0, max(0.0, fade)), viewportSize: vpPx)
                     }
                 }
 
-                // Emote bubble over local cells clipped to cell polygon (`CellOverlayImage::drawWithVertices` 0x1002e2ae8)
+                // drawFillingWithVertices (0x1003a6168): player-owned cells get the
+                // 0xC0C0C0 @ 0.75 highlight; every other cell gets a (r - 10) / r
+                // disc in its own colour.  Skinned non-player cells return before
+                // this pass in the real client.
+                if isLocal || skinTex == nil {
+                    let innerScale = max(0.0, (rW - 10.0) / max(1.0, rW))
+                    let innerColor: SIMD4<Float> = isLocal
+                        ? SIMD4<Float>(0xC0 / 255.0, 0xC0 / 255.0, 0xC0 / 255.0, 0.75)
+                        : fillSIMD
+                    if c.deformedVertices.count >= 8 {
+                        appendScaledFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
+                                        scale: innerScale, color: innerColor)
+                    } else {
+                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW - 10.0) * zoomPx),
+                                      count: segCount, color: innerColor)
+                    }
+                    flushSolid(enc: enc, viewportSize: vpPx)
+                }
+
+                // Emote bubble over local cells clipped to the cell polygon (`CellOverlayImage::drawWithVertices` 0x1002e2ae8)
                 // Drawn BEFORE name/mass/badge labels (`SoftBodyCellView` z:2 child order) so text stays readable on top.
                 if isLocal, let emoteName = box.activeEmoteAsset, nowTS < box.activeEmoteExpiresAt,
                    let emoteTex = texCache.texture(named: emoteName) {
                     let elapsed = nowTS - box.activeEmoteStartedAt
                     let remaining = box.activeEmoteExpiresAt - nowTS
                     let alpha = Float(min(1.0, min(elapsed / 0.12, remaining / 0.2)))
-                    let rFallback = max(1.5, (rW + innerOff) * zoomPx)
+                    let rFallback = max(1.5, rW * zoomPx)
                     if alpha > 0.01 && rFallback > 4 {
                         drawTexturedFan(enc: enc, texture: emoteTex, cx: sx, cy: sy,
                                         verts: c.deformedVertices, zoomPx: zoomPx,
-                                        radiusOffsetWorld: innerOff, fallbackRadiusPx: rFallback,
-                                        baseRadiusWorld: Float(c.cachedVisualRadius), alpha: alpha, viewportSize: vpPx)
+                                        radiusOffsetWorld: 0, fallbackRadiusPx: rFallback,
+                                        baseRadiusWorld: rW, alpha: alpha, viewportSize: vpPx)
                     }
                 }
 

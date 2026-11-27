@@ -414,6 +414,35 @@ def eval_dim(val: float, unit: int, parent: float) -> float:
     return val
 
 
+# Controller state captured from the live CCBISceneView bindings.  The raw .ccbi
+# contains every legacy/A-B layer; the controllers only show the active variant.
+VISIBILITY_OVERRIDES = {
+    "MenuMain": {
+        "_background": False, "_promoMenu": False, "_featureMenu": False,
+        "_matchStatsView": False, "_classicMatchStats": True, "_rushMatchStats": False,
+        "_googleFbMenuItemStatic": False, "_twitterMenuItemStatic": False,
+        "_playerReportButton": False, "_adventureEntryPoint": False,
+        "_seasonEntryPoint": False, "_vipSubscriptionButton": False,
+        "_extraButtonsLayer": False, "_speechButtonsLayer": False,
+        "_shopRedBadge": False, "_newsfeedBadge": False, "_giftCenterBadge": False,
+        "_xpAnim": False, "_timeFrame": False, "_timeLabel": False,
+        "_top2xSprite": False, "_top3xSprite": False, "_bottom2xSprite": False,
+        "_bottom3xSprite": False, "_activeBackgroundSprite": False,
+        "_inventoryBackgroundSprite": False, "_inventoryLabel": False,
+        "_freeCoinsButtonNode._badgeNode": False, "_leaguesButton._badgeNode": False,
+        "_dailyQuestButtonNode._badgeNode": False, "_topSlot5": False, "_topSlot6": False,
+        "_playButtonsScrollNode": False,
+        # Bound slot views replace these CCBI placeholders at runtime.
+        "_inputBox": False, "_rewardSprite": False, "_buttonIcon": False,
+        "_playerAvatar": False, "_leagueBadgeRootNode": False,
+        "_staticPlayButtonsContainer": False, "_skinsButtonSprite": False,
+    },
+    "MenuSettings": {"_menuHelp": False, "_scrollbarNode": False},
+    "MenuShopSkins": {"_scrollbarNode": False, "_tabsNode": False, "_tableNode": False},
+}
+_ACTIVE_HIDDEN = {}
+
+
 def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: AssetLibrary, out_scale: float = 2.0):
     path = os.path.join(CCBI_DIR, ccbi_name if ccbi_name.endswith(".ccbi") else ccbi_name + ".ccbi")
     with open(path, "rb") as f:
@@ -430,6 +459,8 @@ def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: As
         px, py, pw, ph = parent_rect_dp
         props = node["props"]
         if props.get("visible", True) is False:
+            return
+        if node["varName"] in _ACTIVE_HIDDEN and not _ACTIVE_HIDDEN[node["varName"]]:
             return
 
         cls = node["cls"]
@@ -484,12 +515,24 @@ def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: As
         else:
             cx, cy_top = 0.0, ph
 
-        # Anchor point
+        # Anchor point (mirrors CCBIRuntime.effectiveAnchorPoint / resolveAnchorPoint):
+        # layers and generic nodes are bottom-left anchored, sprites/labels/menus are centered,
+        # and ignoreAnchorPointForPosition always wins.
         ap_prop = props.get("anchorPoint")
-        ax, ay = (ap_prop[1], ap_prop[2]) if (isinstance(ap_prop, tuple) and ap_prop[0] == "pt") else (0.5, 0.5)
-        is_root = (parent_rect_dp == (0.0, 0.0, dw, dh) and cls not in ("CCSprite", "MCFramedSprite"))
-        if props.get("ignoreAnchorPointForPosition", False) or is_root:
+        ax, ay = (ap_prop[1], ap_prop[2]) if (isinstance(ap_prop, tuple) and ap_prop[0] == "pt") else (None, None)
+        if props.get("ignoreAnchorPointForPosition", False):
             ax, ay = 0.0, 0.0
+        elif ax is None:
+            if cls in ("CCLayer", "CCNodeColor", "CCLayerColor") or base in ("CCLayer", "CCNodeColor", "CCLayerColor"):
+                ax, ay = 0.0, 0.0
+            elif (cls in ("CCSprite", "MCAutoScalableSprite", "MCFramedSprite", "MCLabelTTF", "CCLabelTTF",
+                          "CCHybridMenu", "CCMenu", "MCAlignmentNode", "MCAlignmentNodeStatic", "MCSpineNode")
+                  or base in ("CCSprite", "MCAutoScalableSprite", "MCFramedSprite", "MCLabelTTF", "CCLabelTTF",
+                              "CCHybridMenu", "CCMenu", "MCAlignmentNode", "MCAlignmentNodeStatic", "MCSpineNode")
+                  or "MenuItem" in cls or "MenuItem" in base):
+                ax, ay = 0.5, 0.5
+            else:
+                ax, ay = 0.0, 0.0
 
         left_dp = px + cx - ax * nw_s
         top_dp = py + cy_top - (1.0 - ay) * nh_s
@@ -596,6 +639,25 @@ def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: As
             origin_x = (dw - rw) * 0.5
             origin_y = (dh - rh) * 0.5
 
+    global _ACTIVE_HIDDEN
+    _ACTIVE_HIDDEN = VISIBILITY_OVERRIDES.get(ccbi_name, {})
+    if "_background" in _ACTIVE_HIDDEN and not _ACTIVE_HIDDEN["_background"]:
+        aspect = dw / max(1.0, dh)
+        if aspect <= 1.48:
+            bg_name = "background-ipadpro.png"
+        elif aspect >= 1.95:
+            bg_name = "backgroundSuperWide.png"
+        elif aspect >= 1.65:
+            bg_name = "backgroundWide.png"
+        else:
+            bg_name = "background.png"
+        bg = lib.get_sprite(bg_name)
+        if bg is not None:
+            cw, ch = canvas.size
+            fill = max(cw / bg.width, ch / bg.height)
+            fw, fh = max(cw, int(round(bg.width * fill))), max(ch, int(round(bg.height * fill)))
+            scaled = bg.resize((fw, fh), Image.Resampling.LANCZOS)
+            canvas.alpha_composite(scaled.crop(((fw - cw) // 2, (fh - ch) // 2, (fw - cw) // 2 + cw, (fh - ch) // 2 + ch)), (0, 0))
     draw_node(root, (origin_x, origin_y, dw, dh))
 
     # Composite dynamic slot CCBIs that C++ controllers instantiate at runtime
