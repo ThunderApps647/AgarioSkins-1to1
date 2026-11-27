@@ -4,12 +4,19 @@ final class AgarUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = true
-        XCUIDevice.shared.orientation = .landscapeLeft
+        XCUIDevice.shared.orientation = .landscapeRight
     }
 
     private func capture(_ app: XCUIApplication, name: String) {
-        let shot = app.screenshot()
+        let shot = XCUIScreen.main.screenshot()
         let att = XCTAttachment(screenshot: shot)
+        att.name = name
+        att.lifetime = .keepAlways
+        add(att)
+    }
+
+    private func attachTree(_ app: XCUIApplication, name: String) {
+        let att = XCTAttachment(string: app.debugDescription)
         att.name = name
         att.lifetime = .keepAlways
         add(att)
@@ -44,9 +51,11 @@ final class AgarUITests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments += ["-ApplePersistenceIgnoreState", "YES"]
         app.launch()
+        XCUIDevice.shared.orientation = .landscapeRight
 
         let playBtn = try XCTUnwrap(firstExisting(app, ids: ["ccbi.playButtonCallback"], timeout: 10.0), "Play button must appear on MenuMain")
         RunLoop.current.run(until: Date().addingTimeInterval(0.75))
+        attachTree(app, name: "Live_01_MainMenu_Tree.txt")
         capture(app, name: "Live_01_MainMenu.png")
 
         // 1. Settings route + toggle

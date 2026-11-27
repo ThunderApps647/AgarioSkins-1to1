@@ -24,6 +24,11 @@ struct MyApp: App {
                 .statusBar(hidden: true)
                 .persistentSystemOverlays(.hidden)
                 .ignoresSafeArea()
+                .onAppear {
+                    if let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first {
+                        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscape)) { _ in }
+                    }
+                }
         }
     }
     // Custom App Delegate to configure the window
