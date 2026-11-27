@@ -1075,8 +1075,8 @@ final class AgarParityTests: XCTestCase {
         for _ in 0..<10 {
             AgarPhysicsCore.deformVertices(cells: &wallArr, neighborsByOwner: true, visibleWorldRect: vis, worldSize: ws, dt: 1.0/60.0, cocosZoom: 0.5)
         }
-        let leftRadii = wallArr[0].deformedVertices.filter { $0.x < -wallArr[0].cachedVisualRadius * 0.5 }.map { hypot($0.x, $0.y) }
-        let rightRadii = wallArr[0].deformedVertices.filter { $0.x > wallArr[0].cachedVisualRadius * 0.5 }.map { hypot($0.x, $0.y) }
+        let leftRadii = wallArr[0].deformedVertices.filter { $0.x < 0 && abs($0.y) < abs($0.x) }.map { hypot($0.x, $0.y) }
+        let rightRadii = wallArr[0].deformedVertices.filter { $0.x > 0 && abs($0.y) < abs($0.x) }.map { hypot($0.x, $0.y) }
         XCTAssertFalse(leftRadii.isEmpty)
         XCTAssertFalse(rightRadii.isEmpty)
         let avgLeft = leftRadii.reduce(0, +) / CGFloat(leftRadii.count)
