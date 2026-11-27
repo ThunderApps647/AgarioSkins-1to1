@@ -134,7 +134,21 @@ enum OriginalGameplay {
     /// Cocos2d `.ccbi` design point scale (`480x320` base resolution).
     static func uiScale(for size: CGSize) -> CGFloat {
         let s = min(max(size.height, 1) / 320.0, max(size.width, 1) / 480.0)
-        return max(1.0, s)
+        return max(0.5, s)
+    }
+
+    static func menuBackgroundSpritePath(for size: CGSize) -> String {
+        let aspect = max(size.width, 1) / max(size.height, 1)
+        if aspect <= 1.48 {
+            return "GeneratedAssets/images/Bundle/Background/background-ipadpro.png"
+        }
+        if aspect >= 1.95 {
+            return "GeneratedAssets/images/Bundle/Background/backgroundSuperWide.png"
+        }
+        if aspect >= 1.65 {
+            return "GeneratedAssets/images/Bundle/Background/backgroundWide.png"
+        }
+        return "GeneratedAssets/images/Bundle/Background/background.png"
     }
 }
 

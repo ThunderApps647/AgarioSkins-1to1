@@ -11424,7 +11424,7 @@ struct LeavePopupModal: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let s = max(1.0, min(OriginalGameplay.uiScale(for: geometry.size), geometry.size.width / 460.0))
+            let s = OriginalGameplay.uiScale(for: geometry.size)
             let popupHeight = 166.0 * s
 
             ZStack {
@@ -13161,11 +13161,13 @@ struct MainMenu: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let s = max(0.75, geometry.size.height / 320.0)
             let sideInset = max(geometry.safeAreaInsets.leading, geometry.safeAreaInsets.trailing)
+            let safeW = max(1, geometry.size.width - sideInset * 2)
+            let s = OriginalGameplay.uiScale(for: CGSize(width: safeW, height: geometry.size.height))
 
             ZStack {
-                if let bg = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/images/Bundle/Background/background.png") {
+                if let bg = CCBIAtlasStore.shared.sprite(for: OriginalGameplay.menuBackgroundSpritePath(for: geometry.size))
+                    ?? CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/images/Bundle/Background/background.png") {
                     Image(uiImage: bg.image)
                         .resizable()
                         .scaledToFill()
@@ -13338,7 +13340,8 @@ struct MainMenu: View {
                                 )
                             }
                             return slots
-                        }()
+                        }(),
+                        designScaleModifier: { _ in s }
                     )
                 )
                 .padding(.horizontal, sideInset)

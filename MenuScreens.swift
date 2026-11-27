@@ -152,9 +152,9 @@ struct ShopModalView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let s = max(1.0, min(OriginalGameplay.uiScale(for: geometry.size), geometry.size.width / 460.0))
             let sideInset = max(geometry.safeAreaInsets.leading, geometry.safeAreaInsets.trailing)
             let sceneW = max(1, geometry.size.width - sideInset * 2)
+            let s = OriginalGameplay.uiScale(for: CGSize(width: sceneW, height: geometry.size.height))
 
             ZStack {
                 Color.white.edgesIgnoringSafeArea(.all)
@@ -305,7 +305,7 @@ struct ShopModalView: View {
                                     labelOverrides: boostLabels,
                                     visibilityOverrides: boostVis,
                                     replacingSlotViews: boostSlots,
-                                    designScaleModifier: { geo in min(s, geo.height / 320.0) }
+                                    designScaleModifier: { _ in s }
                                 )
                             )
                             .frame(width: sceneW, height: geometry.size.height)
@@ -368,7 +368,8 @@ struct ShopModalView: View {
                                 "_skinsRedBadge": false,
                                 "_massRedBadge": false,
                                 "_xpRedBadge": false
-                            ]
+                            ],
+                            designScaleModifier: { _ in s }
                         )
                     )
                     .frame(width: sceneW, height: geometry.size.height)
@@ -472,7 +473,7 @@ struct QuestsModalView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let s = max(1.0, min(OriginalGameplay.uiScale(for: geometry.size), geometry.size.width / 460.0))
+            let s = OriginalGameplay.uiScale(for: geometry.size)
             let foodProg = min(100, offlineQuestProgress + 100 * offlineQuestStage)
 
             ZStack {
@@ -668,8 +669,8 @@ struct PotionsModalView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let s = max(0.75, geometry.size.height / 320.0)
             let sideInset = max(geometry.safeAreaInsets.leading, geometry.safeAreaInsets.trailing)
+            let s = OriginalGameplay.uiScale(for: CGSize(width: max(1, geometry.size.width - sideInset * 2), height: geometry.size.height))
 
             ZStack {
                 Color.white.edgesIgnoringSafeArea(.all)
@@ -975,7 +976,7 @@ struct GiftsNewsModalView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let s = max(1.0, min(OriginalGameplay.uiScale(for: geometry.size), geometry.size.width / 460.0))
+            let s = OriginalGameplay.uiScale(for: geometry.size)
 
             if title == "Gifts" {
                 let giftNodeRow = AnyView(
@@ -1083,7 +1084,7 @@ struct MatchResultsModalView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let s = max(1.0, min(OriginalGameplay.uiScale(for: geometry.size), geometry.size.width / 460.0))
+            let s = OriginalGameplay.uiScale(for: geometry.size)
             let timeStr = String(format: "%dm %02ds", survivalSeconds / 60, survivalSeconds % 60)
 
             let statsLabels: [String: String] = [

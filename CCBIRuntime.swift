@@ -704,7 +704,7 @@ struct CCBISceneView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let scale = context.designScaleModifier?(geo.size) ?? max(0.5, geo.size.height / 320.0)
+            let scale = context.designScaleModifier?(geo.size) ?? OriginalGameplay.uiScale(for: geo.size)
             let designSize = CGSize(width: geo.size.width / scale, height: geo.size.height / scale)
             if let root = CCBIAtlasStore.shared.loadCCBI(named: ccbFile) {
                 CCBINodeRenderer(
