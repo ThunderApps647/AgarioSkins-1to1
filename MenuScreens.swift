@@ -724,7 +724,7 @@ struct PotionsModalView: View {
                         ForEach(potionStore.slots) { slot in
                             potionCCBICard(slot: slot, scale: s)
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 210 * s)
+                                .frame(height: 195 * s)
                         }
                     }
                     .padding(.horizontal, max(12 * s, sideInset + 10))
@@ -844,6 +844,7 @@ struct PotionsModalView: View {
 
         return CCBISceneView(
             ccbFile: "PotionSlot.ccbi",
+            centerRoot: true,
             context: CCBIBindingContext(
                 actions: actions,
                 labelOverrides: labels,
