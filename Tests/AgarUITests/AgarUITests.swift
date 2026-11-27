@@ -8,6 +8,7 @@ final class AgarUITests: XCTestCase {
     }
 
     private func capture(_ app: XCUIApplication, name: String) {
+        let prefix = UIDevice.current.userInterfaceIdiom == .pad ? "iPad_" : "iPhone_"
         let raw = XCUIScreen.main.screenshot().image
         let fmt = UIGraphicsImageRendererFormat()
         fmt.scale = raw.scale
@@ -30,7 +31,7 @@ final class AgarUITests: XCTestCase {
             }
         }
         let att = XCTAttachment(image: outImage)
-        att.name = name
+        att.name = prefix + name
         att.lifetime = .keepAlways
         add(att)
     }
@@ -156,14 +157,23 @@ final class AgarUITests: XCTestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(0.25))
         capture(app, name: "Live_05_Arena_Edge.png")
 
-        // Exercise HUD actions (Emoji toggle, Leaderboard toggle, Split, Feed, Pause)
+        // Exercise HUD actions (Emoji toggle + emote pick, Leaderboard toggle, Split, Feed, Pause)
         if let emojiBtn = firstExisting(app, ids: ["ccbi.onToggle"], timeout: 2.0) {
             waitAndTap(emojiBtn)
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-        }
-        if let lbBtn = firstExisting(app, ids: ["hud.leaderboard"], timeout: 2.0) {
+            if let tongueBtn = firstExisting(app, ids: ["hud.emote.emoji-tongue"], timeout: 2.0) {
+                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+                if let lbBtn = firstExisting(app, ids: ["hud.leaderboard"], timeout: 2.0) {
+                    waitAndTap(lbBtn)
+                    RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+                }
+                capture(app, name: "Live_05b_Arena_Emote_and_Leaderboard.png")
+                waitAndTap(tongueBtn)
+                RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+            }
+        } else if let lbBtn = firstExisting(app, ids: ["hud.leaderboard"], timeout: 2.0) {
             waitAndTap(lbBtn)
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+            RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+            capture(app, name: "Live_05b_Arena_Emote_and_Leaderboard.png")
         }
         if let splitBtn = firstExisting(app, ids: ["hud.split"], timeout: 2.0) {
             waitAndTap(splitBtn)

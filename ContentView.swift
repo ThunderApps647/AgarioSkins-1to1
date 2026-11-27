@@ -533,7 +533,6 @@ final class TextSpriteCache {
     
     private func font(_ size: CGFloat) -> UIFont {
         return UIFont(name: "OpenSans-Bold", size: size)
-            ?? UIFont(name: "UbuntuSans-Bold", size: size)
             ?? UIFont.systemFont(ofSize: size, weight: .bold)
     }
     
@@ -2911,7 +2910,8 @@ struct GameWorldView: View {
         renderBox.showGrid = showGrid
         renderBox.showSkins = showSkins
         renderBox.showMassText = showMassText
-        renderBox.showBoundaryOverlay = true
+        // GameConfiguration k13_58_1 = undefined for Classic / Offline Burst (only Solo Levelling enables boundary shader).
+        renderBox.showBoundaryOverlay = false
         renderBox.tokens = tokens
         renderBox.foodManager = foodManager
         renderBox.massManager = massManager
@@ -4839,9 +4839,9 @@ struct ContentView: View {
                                     joystickIsDragging = true
                                 }
                                 // Retail `ControlsWidget` (`0x1000ebc84` / `0x1000e2b1c`): base stays anchored where
-                                // `touchesBegan` placed it (never chases finger on drag), and `_maxRadius = 0.5*82 - 0.25*42.5 = 30.375 * s`.
+                                // `touchesBegan` placed it (never chases finger on drag).
                                 let s = OriginalGameplay.uiScale(for: geometry.size)
-                                let maxDistance: CGFloat = 30.375 * s
+                                let maxDistance = OriginalGameplay.joystickMetrics(for: geometry.size, uiScale: s).maxRadius
                                 let basePos = joystickBasePosition ?? value.startLocation
                                 let dx = value.location.x - basePos.x
                                 let dy = value.location.y - basePos.y
@@ -4887,7 +4887,8 @@ struct ContentView: View {
                         JoystickView(
                             joystickOffset: $joystickOffset,
                             joystickBasePosition: $joystickBasePosition,
-                            uiScale: OriginalGameplay.uiScale(for: geometry.size)
+                            uiScale: OriginalGameplay.uiScale(for: geometry.size),
+                            viewportSize: geometry.size
                         )
                     }
                 }
@@ -10390,19 +10391,15 @@ struct ContentView: View {
             if joystickIsDragging || stopOnRelease { return agarJoystick.axis }
             return lastJoystickDirection.normalized()
         }()
-        let magSq = rawAxis.width * rawAxis.width + rawAxis.height * rawAxis.height
-        let rawMag = sqrt(magSq)
-        let isStopped = centerAimUntilCursorMoves || magSq < 0.01
+        let rawMag = hypot(rawAxis.width, rawAxis.height)
+        let isStopped = centerAimUntilCursorMoves || rawMag < 0.0005
 
         let flockCenter = playerCenter
         let reach = AgarPhysicsCore.worldCursorReach(cells: playerCells, viewportSize: UIScreen.main.bounds.size)
-        let unitDir: CGSize = (!isStopped && rawMag > 0.0001)
-            ? CGSize(width: rawAxis.width / rawMag, height: rawAxis.height / rawMag)
-            : .zero
         let worldCursor = isStopped
             ? flockCenter
-            : CGPoint(x: flockCenter.x + unitDir.width * reach.worldReach,
-                      y: flockCenter.y + unitDir.height * reach.worldReach)
+            : CGPoint(x: flockCenter.x + rawAxis.width * reach.worldReach,
+                      y: flockCenter.y + rawAxis.height * reach.worldReach)
         let baseRadius = CGFloat(OriginalGameplay.baseRadius)
 
         var idToIndex = [UUID: Int]()
@@ -10459,8 +10456,9 @@ struct ContentView: View {
                 let dist = hypot(vx, vy)
                 if dist > 0.001 {
                     distToTarget = dist
-                    dirX = vx / dist
-                    dirY = vy / dist
+                    let normReach = dist / max(reach.worldReach, 0.001)
+                    dirX = (vx / dist) * normReach
+                    dirY = (vy / dist) * normReach
                 }
             }
 
@@ -10640,7 +10638,7 @@ struct ContentView: View {
     
     private func updateCellDeformation(dt: CGFloat) {
         let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
-        let cocosZoom = zoomLevel / OriginalGameplay.uiScale(for: UIScreen.main.bounds.size)
+        let cocosZoom = zoomLevel / OriginalGameplay.arenaScreenScale(for: UIScreen.main.bounds.size)
         AgarPhysicsCore.deformVertices(
             cells: &playerCells,
             neighborsByOwner: true,
@@ -11759,7 +11757,7 @@ struct TopBarHUD: View, Equatable {
             let trailPad = max(0, geometry.safeAreaInsets.trailing)
             let topPad = max(0, geometry.safeAreaInsets.top)
             ZStack(alignment: .topLeading) {
-                // Top-left: PauseButton.ccbi + Score.ccbi + Token/FPS badge
+                // Top-left: PauseButton.ccbi + Score.ccbi + TokenCounter.ccbi (+ optional FPS)
                 ZStack(alignment: .topLeading) {
                     CCBISceneView(
                         ccbFile: "PauseButton.ccbi",
@@ -11769,7 +11767,8 @@ struct TopBarHUD: View, Equatable {
                             designScaleModifier: { _ in s }
                         )
                     )
-                    .frame(width: 60 * s, height: 60 * s)
+                    .frame(width: 52 * s, height: 52 * s)
+                    .zIndex(2)
 
                     CCBISceneView(
                         ccbFile: "Score.ccbi",
@@ -11778,24 +11777,34 @@ struct TopBarHUD: View, Equatable {
                             designScaleModifier: { _ in s }
                         )
                     )
-                    .frame(width: 220 * s, height: 60 * s)
+                    .frame(width: 240 * s, height: 52 * s)
                     .allowsHitTesting(false)
 
-                    HStack(spacing: 6 * s) {
-                        HStack(spacing: 4 * s) {
-                            Image("token").resizable().aspectRatio(contentMode: .fit).frame(width: 14 * s, height: 14 * s)
-                            Text("\(tokenCount)")
-                                .font(.custom("OpenSans-Bold", size: 13.5 * s))
-                                .foregroundColor(Color(red: 0.5569, green: 0.5569, blue: 0.5569))
-                        }
-                        if showFPS {
-                            Text("\(fps) FPS")
-                                .font(.custom("OpenSans-Bold", size: 11 * s))
-                                .foregroundColor(fps >= 100 ? Color(hex: 0x54C826) : Color(red: 0.5569, green: 0.5569, blue: 0.5569))
-                        }
-                    }
-                    .offset(x: 50 * s, y: 27 * s)
+                    CCBISceneView(
+                        ccbFile: "TokenCounter.ccbi",
+                        context: CCBIBindingContext(
+                            labelOverrides: ["_countLabel": "\(tokenCount)"],
+                            replacingSlotViews: [
+                                "_tokenNode": AnyView(
+                                    Image("token-snowflake")
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(width: 20 * s, height: 20 * s)
+                                )
+                            ],
+                            designScaleModifier: { _ in s }
+                        )
+                    )
+                    .frame(width: 240 * s, height: 52 * s)
                     .allowsHitTesting(false)
+
+                    if showFPS {
+                        Text("\(fps) FPS")
+                            .font(.custom("OpenSans-Bold", size: 11 * s))
+                            .foregroundColor(fps >= 100 ? Color(hex: 0x54C826) : Color(red: 0.5569, green: 0.5569, blue: 0.5569))
+                            .offset(x: 50 * s, y: 46 * s)
+                            .allowsHitTesting(false)
+                    }
                 }
                 .padding(.leading, leadPad)
                 .padding(.top, topPad)
@@ -11898,20 +11907,18 @@ struct LeaderboardHUDButton: View {
         _expandedV = State(initialValue: initialExpanded)
     }
 
-    private var collapsedSide: CGFloat { 39.17 * uiScale }
-    private let expansionFactor: CGFloat = 3.5
-    private var cornerRadius: CGFloat { 7.5 * uiScale }
+    private var collapsedSide: CGFloat { 39.1724 * uiScale }
+    private var widgetDesignWidth: CGFloat { 136.2519 * uiScale }
     private var iconSize: CGFloat { 22 * uiScale }
     private var labelFontSize: CGFloat { 14 * uiScale }
     private var iconInset: CGFloat { (collapsedSide - iconSize) / 2 }
     private var iconTextGap: CGFloat { 8 * uiScale }
     private var separatorHeight: CGFloat { max(1.5, 1.5 * uiScale) }
     private var headerBottom: CGFloat { collapsedSide - 3 * uiScale }
-    private var rowFontSize: CGFloat { 13.5 * uiScale }
+    private var rowFontSize: CGFloat { 14 * uiScale }
     private var rowSlot: CGFloat { 20 * uiScale }
-    private var rowsVerticalMargin: CGFloat { 6 * uiScale }
+    private var rowsVerticalMargin: CGFloat { 5 * uiScale }
     private var pfpSide: CGFloat { 17 * uiScale }
-    private var pfpNameGap: CGFloat { 5 * uiScale }
     private var pfpRingWidth: CGFloat { 1.5 * uiScale }
 
     private var partyPfp: some View {
@@ -11933,8 +11940,8 @@ struct LeaderboardHUDButton: View {
     @State private var labelWidth: CGFloat = 0
 
     private var expandedWidth: CGFloat {
-        guard labelWidth > 0 else { return collapsedSide * expansionFactor }
-        return max(150 * uiScale, iconInset + iconSize + iconTextGap + labelWidth + iconInset)
+        guard labelWidth > 0 else { return widgetDesignWidth }
+        return max(widgetDesignWidth, iconInset + iconSize + iconTextGap + labelWidth + iconInset * 0.7)
     }
     private var expandedHeight: CGFloat {
         headerBottom + separatorHeight + rowsVerticalMargin * 2
@@ -12024,34 +12031,50 @@ struct LeaderboardHUDButton: View {
         let rowColorPlayer = Color(hex: 0xFFE38A)
         return VStack(alignment: .leading, spacing: 0) {
             ForEach(rows, id: \.rank) { row in
-                let maxNameW = max(20, expandedWidth - (showPfpColumn ? 52 : 36) * uiScale)
-                let rowCtx = CCBIBindingContext(
-                    labelOverrides: [
-                        "_positionLabel": "\(row.rank).",
-                        "_nameLabel": fittedRowText(row.name, maxWidth: maxNameW)
-                    ],
-                    labelColorOverrides: [
-                        "_positionLabel": row.isPlayer ? rowColorPlayer : rowColorWhite,
-                        "_nameLabel": row.isPlayer ? rowColorPlayer : rowColorWhite
-                    ],
-                    visibilityOverrides: [
-                        "_imagesNode": row.isPartyMember,
-                        "_outlineSprite": row.isPartyMember
-                    ],
-                    replacingSlotViews: [
-                        "_avatar": AnyView(partyPfp)
-                    ],
-                    designScaleModifier: { _ in uiScale }
-                )
-                CCBISceneView(
-                    ccbFile: "GameHUD-LeaderboardPlayer.ccbi",
-                    centerRoot: true,
-                    context: rowCtx
-                )
-                .frame(width: expandedWidth, height: rowSlot)
-                .offset(x: showPfpColumn ? 4 * uiScale : -11 * uiScale)
-                .shadow(color: Color.black.opacity(0.45), radius: 0.5, x: 0, y: 0.7)
-                .transition(.identity)
+                if showPfpColumn {
+                    let maxNameW = max(20, expandedWidth - 48 * uiScale)
+                    let rowCtx = CCBIBindingContext(
+                        labelOverrides: [
+                            "_positionLabel": "\(row.rank).",
+                            "_nameLabel": fittedRowText(row.name, maxWidth: maxNameW)
+                        ],
+                        labelColorOverrides: [
+                            "_positionLabel": row.isPlayer ? rowColorPlayer : rowColorWhite,
+                            "_nameLabel": row.isPlayer ? rowColorPlayer : rowColorWhite
+                        ],
+                        visibilityOverrides: [
+                            "_imagesNode": row.isPartyMember,
+                            "_outlineSprite": row.isPartyMember
+                        ],
+                        replacingSlotViews: [
+                            "_avatar": AnyView(partyPfp)
+                        ],
+                        designScaleModifier: { _ in uiScale }
+                    )
+                    CCBISceneView(
+                        ccbFile: "GameHUD-LeaderboardPlayer.ccbi",
+                        centerRoot: true,
+                        context: rowCtx
+                    )
+                    .frame(width: expandedWidth, height: rowSlot)
+                    .transition(.identity)
+                } else {
+                    let rowColor = row.isPlayer ? rowColorPlayer : rowColorWhite
+                    let maxNameW = max(20, expandedWidth - 34 * uiScale)
+                    HStack(spacing: 4 * uiScale) {
+                        Text("\(row.rank).")
+                            .font(.custom("OpenSans-Bold", size: 13 * uiScale))
+                            .foregroundColor(rowColor)
+                        Text(fittedRowText(row.name, maxWidth: maxNameW))
+                            .font(.custom("OpenSans-Bold", size: 14 * uiScale))
+                            .foregroundColor(rowColor)
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 7 * uiScale)
+                    .frame(width: expandedWidth, height: rowSlot, alignment: .leading)
+                    .transition(.identity)
+                }
             }
         }
         .padding(.top, headerBottom + separatorHeight + rowsVerticalMargin)
@@ -12189,18 +12212,18 @@ struct ActionButtonsHUD: View, Equatable {
         GeometryReader { geometry in
             let s = OriginalGameplay.uiScale(for: geometry.size)
             let buttonSide = 65.0 * s
-            let macroSide = 54.0 * s
+            let macroSide = buttonSide
             let leadInset = max(0, geometry.safeAreaInsets.leading - 6)
             let trailInset = max(0, geometry.safeAreaInsets.trailing - 6)
             let sceneW = max(1, geometry.size.width - leadInset - trailInset)
             let ccbName: String = controlLayout == 0 ? "Controls-Left.ccbi" : (controlLayout == 1 ? "Controls-Sides.ccbi" : "Controls-Right.ccbi")
             let macroX: CGFloat = {
                 if controlLayout == 0 {
-                    return leadInset + sceneW * 0.137 + buttonSide * 1.15
+                    return leadInset + sceneW * 0.137 + buttonSide * 1.18
                 } else if controlLayout == 1 {
-                    return leadInset + sceneW * 0.92 - buttonSide * 1.15
+                    return leadInset + sceneW * 0.92 - buttonSide * 1.18
                 } else {
-                    return leadInset + sceneW * 0.863 - buttonSide * 1.15
+                    return leadInset + sceneW * 0.863 - buttonSide * 1.18
                 }
             }()
             let shootCenterY = geometry.size.height * 0.875
@@ -12257,13 +12280,14 @@ struct ActionButtonsHUD: View, Equatable {
                     .frame(width: buttonSide * 0.56, height: buttonSide * 0.56)
 
                     Circle()
-                        .fill(Color.black.opacity(0.22))
+                        .fill(Color.black.opacity(0.15))
                         .frame(width: buttonSide, height: buttonSide)
-                        .scaleEffect(isFeedingHeld ? 0.8 : 0.0)
+                        .scaleEffect(isFeedingHeld ? 1.4 : 0.0)
+                        .clipShape(Circle())
                         .opacity(isFeedingHeld ? 1.0 : 0.0)
                         .animation(
                             isFeedingHeld
-                            ? .linear(duration: feedHoldThreshold)
+                            ? .easeIn(duration: feedHoldThreshold)
                             : .easeOut(duration: 0.1),
                             value: isFeedingHeld
                         )
@@ -12308,7 +12332,6 @@ struct ActionButtonsHUD: View, Equatable {
                     .aspectRatio(contentMode: .fit)
                     .frame(width: macroSide, height: macroSide)
                     .scaleEffect(macroButtonScale)
-                    .padding(6)
                     .overlay(
                         ImmediatePressSurface(onDown: { macroPressed = true; onMacroDown() },
                                               onUp: { macroPressed = false; onMacroUp() })
@@ -12399,43 +12422,70 @@ struct EmojiWidgetHUD: View, Equatable {
         GeometryReader { geometry in
             let s = OriginalGameplay.uiScale(for: geometry.size)
             let btnSide = 39.1724 * s
-            let leadPad = max(0, geometry.safeAreaInsets.leading)
-            let topPad = max(0, geometry.safeAreaInsets.top)
-            let seqName: String? = toggleSeqID == 0 ? nil : (isOpen ? "enter" : "leave")
+            let pad = 5.1094 * s
+            let leadPad = max(0, geometry.safeAreaInsets.leading) + pad
+            let topPad = max(0, geometry.safeAreaInsets.top) + 49.3912 * s
+            let iconSprite = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/spritesheets/Bundle/All/ingameUI/Icon_Emoji.png")?.image
+            let hudBtnMcfs = CCBIAtlasStore.shared.mcfs(for: "FramedSprites/Bundle/MCFS_hud_button.plist")
+            let trayMcfs = CCBIAtlasStore.shared.mcfs(for: "FramedSprites/Bundle/MCFS_leaderboard_content_float.plist")
 
-            let selectorContent = AnyView(
-                VStack(spacing: 4 * s) {
-                    ForEach(emotes, id: \.self) { asset in
-                        Button(action: { onSelect(asset) }) {
-                            Image(asset)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: btnSide * 0.72, height: btnSide * 0.72)
-                                .clipShape(Circle())
-                                .opacity(isOnCooldown ? 0.45 : 1.0)
+            VStack(alignment: .leading, spacing: 2 * s) {
+                Button(action: onToggle) {
+                    ZStack {
+                        if let hudBtnMcfs {
+                            let pair = hudBtnMcfs.uiImageAndInsets(forUIScale: s)
+                            Image(uiImage: pair.0)
+                                .resizable(capInsets: pair.1, resizingMode: .stretch)
+                        } else {
+                            MCFSFrame(name: "mcfs-hud-button")
                         }
-                        .buttonStyle(CCBIMenuItemButtonStyle())
-                        .disabled(isOnCooldown || !isOpen)
+                        if let iconSprite {
+                            Image(uiImage: iconSprite)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: btnSide * 0.68, height: btnSide * 0.68)
+                        }
                     }
+                    .frame(width: btnSide, height: btnSide)
                 }
-                .padding(.top, 2 * s)
-                .allowsHitTesting(isOpen)
-            )
+                .buttonStyle(CCBIMenuItemButtonStyle())
+                .accessibilityIdentifier("ccbi.onToggle")
+                .accessibilityLabel("Emotes")
 
-            CCBISceneView(
-                ccbFile: "EmojiWidget.ccbi",
-                context: CCBIBindingContext(
-                    actions: ["onToggle": onToggle],
-                    activeSequenceName: seqName,
-                    sequencePlayID: toggleSeqID,
-                    heightOverrides: ["_selectorArea": 70],
-                    useImmediateTouch: true,
-                    slotViews: ["_selector": selectorContent],
-                    designScaleModifier: { _ in s }
-                )
-            )
+                if isOpen {
+                    VStack(spacing: 4 * s) {
+                        ForEach(emotes, id: \.self) { asset in
+                            Button(action: { onSelect(asset) }) {
+                                Image(asset)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: btnSide * 0.72, height: btnSide * 0.72)
+                                    .clipShape(Circle())
+                                    .opacity(isOnCooldown ? 0.45 : 1.0)
+                            }
+                            .buttonStyle(CCBIMenuItemButtonStyle())
+                            .disabled(isOnCooldown)
+                            .accessibilityIdentifier("hud.emote.\(asset)")
+                        }
+                    }
+                    .padding(.vertical, 5 * s)
+                    .frame(width: btnSide)
+                    .background(
+                        Group {
+                            if let trayMcfs {
+                                let pair = trayMcfs.uiImageAndInsets(forUIScale: s)
+                                Image(uiImage: pair.0).resizable(capInsets: pair.1, resizingMode: .stretch)
+                            } else {
+                                MCFSFrame(name: "mcfs-leaderboard-content-float")
+                            }
+                        }
+                    )
+                    .transition(.opacity)
+                }
+            }
             .padding(.leading, leadPad)
             .padding(.top, topPad)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 }
@@ -12556,6 +12606,8 @@ private final class ReliableNicknameUITextField: UITextField {
 private struct ReliableNicknameField: UIViewRepresentable {
     @Binding var text: String
     let placeholder: String
+    var fontSize: CGFloat = 18.0
+    var textColor: UIColor = UIColor(red: 0x3D / 255.0, green: 0x43 / 255.0, blue: 0x47 / 255.0, alpha: 1.0)
     
     final class Coordinator: NSObject, UITextFieldDelegate {
         var text: Binding<String>
@@ -12595,9 +12647,9 @@ private struct ReliableNicknameField: UIViewRepresentable {
             attributes: [.foregroundColor: UIColor(white: 0.62, alpha: 1.0)]
         )
         field.textAlignment = .center
-        field.font = UIFont(name: "Lato-Regular", size: 16)
-            ?? UIFont.systemFont(ofSize: 16, weight: .semibold)
-        field.textColor = .black
+        field.font = UIFont(name: "OpenSans-Bold", size: fontSize)
+            ?? UIFont.systemFont(ofSize: fontSize, weight: .bold)
+        field.textColor = textColor
         field.tintColor = .systemBlue
         field.borderStyle = .none
         field.backgroundColor = .clear
@@ -12609,7 +12661,7 @@ private struct ReliableNicknameField: UIViewRepresentable {
         field.textContentType = .nickname
         field.clearButtonMode = .never
         field.adjustsFontSizeToFitWidth = true
-        field.minimumFontSize = 14
+        field.minimumFontSize = 11
         field.accessibilityLabel = "Nickname"
         return field
     }
@@ -12618,6 +12670,14 @@ private struct ReliableNicknameField: UIViewRepresentable {
         context.coordinator.text = $text
         if field.text != text {
             field.text = text
+        }
+        let targetFont = UIFont(name: "OpenSans-Bold", size: fontSize)
+            ?? UIFont.systemFont(ofSize: fontSize, weight: .bold)
+        if field.font != targetFont {
+            field.font = targetFont
+        }
+        if field.textColor != textColor {
+            field.textColor = textColor
         }
         // Never install an empty custom inputView; nil explicitly means the system keyboard.
         if field.inputView != nil {
@@ -12682,7 +12742,7 @@ private struct ReliableLevelField: UIViewRepresentable {
                         for: .editingChanged)
         field.text = String(level)
         field.textAlignment = .center
-        field.font = UIFont(name: "UbuntuSans-Bold", size: 20)
+        field.font = UIFont(name: "OpenSans-Bold", size: 20)
         ?? UIFont.systemFont(ofSize: 20, weight: .bold)
         field.textColor = .black
         field.tintColor = .systemBlue
@@ -12874,7 +12934,6 @@ struct MainMenu: View {
                 )
                 .frame(width: dialogW, height: dialogH)
                 .background(MCFSFrame(name: "mcfs-white-gray"))
-                .shadow(color: Color.black.opacity(0.35), radius: 14, y: 6)
 
                 Button(action: {
                     SoundManager.shared.play(.menuClick)
@@ -12895,7 +12954,6 @@ struct MainMenu: View {
         Text(text)
             .font(.custom("OpenSans-Bold", size: size))
             .foregroundColor(color)
-            .shadow(color: Color.black.opacity(0.45), radius: 0, x: 0, y: 1.5)
     }
 
     private func topMenuBar(scale s: CGFloat, insets: EdgeInsets) -> some View {
@@ -13231,8 +13289,8 @@ struct MainMenu: View {
                                 "_tabLabelGrey": tabNames[idx]
                             ],
                             visibilityOverrides: [
-                                "_whiteTabNode": selected,
-                                "_greyTabNode": !selected
+                                "_whiteTabNode": !selected,
+                                "_greyTabNode": selected
                             ],
                             designScaleModifier: { _ in s }
                         )
@@ -13254,8 +13312,8 @@ struct MainMenu: View {
                             "_tabLabelGrey": "No Skin"
                         ],
                         visibilityOverrides: [
-                            "_whiteTabNode": selectedSkinName == nil,
-                            "_greyTabNode": selectedSkinName != nil
+                            "_whiteTabNode": selectedSkinName != nil,
+                            "_greyTabNode": selectedSkinName == nil
                         ],
                         designScaleModifier: { _ in s }
                     )
@@ -13269,7 +13327,6 @@ struct MainMenu: View {
                 }
             }
             .padding(.horizontal, 8 * s)
-            .offset(y: 12 * s)
         )
 
         let tableSlot = AnyView(
@@ -13297,7 +13354,6 @@ struct MainMenu: View {
                                             .offset(x: 4 * s, y: -2 * s)
                                     }
                                 }
-                                .frame(width: 10 * s, height: 10 * s)
                             )
                             let cardCtx = CCBIBindingContext(
                                 actions: [
@@ -13400,7 +13456,6 @@ struct MainMenu: View {
             .padding(16 * s)
             .frame(width: min(containerSize.width * 0.85, 340 * s))
             .background(MCFSFrame(name: "mcfs-white"))
-            .shadow(radius: 20)
         }
     }
 
@@ -13518,11 +13573,13 @@ struct MainMenu: View {
                         slotViews: {
                             var slots: [String: AnyView] = [
                                 "_inputBox": AnyView(
-                                    ReliableNicknameField(text: $playerName, placeholder: "Nickname")
-                                        .font(.custom("OpenSans-Bold", size: 13 * s))
-                                        .foregroundColor(Color(hex: 0x3D4347))
-                                        .multilineTextAlignment(.center)
-                                        .padding(.horizontal, 10 * s)
+                                    ReliableNicknameField(
+                                        text: $playerName,
+                                        placeholder: "Nickname",
+                                        fontSize: 16 * s,
+                                        textColor: UIColor(red: 0x3D / 255.0, green: 0x43 / 255.0, blue: 0x47 / 255.0, alpha: 1.0)
+                                    )
+                                    .padding(.horizontal, 12 * s)
                                 ),
                                 "_rewardSprite": AnyView(
                                     Image("menu-coin-icon").resizable().scaledToFit().frame(width: 19 * s, height: 19 * s)
@@ -13594,7 +13651,6 @@ struct MainMenu: View {
                                                 Text("Play Online")
                                                     .font(.custom("OpenSans-Bold", size: 13 * s))
                                                     .foregroundColor(.white)
-                                                    .shadow(color: Color.black.opacity(0.45), radius: 0, x: 0, y: 1)
                                                     .offset(y: 16 * s)
                                             }
                                             .frame(width: 120 * s, height: 80 * s)
@@ -13972,32 +14028,34 @@ struct JoystickView: View {
     @Binding var joystickOffset: CGSize
     @Binding var joystickBasePosition: CGPoint?
     var uiScale: CGFloat = 1.2
+    var viewportSize: CGSize = .zero
     
     var body: some View {
         let baseImg = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/spritesheets/Bundle/All/Controls/game_joystick_bg.png")?.image
         let knobImg = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/spritesheets/Bundle/All/Controls/game_joystick.png")?.image
+        let metrics = OriginalGameplay.joystickMetrics(for: viewportSize, uiScale: uiScale)
         // Retail `JoystickView::createTexture` (`0x1000e2e64`): single offscreen render target
-        // (knob occludes base without stacking) drawn at opacity 50/255 (~19.6%) and _maxRadius = 0.5*82 - 0.25*42.5.
+        // (knob occludes base without stacking) drawn at opacity 50/255 (~19.6%).
         ZStack {
             if let baseImg {
                 Image(uiImage: baseImg)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 82 * uiScale, height: 82 * uiScale)
+                    .frame(width: metrics.bgSide, height: metrics.bgSide)
             } else {
                 ZStack {
-                    Image("joystick-base").resizable().scaledToFit().frame(width: 82 * uiScale)
-                    Circle().fill(Color.black).frame(width: 40 * uiScale).offset(joystickOffset).blendMode(.destinationOut)
+                    Image("joystick-base").resizable().scaledToFit().frame(width: metrics.bgSide)
+                    Circle().fill(Color.black).frame(width: metrics.knobSide * 0.94).offset(joystickOffset).blendMode(.destinationOut)
                 }.compositingGroup()
             }
             if let knobImg {
                 Image(uiImage: knobImg)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 42.5 * uiScale, height: 42.5 * uiScale)
+                    .frame(width: metrics.knobSide, height: metrics.knobSide)
                     .offset(joystickOffset)
             } else {
-                Image("joystick-circle").resizable().scaledToFit().frame(width: 42.5 * uiScale).offset(joystickOffset)
+                Image("joystick-circle").resizable().scaledToFit().frame(width: metrics.knobSide).offset(joystickOffset)
             }
         }
         .compositingGroup()

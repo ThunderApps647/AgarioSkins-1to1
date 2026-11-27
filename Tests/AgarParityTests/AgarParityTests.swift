@@ -806,4 +806,32 @@ final class AgarParityTests: XCTestCase {
         }
         return false
     }
+
+    func testIPadScalingDecayAndJoystickMetrics() throws {
+        let tol = 1e-5
+        // Verify BaseArenaView fixedWidth=768 iPad zoom across 4:3 iPads (1024x768 and Pro 1366x1024)
+        for vp in [CGSize(width: 1024, height: 768), CGSize(width: 1366, height: 1024)] {
+            let designH = 768.0 * (vp.height / vp.width)
+            let screenScale = vp.height / designH
+            let r = 100.0
+            let n = 4.0
+            let expectedCocos = min(pow(designH / (42.0 * r), 0.4) * pow(n, 0.1), max(0.05, (0.37 * designH * pow(n, 0.32)) / r))
+            let actual = Double(OriginalGameplay.calculateZoom(totalRadius: r, cellCount: Int(n), viewportSize: vp, isPhoneOverride: false))
+            XCTAssertEqual(actual, Double(expectedCocos * screenScale), accuracy: tol)
+        }
+
+        // Verify iPad physical inch-height joystick metrics (JoystickView::initWithEaseFactor 0x1000e2b1c)
+        let ipadJoy = OriginalGameplay.joystickMetrics(for: CGSize(width: 1024, height: 768), uiScale: 2.133, isPhoneOverride: false)
+        XCTAssertEqual(Double(ipadJoy.bgSide), 1.04434 * 132.0, accuracy: tol)
+        XCTAssertEqual(Double(ipadJoy.knobSide), 0.5446 * 132.0, accuracy: tol)
+        XCTAssertEqual(Double(ipadJoy.maxRadius), 0.5 * 1.04434 * 132.0 - 0.25 * 0.5446 * 132.0, accuracy: tol)
+
+        // Verify sub_10004B844 + sub_10004BFC8 linear radius decay rate
+        let r = 1000.0 // mass 10000
+        let t = (r - 200.0) / (1500.0 - 200.0)
+        let rate = 0.99998 + (0.99922 - 0.99998) * t
+        let expectedMass = 10000.0 * pow(rate, 2.0 * 50.0 * 0.02)
+        let actualMass = Double(AgarPhysicsCore.applyOfflineMassDecay(mass: 10000, isPlayer: true, dt: 0.02))
+        XCTAssertEqual(actualMass, expectedMass, accuracy: 1e-4)
+    }
 }

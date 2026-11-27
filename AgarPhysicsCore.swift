@@ -48,13 +48,14 @@ enum AgarPhysicsCore {
     // MARK: - Offline Adapted Mass Decay (`Offline Mode - Settings`)
 
     static func applyOfflineMassDecay(mass: CGFloat, isPlayer: Bool, dt: CGFloat) -> CGFloat {
-        // radiusDecayRate = 0.99998 (base), adapted with baseRadiusForAdaptedDecay = 200, maxDecayRateForPlayer = 0.99922
+        // `sub_10004B844` + `sub_10004BFC8`: linear rate interpolation over
+        // [baseRadiusForAdaptedDecay (200), maxCellRadius (1500)] with radiusDecayMultiplier = 50.
         let r = Double(max(mass, 1.0)).squareRoot() * 10.0
-        guard r >= 200.0 else { return mass }
-        let ratio = min(4.0, r / 200.0)
-        let stepFactor = max(0.99922, pow(0.99998, ratio * 25.0))
-        let decayPerFrame = isPlayer ? stepFactor : 0.99998
-        let factor = pow(decayPerFrame, Double(dt * 60.0))
+        guard r > 200.0 else { return mass }
+        let t = max(0.0, r - 200.0) / (1500.0 - 200.0)
+        let maxRate = isPlayer ? 0.99922 : 1.0
+        let rate = 0.99998 + (maxRate - 0.99998) * t
+        let factor = pow(rate, 2.0 * 50.0 * Double(dt))
         return max(CGFloat(10.0), mass * CGFloat(factor))
     }
 

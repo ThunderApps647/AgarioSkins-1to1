@@ -1273,7 +1273,8 @@ private struct CCBINodeRenderer: View {
             let swiftAnchorX = anchor.x
             let swiftAnchorY = 1.0 - anchor.y
 
-            let isZeroContainer = (resolvedSize.width <= 0 && resolvedSize.height <= 0)
+            let isSkinSlotPlaceholder = (node.varName == "_skin" && replacingSlot != nil)
+        let isZeroContainer = (resolvedSize.width <= 0 && resolvedSize.height <= 0) || isSkinSlotPlaceholder
             let isSlotReplaced = context.scopedLookup(context.replacingSlotViews, varName: node.varName) != nil
                 || (context.scopedLookup(context.slotViews, varName: node.varName) != nil && (
                     node.varName == "_playerAvatar" ||
@@ -1642,6 +1643,7 @@ private struct CCBINodeRenderer: View {
                 if w > 1.0 { reqW = w }
             }
             let uiFont = UIFont(name: fontName, size: max(7, fontSizeDesign))
+                ?? UIFont(name: "OpenSans-Bold", size: max(7, fontSizeDesign))
                 ?? UIFont.systemFont(ofSize: max(7, fontSizeDesign), weight: .bold)
             let rect = (rawText as NSString).boundingRect(
                 with: CGSize(width: reqW > 0 ? reqW : 10000, height: 10000),
@@ -1799,7 +1801,11 @@ private struct CCBINodeRenderer: View {
 
         ZStack(alignment: (wPx == 0 && hPx == 0) ? .center : .topLeading) {
             if suppressDefaultsForSlot, let customSlot {
-                customSlot.frame(width: wPx > 0 ? wPx : nil, height: hPx > 0 ? hPx : nil)
+                if node.varName == "_skin" {
+                    customSlot
+                } else {
+                    customSlot.frame(width: wPx > 0 ? wPx : nil, height: hPx > 0 ? hPx : nil)
+                }
             } else if let subRoot = subFileRoot {
                 let _ = {
                     subRoot.props["position"] = .pos(x: 0, y: 0, refCorner: 1, xUnit: 0, yUnit: 0, c: 0)
@@ -1939,6 +1945,7 @@ private struct CCBINodeRenderer: View {
         let spec = resolveLabelTextAndFont()
         guard !spec.text.isEmpty else { return .zero }
         let uiFont = UIFont(name: spec.fontName, size: max(7, spec.fontSizeDesign))
+            ?? UIFont(name: "OpenSans-Bold", size: max(7, spec.fontSizeDesign))
             ?? UIFont.systemFont(ofSize: max(7, spec.fontSizeDesign), weight: .bold)
         let req = requestedLabelDimensions(parentDesignSize: parentDesignSize)
         let singleLine = isSingleLineLabel()

@@ -51,22 +51,37 @@ enum OriginalGameplay {
     static let zoomMultiplier: CGFloat = 1.5
     static let minZoomValue: CGFloat = 0.05
 
+    /// Screen-point multiplier (`h / designH`) for world camera zoom:
+    /// iPhone uses FixedHeight 320pt; iPad uses FixedWidth 768pt (`AppDelegate` `0x1002a714c`).
+    static func arenaScreenScale(for viewportSize: CGSize, isPhoneOverride: Bool? = nil) -> CGFloat {
+        let w = max(viewportSize.width, 1)
+        let h = max(viewportSize.height, 1)
+        #if canImport(UIKit)
+        let isPhone = isPhoneOverride ?? (UIDevice.current.userInterfaceIdiom != .pad)
+        #else
+        let isPhone = isPhoneOverride ?? true
+        #endif
+        let designH: CGFloat = isPhone ? 320.0 : (768.0 * (h / w))
+        return h / max(designH, 1)
+    }
+
     static func calculateZoom(totalRadius: CGFloat,
                               cellCount: Int,
                               viewportSize: CGSize,
-                              customZoomMultiplier: CGFloat = 1.0) -> CGFloat {
+                              customZoomMultiplier: CGFloat = 1.0,
+                              isPhoneOverride: Bool? = nil) -> CGFloat {
         let w = max(viewportSize.width, 1)
         let h = max(viewportSize.height, 1)
-        let designH: CGFloat = 320.0
-        let designW = designH * (w / h)
-        let screenScale = h / designH
         #if canImport(UIKit)
         // BaseArenaView::calculateWindowHeight (`0x10037506c`): only deviceType == 0 (iPhone)
-        // divides windowHeight by `(winW/winH)/zoomMultiplier`; iPad uses `designH`.
-        let isPhone = UIDevice.current.userInterfaceIdiom != .pad
+        // divides windowHeight by `(winW/winH)/zoomMultiplier`; iPad uses FixedWidth `768 * (h / w)`.
+        let isPhone = isPhoneOverride ?? (UIDevice.current.userInterfaceIdiom != .pad)
         #else
-        let isPhone = true
+        let isPhone = isPhoneOverride ?? true
         #endif
+        let designH: CGFloat = isPhone ? 320.0 : (768.0 * (h / w))
+        let designW = isPhone ? (designH * (w / h)) : 768.0
+        let screenScale = h / max(designH, 1)
         let phoneRatio = isPhone ? ((designW / designH) / zoomMultiplier) : 1.0
         let windowHeight = designH / max(phoneRatio, 0.001)
         let rEff = max(totalRadius, CGFloat(baseRadius))
@@ -77,6 +92,28 @@ enum OriginalGameplay {
         let q = windowHeight / (42.0 * rEff)
         let cocosZoom = min(pow(max(q, 0.0001), 0.4) * scaleFactor, minZoom)
         return cocosZoom * screenScale * customZoomMultiplier
+    }
+
+    /// `JoystickView::initWithEaseFactor:` (`0x1000e2b1c`): iPad sizes joystick from physical inch height
+    /// (`1.04434"` bg, `0.5446"` stick); iPhone scales native `82x82` / `42.5x42.5` Controls sprites by `uiScale`.
+    static func joystickMetrics(for viewportSize: CGSize, uiScale s: CGFloat, isPhoneOverride: Bool? = nil) -> (bgSide: CGFloat, knobSide: CGFloat, maxRadius: CGFloat) {
+        #if canImport(UIKit)
+        let isPhone = isPhoneOverride ?? (UIDevice.current.userInterfaceIdiom != .pad)
+        #else
+        let isPhone = isPhoneOverride ?? true
+        #endif
+        if !isPhone {
+            // Standard iPad Retina density is 264 ppi / 2x = 132 pt/inch.
+            let ptPerInch: CGFloat = 132.0
+            let bg = CGFloat(1.04434) * ptPerInch
+            let knob = CGFloat(0.5446) * ptPerInch
+            let maxR = bg * 0.5 - knob * 0.25
+            return (bg, knob, maxR)
+        }
+        let bg = 82.0 * s
+        let knob = 42.5 * s
+        let maxR = bg * 0.5 - knob * 0.25
+        return (bg, knob, maxR)
     }
 
     /// Screen-normalised input distance (`0x1000b5550` + `0x10003f470`): `sqrt(500000 / aspect) / 1.5`.

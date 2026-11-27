@@ -459,7 +459,6 @@ struct ShopModalView: View {
                     Text("\(cost)")
                         .font(.custom("OpenSans-Bold", size: 11.5 * s))
                         .foregroundColor(.white)
-                        .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 27 * s)
@@ -658,7 +657,6 @@ struct QuestsModalView: View {
                     Text("Claim")
                         .font(.custom("OpenSans-Bold", size: 9.5 * s))
                         .foregroundColor(.white)
-                        .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
                         .padding(.horizontal, 8 * s)
                         .frame(height: 22 * s)
                 }
@@ -1167,7 +1165,6 @@ struct GiftsNewsModalView: View {
                     .padding(16 * s)
                     .frame(width: min(geometry.size.width * 0.85, 340 * s))
                     .background(MCFSFrame(name: "mcfs-white"))
-                    .shadow(radius: 20)
                 }
             }
         }
@@ -1245,7 +1242,6 @@ struct MatchResultsModalView: View {
                             Text("Menu")
                                 .font(.custom("OpenSans-Bold", size: 14 * s))
                                 .foregroundColor(.white)
-                                .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 36 * s)
                         }
@@ -1257,7 +1253,6 @@ struct MatchResultsModalView: View {
                             Text("Play Again")
                                 .font(.custom("OpenSans-Bold", size: 14 * s))
                                 .foregroundColor(.white)
-                                .shadow(color: Color.black.opacity(0.35), radius: 0, x: 0, y: 1)
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 36 * s)
                         }
@@ -1267,7 +1262,6 @@ struct MatchResultsModalView: View {
                 .padding(14 * s)
                 .frame(width: min(geometry.size.width * 0.88, 300 * s))
                 .background(MCFSFrame(name: "mcfs-white-gray"))
-                .shadow(radius: 24)
             }
             .onAppear {
                 if !checkedAward {

@@ -612,7 +612,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         )
 
         // 1. Background + Infinite 50u Grid (`OptimizedArenaBackground::draw` 0x10030e108)
-        let uiScale = max(Float(0.5), min(Float(boundsSize.height) / 320.0, Float(boundsSize.width) / 480.0))
+        let uiScale = Float(OriginalGameplay.arenaScreenScale(for: boundsSize))
         let cocosZoom = ptZoom / uiScale
         let intensity = min(Float(0.85), max(Float(0.10), (50.0 * 50.0 * cocosZoom * cocosZoom) / 5000.0 + 0.10))
         let gridGray = box.darkMode ? intensity : (1.0 - intensity)
@@ -673,25 +673,8 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
             appendDiskFan(cx: sx, cy: sy, radius: foodPxR, count: foodSegs, color: col)
         }
 
-        // 4. Ejected Mass (`SoftBodyCellView`: rigid polygon r=40, scale=1+5/r -> outer r+5=45, inner r*(r-5)/(r+5)=31.111)
-        if let mm = box.massManager {
-            var visMass: [EjectedMass] = []
-            mm.forEachVisibleMass(in: worldVisible) { visMass.append($0) }
-            visMass.sort { $0.zIndex < $1.zIndex }
-            let shotR = Float(OriginalGameplay.shotMassBaseRadiusCGFloat)
-            let rOut = (shotR + 5.0) * zoomPx
-            let rIn = max(1.0, (shotR * (shotR - 5.0) / (shotR + 5.0)) * zoomPx)
-            let segs = min(64, max(10, Int(floor(shotR * cocosZoom))))
-            for m in visMass {
-                guard let st = mm.renderStyle(for: m.styleID) else { continue }
-                let sx = Float(m.renderPosition.x) * zoomPx + screenOffX
-                let sy = Float(m.renderPosition.y) * zoomPx + screenOffY
-                appendDiskFan(cx: sx, cy: sy, radius: rOut, count: segs, color: rgba(st.borderColor))
-                appendDiskFan(cx: sx, cy: sy, radius: rIn, count: segs, color: rgba(st.color))
-            }
-        }
-
-        // 4.5 Consumed Pickup Slide Animations beneath cells
+        // 4. Consumed Pickup Slide Animations + Sorted Drawables by (int)radius z-order (`BaseArenaView::createCell` 0x1003736c4)
+        let shotR = Float(OriginalGameplay.shotMassBaseRadiusCGFloat)
         for anim in box.consumeAnimations {
             let sx = Float(anim.position.x) * zoomPx + screenOffX
             let sy = Float(anim.position.y) * zoomPx + screenOffY
@@ -706,7 +689,6 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 }
             case .ejected(let sid):
                 if let st = box.massManager?.renderStyle(for: sid) {
-                    let shotR = Float(OriginalGameplay.shotMassBaseRadiusCGFloat)
                     let ro = (shotR + 5.0) * sc * zoomPx
                     let ri = max(1.0, (shotR * (shotR - 5.0) / (shotR + 5.0)) * sc * zoomPx)
                     let segs = min(64, max(10, Int(floor(shotR * cocosZoom))))
@@ -719,34 +701,53 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         }
         flushSolid(enc: enc, viewportSize: vpPx)
 
-        // 5. Tokens (Sprites)
-        let nowTS = CACurrentMediaTime()
-        if let tokTex = texCache.texture(named: "token-snowflake") ?? texCache.texture(named: "token") {
-            let tokSide = Float(52.0) * zoomPx
-            for tok in box.tokens {
-                guard worldVisible.contains(tok.position) else { continue }
-                let sx = Float(tok.position.x) * zoomPx + screenOffX
-                let sy = Float(tok.position.y) * zoomPx + screenOffY
-                drawQuad(enc: enc, texture: tokTex, centerX: sx, centerY: sy, width: tokSide * 0.9, height: tokSide, alpha: 1.0, viewportSize: vpPx)
-            }
-        }
-
-        // 6. Sorted Drawables (Player + Bots + Animating Eaten + Viruses)
+        // 5. All Arena Entities Sorted by zOrder = Int(stateRadius) (Tokens, EjectedMass, Cells, Viruses)
         enum RenderEntity {
+            case token(Token)
+            case ejected(EjectedMass, style: EjectedMassManager.RenderStyle)
             case cell(PlayerCell, isLocal: Bool)
             case virus(Virus)
-            var sortMass: CGFloat {
+            var zOrder: Int {
                 switch self {
-                case .cell(let c, _): return c.mass
-                case .virus(let v): return v.mass
+                case .token: return 20
+                case .ejected: return Int(OriginalGameplay.shotMassBaseRadiusCGFloat)
+                case .cell(let c, _): return Int(c.cachedSolidRadius)
+                case .virus(let v): return Int(v.radius)
+                }
+            }
+            var tieOrder: Int {
+                switch self {
+                case .token: return 0
+                case .ejected(let m, _): return m.zIndex
+                case .cell(let c, _): return Int(c.mass * 100)
+                case .virus: return 10000
                 }
             }
         }
 
+        let nowTS = CACurrentMediaTime()
+        let tokTex = texCache.texture(named: "token-snowflake") ?? texCache.texture(named: "token")
+        let tokSide = Float(52.0) * zoomPx
+        let rOutShot = (shotR + 5.0) * zoomPx
+        let rInShot = max(1.0, (shotR * (shotR - 5.0) / (shotR + 5.0)) * zoomPx)
+        let segsShot = min(64, max(10, Int(floor(shotR * cocosZoom))))
+
         var drawables: [RenderEntity] = []
-        drawables.reserveCapacity(box.playerCells.count + box.botCells.count + box.animatingEatenCells.count + box.viruses.count)
+        drawables.reserveCapacity(box.tokens.count + box.playerCells.count + box.botCells.count + box.animatingEatenCells.count + box.viruses.count + 64)
         let myOwner = box.playerCells.first?.ownerID
 
+        if tokTex != nil {
+            for tok in box.tokens where worldVisible.contains(tok.position) {
+                drawables.append(.token(tok))
+            }
+        }
+        if let mm = box.massManager {
+            mm.forEachVisibleMass(in: worldVisible) { m in
+                if let st = mm.renderStyle(for: m.styleID) {
+                    drawables.append(.ejected(m, style: st))
+                }
+            }
+        }
         for c in box.animatingEatenCells {
             let r = c.cachedVisualRadius
             if worldVisible.intersects(CGRect(x: c.position.x - r, y: c.position.y - r, width: r * 2, height: r * 2)) {
@@ -771,7 +772,10 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 drawables.append(.virus(v))
             }
         }
-        drawables.sort { $0.sortMass < $1.sortMass }
+        drawables.sort {
+            if $0.zOrder != $1.zOrder { return $0.zOrder < $1.zOrder }
+            return $0.tieOrder < $1.tieOrder
+        }
 
         let borderColVirus = SIMD4<Float>(0.0, 0.9, 0.0, 1.0)
         let fillColVirus = SIMD4<Float>(0.0, 1.0, 0.0, 1.0)
@@ -779,6 +783,20 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
 
         for item in drawables {
             switch item {
+            case .token(let tok):
+                if let tokTex {
+                    flushSolid(enc: enc, viewportSize: vpPx)
+                    let sx = Float(tok.position.x) * zoomPx + screenOffX
+                    let sy = Float(tok.position.y) * zoomPx + screenOffY
+                    drawQuad(enc: enc, texture: tokTex, centerX: sx, centerY: sy, width: tokSide * 0.9, height: tokSide, alpha: 1.0, viewportSize: vpPx)
+                }
+
+            case .ejected(let m, let st):
+                let sx = Float(m.renderPosition.x) * zoomPx + screenOffX
+                let sy = Float(m.renderPosition.y) * zoomPx + screenOffY
+                appendDiskFan(cx: sx, cy: sy, radius: rOutShot, count: segsShot, color: rgba(st.borderColor))
+                appendDiskFan(cx: sx, cy: sy, radius: rInShot, count: segsShot, color: rgba(st.color))
+
             case .virus(let v):
                 let sx = Float(v.position.x) * zoomPx + screenOffX
                 let sy = Float(v.position.y) * zoomPx + screenOffY
@@ -956,6 +974,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
             }
         }
 
+        flushSolid(enc: enc, viewportSize: vpPx)
         enc.endEncoding()
         return true
     }
