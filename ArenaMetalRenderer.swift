@@ -447,6 +447,30 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         }
     }
 
+    /// drawFillingWithVertices on a virus: the spiked vertices are scaled uniformly by
+    /// (r - 10) / r after calculateVirusEdgeRadiusDelta has been applied.
+    private func appendScaledVirusFan(cx: Float, cy: Float, verts: [CGPoint], zoomPx: Float, scale: Float, spikeDeltaWorld: Float, color: SIMD4<Float>) {
+        let n = verts.count
+        guard n >= 6 else { return }
+        let center = SolidVertex(pixelPos: SIMD2<Float>(cx, cy), color: color)
+        var pts = [SIMD2<Float>](repeating: .zero, count: n)
+        for i in 0..<n {
+            let v = verts[i]
+            let vx = Float(v.x)
+            let vy = Float(v.y)
+            let len = max(0.0001, hypotf(vx, vy))
+            let spike = (i & 1) == 0 ? spikeDeltaWorld : 0.0
+            let rr = (len + spike) * scale * zoomPx
+            pts[i] = SIMD2<Float>(cx + (vx / len) * rr, cy + (vy / len) * rr)
+        }
+        for i in 0..<n {
+            let next = (i + 1) % n
+            solidBuf.append(center)
+            solidBuf.append(SolidVertex(pixelPos: pts[i], color: color))
+            solidBuf.append(SolidVertex(pixelPos: pts[next], color: color))
+        }
+    }
+
     private func appendVirusFan(cx: Float, cy: Float, radiusWorld: Float, zoomPx: Float, pointCount: Int, radiusOffsetWorld: Float, spikeDeltaWorld: Float, color: SIMD4<Float>) {
         let count = max(12, pointCount & ~1)
         let ring = trigRing(count: count)
@@ -493,7 +517,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         solidBuf.removeAll(keepingCapacity: true)
     }
 
-    private func drawTexturedFan(enc: MTLRenderCommandEncoder, texture: MTLTexture, cx: Float, cy: Float, verts: [CGPoint], zoomPx: Float, radiusOffsetWorld: Float, fallbackRadiusPx: Float, baseRadiusWorld: Float, alpha: Float, viewportSize: SIMD2<Float>) {
+    private func drawTexturedFan(enc: MTLRenderCommandEncoder, texture: MTLTexture, cx: Float, cy: Float, verts: [CGPoint], zoomPx: Float, radiusOffsetWorld: Float, fallbackRadiusPx: Float, baseRadiusWorld: Float, vertexScale: Float = 1.0, alpha: Float, viewportSize: SIMD2<Float>) {
         var tv: [TexVertex] = []
         let tint = SIMD4<Float>(alpha, alpha, alpha, alpha) // premultiplied alpha
         if verts.count >= 8 && baseRadiusWorld > 1 {
@@ -505,14 +529,15 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
             // Mirrors SoftBodyCellView::calcTexCoordsInto:vertexArray: (0x1003a5354):
             // texCoord = vertex / (2 * radius) + 0.5.  The old (5/r + 1) factor sampled
             // outside the skin and relied on clampToEdge, visibly stretching every skin.
-            let uvScale = 1.0 / max(1.0, baseRadiusWorld)
+            let uvScale = 1.0 / max(0.0001, baseRadiusWorld)
             for i in 0..<n {
                 let v = verts[i]
                 let vx = Float(v.x)
                 let vy = Float(v.y)
                 let len = max(0.0001, hypotf(vx, vy))
-                pxPts[i] = SIMD2<Float>(cx + vx * zoomPx + (vx / len) * radiusOffsetWorld * zoomPx,
-                                        cy + vy * zoomPx + (vy / len) * radiusOffsetWorld * zoomPx)
+                let rr = (radiusOffsetWorld + len) * vertexScale
+                pxPts[i] = SIMD2<Float>(cx + (vx / len) * rr * zoomPx,
+                                        cy + (vy / len) * rr * zoomPx)
                 uvs[i] = SIMD2<Float>(0.5 + 0.5 * (vx * uvScale), 0.5 + 0.5 * (vy * uvScale))
             }
             for i in 0..<n {
@@ -529,9 +554,9 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 let next = (i + 1) % ring.count
                 let c1 = ring[i]; let c2 = ring[next]
                 tv.append(center)
-                tv.append(TexVertex(pixelPos: SIMD2<Float>(cx + c1.cos * fallbackRadiusPx, cy + c1.sin * fallbackRadiusPx),
+                tv.append(TexVertex(pixelPos: SIMD2<Float>(cx + c1.cos * fallbackRadiusPx * vertexScale, cy + c1.sin * fallbackRadiusPx * vertexScale),
                                     texCoord: SIMD2<Float>(0.5 + 0.5 * c1.cos, 0.5 + 0.5 * c1.sin), tint: tint))
-                tv.append(TexVertex(pixelPos: SIMD2<Float>(cx + c2.cos * fallbackRadiusPx, cy + c2.sin * fallbackRadiusPx),
+                tv.append(TexVertex(pixelPos: SIMD2<Float>(cx + c2.cos * fallbackRadiusPx * vertexScale, cy + c2.sin * fallbackRadiusPx * vertexScale),
                                     texCoord: SIMD2<Float>(0.5 + 0.5 * c2.cos, 0.5 + 0.5 * c2.sin), tint: tint))
             }
         }
@@ -856,7 +881,9 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
 
         let borderColVirus = SIMD4<Float>(0.0, 0.9, 0.0, 1.0)
         let fillColVirus = SIMD4<Float>(0.0, 1.0, 0.0, 1.0)
-        let partyRingCol = SIMD4<Float>(1.0, 0x8C / 255.0, 0.0, 1.0)
+        // Default Settings - Party Mode: outer 0xFFC300, inner 0xF9F92F.
+        let partyRingCol = SIMD4<Float>(1.0, 0xC3 / 255.0, 0.0, 1.0)
+        let partyInnerCol = SIMD4<Float>(0xF9 / 255.0, 0xF9 / 255.0, 0x2F / 255.0, 1.0)
 
         for item in drawables {
             switch item {
@@ -878,22 +905,31 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 let sx = Float(v.position.x) * zoomPx + screenOffX
                 let sy = Float(v.position.y) * zoomPx + screenOffY
                 let rW = Float(v.radius)
-                // SoftBodyCellView::calculateVirusEdgeRadiusDelta (0x1003a49fc)
+                // SoftBodyCellView::calculateVirusEdgeRadiusDelta (0x1003a49fc).
+                // drawOutlineWithVertices scales by (r*zoom + 10)/(r*zoom), so the
+                // 10 and 5 offsets are screen points, not world units.
                 let spikeDelta = rW * Float(OriginalGameplay.virusEdgeRadiusMultiplier) + 5.0
+                let borderOff = 10.0 / max(0.01, ptZoom)
+                let bodyOff = 5.0 / max(0.01, ptZoom)
+                let innerScale = max(0.0, 1.0 - 10.0 / max(0.001, rW * ptZoom))
                 if v.deformedVertices.count >= 8 {
-                    // calculateVirusEdgeRadiusDelta stores r*0.02 + 5; the outline then
-                    // scales by (r+10)/r and the inner fill by (r+5)/r, exactly like
-                    // drawOutlineWithVertices does for normal cells.
+                    // calculateVirusEdgeRadiusDelta stores r*0.02 + 5; drawOutlineWithVertices
+                    // then draws (r+10)/r and (r+5)/r, and drawFillingWithVertices adds the
+                    // opaque (r-10)/r core from the same spiked vertices.
                     appendDeformedFan(cx: sx, cy: sy, verts: v.deformedVertices, zoomPx: zoomPx,
-                                      radiusOffsetWorld: 10.0, isVirus: true, virusSpikeDeltaWorld: spikeDelta, color: borderColVirus)
+                                      radiusOffsetWorld: borderOff, isVirus: true, virusSpikeDeltaWorld: spikeDelta, color: borderColVirus)
                     appendDeformedFan(cx: sx, cy: sy, verts: v.deformedVertices, zoomPx: zoomPx,
-                                      radiusOffsetWorld: 5.0, isVirus: true, virusSpikeDeltaWorld: spikeDelta, color: fillColVirus)
+                                      radiusOffsetWorld: bodyOff, isVirus: true, virusSpikeDeltaWorld: spikeDelta, color: fillColVirus)
+                    appendScaledVirusFan(cx: sx, cy: sy, verts: v.deformedVertices, zoomPx: zoomPx,
+                                         scale: innerScale, spikeDeltaWorld: spikeDelta, color: fillColVirus)
                 } else {
                     let vCount = min(120, max(30, (2 * Int(floor(max(1, rW * cocosZoom)))) & ~1))
                     appendVirusFan(cx: sx, cy: sy, radiusWorld: rW, zoomPx: zoomPx, pointCount: vCount,
-                                   radiusOffsetWorld: 10.0, spikeDeltaWorld: spikeDelta, color: borderColVirus)
+                                   radiusOffsetWorld: borderOff, spikeDeltaWorld: spikeDelta, color: borderColVirus)
                     appendVirusFan(cx: sx, cy: sy, radiusWorld: rW, zoomPx: zoomPx, pointCount: vCount,
-                                   radiusOffsetWorld: 5.0, spikeDeltaWorld: spikeDelta, color: fillColVirus)
+                                   radiusOffsetWorld: bodyOff, spikeDeltaWorld: spikeDelta, color: fillColVirus)
+                    appendVirusFan(cx: sx, cy: sy, radiusWorld: rW * innerScale, zoomPx: zoomPx, pointCount: vCount,
+                                   radiusOffsetWorld: 0, spikeDeltaWorld: spikeDelta * innerScale, color: fillColVirus)
                 }
                 flushSolid(enc: enc, viewportSize: vpPx)
 
@@ -905,47 +941,90 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 // SoftBodyCellView::drawOutlineWithVertices (0x1003a5064):
                 //   outline at (r + 10) / r, body fill at (r + 5) / r.
                 // drawFillingWithVertices (0x1003a528c) then paints an inner disc at (r - 10) / r.
-                let hasBorder = rW > 18.0
-                let borderOff: Float = hasBorder ? 10.0 : 0.0
-                let bodyOff: Float = hasBorder ? 5.0 : 0.0
+                let isSmall = rW <= 18.0
+                // (r*zoom + 10)/(r*zoom): 10 and 5 are fixed screen points.
+                let borderOff = 10.0 / max(0.01, ptZoom)
+                let bodyOff = 5.0 / max(0.01, ptZoom)
+                let innerScale = max(0.0, 1.0 - 10.0 / max(0.001, rW * ptZoom))
                 let isTeammate = box.teammateOwnerID == c.ownerID || box.teammateOwnerIDs.contains(c.ownerID)
                 let showPartyBorder = isTeammate || (isLocal && box.localPlayerInParty)
-
-                let borderSIMD: SIMD4<Float> = showPartyBorder ? partyRingCol : rgba(c.borderColor)
                 let fillSIMD = rgba(c.color)
                 let skinTex: MTLTexture? = {
                     guard box.showSkins, let sName = c.skinName else { return nil }
                     return texCache.skinTexture(name: sName)
                 }()
-
-                // drawOutlineWithVertices: (r+10)/r opaque rim, then (r+5)/r body
-                // colour at alpha 0x83.  The inner (r-10)/r disc is drawFilling,
-                // applied after the skin below.
-                let bodyBandSIMD = SIMD4<Float>(fillSIMD.x, fillSIMD.y, fillSIMD.z, 0x83 / 255.0)
-                if c.deformedVertices.count >= 8 {
-                    if hasBorder {
+                // Party cells use the dedicated branch in drawOutlineWithVertices:
+                // an opaque partySkinOuterOutlineColor disc at r, then
+                // partySkinInnerOutlineColor at r-5pt.  The skin is then shrunk by
+                // 6pt, leaving the 5pt orange ring and a 1pt yellow seam.
+                if showPartyBorder {
+                    let outerCol = SIMD4<Float>(partyRingCol.x, partyRingCol.y, partyRingCol.z, fillSIMD.w)
+                    let innerCol = SIMD4<Float>(partyInnerCol.x, partyInnerCol.y, partyInnerCol.z, fillSIMD.w)
+                    let innerPartyScale = max(0.0, 1.0 - 5.0 / max(0.001, rW * ptZoom))
+                    if c.deformedVertices.count >= 8 {
                         appendDeformedFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
-                                          radiusOffsetWorld: borderOff, isVirus: false, virusSpikeDeltaWorld: 0, color: borderSIMD)
+                                          radiusOffsetWorld: 0, isVirus: false, virusSpikeDeltaWorld: 0, color: outerCol)
+                        appendScaledFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
+                                        scale: innerPartyScale, color: innerCol)
+                    } else {
+                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, rW * zoomPx), count: segCount, color: outerCol)
+                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW - 5.0 / max(0.01, ptZoom)) * zoomPx),
+                                      count: segCount, color: innerCol)
                     }
-                    appendDeformedFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
-                                      radiusOffsetWorld: bodyOff, isVirus: false, virusSpikeDeltaWorld: 0, color: bodyBandSIMD)
-                } else {
-                    if hasBorder {
-                        appendDiskFan(cx: sx, cy: sy, radius: (rW + borderOff) * zoomPx, count: segCount, color: borderSIMD)
+                    flushSolid(enc: enc, viewportSize: vpPx)
+                } else if !(showPartyBorder && skinTex != nil) {
+                    if isSmall {
+                        if c.deformedVertices.count >= 8 {
+                            appendDeformedFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
+                                              radiusOffsetWorld: 0, isVirus: false, virusSpikeDeltaWorld: 0, color: fillSIMD)
+                        } else {
+                            appendDiskFan(cx: sx, cy: sy, radius: max(1.5, rW * zoomPx), count: segCount, color: fillSIMD)
+                        }
+                    } else {
+                        let borderSIMD = SIMD4<Float>(rgba(c.borderColor).x, rgba(c.borderColor).y, rgba(c.borderColor).z, fillSIMD.w)
+                        let bodyBandSIMD = SIMD4<Float>(fillSIMD.x, fillSIMD.y, fillSIMD.z, 0x83 / 255.0)
+                        if c.deformedVertices.count >= 8 {
+                            appendDeformedFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
+                                              radiusOffsetWorld: borderOff, isVirus: false, virusSpikeDeltaWorld: 0,
+                                              color: showPartyBorder ? partyRingCol : borderSIMD)
+                            appendDeformedFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
+                                              radiusOffsetWorld: bodyOff, isVirus: false, virusSpikeDeltaWorld: 0, color: bodyBandSIMD)
+                        } else {
+                            appendDiskFan(cx: sx, cy: sy, radius: (rW + borderOff) * zoomPx, count: segCount,
+                                          color: showPartyBorder ? partyRingCol : borderSIMD)
+                            appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW + bodyOff) * zoomPx), count: segCount, color: bodyBandSIMD)
+                        }
                     }
-                    appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW + bodyOff) * zoomPx), count: segCount, color: bodyBandSIMD)
+                    flushSolid(enc: enc, viewportSize: vpPx)
                 }
-                flushSolid(enc: enc, viewportSize: vpPx)
 
-                // Skin is drawn on the untrimmed soft-body polygon.  The real client applies the
-                // +5 edge expansion with a GL scale on the vertices, never by shrinking the UVs.
+                // drawBackgroundForTextureTransparency: (0x1003a56d0) runs before
+                // the skin and paints an opaque white polygon only when the cell's
+                // alpha is not fully opaque.
+                if let skinTex, fillSIMD.w < 1.0 {
+                    if c.deformedVertices.count >= 8 {
+                        appendScaledFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
+                                        scale: 1.0, color: SIMD4<Float>(1, 1, 1, 1))
+                    } else {
+                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, rW * zoomPx), count: segCount,
+                                      color: SIMD4<Float>(1, 1, 1, 1))
+                    }
+                    flushSolid(enc: enc, viewportSize: vpPx)
+                }
+
+                // Skin is drawn on the full soft-body polygon.  shrinkGLForPartyCell
+                // (0x1003a56f0) scales the party skin geometry by 1 - 6/(r*zoom),
+                // but calcTexCoordsInto still uses the unscaled vertices.
                 if let skinTex {
-                    let skinAlpha: Float = showPartyBorder ? 0.96 : 1.0
+                    let vertexScale = showPartyBorder
+                        ? max(0.5, 1.0 - 6.0 / max(0.001, rW * ptZoom))
+                        : 1.0
                     let rFallback = max(1.5, rW * zoomPx)
                     drawTexturedFan(enc: enc, texture: skinTex, cx: sx, cy: sy,
                                     verts: c.deformedVertices, zoomPx: zoomPx,
                                     radiusOffsetWorld: 0, fallbackRadiusPx: rFallback,
-                                    baseRadiusWorld: rW, alpha: skinAlpha, viewportSize: vpPx)
+                                    baseRadiusWorld: rW, vertexScale: vertexScale,
+                                    alpha: fillSIMD.w, viewportSize: vpPx)
 
                     let altSince: TimeInterval? = isLocal
                         ? box.dualSkinSwapShowingSince
@@ -957,25 +1036,44 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                         drawTexturedFan(enc: enc, texture: altTex, cx: sx, cy: sy,
                                         verts: c.deformedVertices, zoomPx: zoomPx,
                                         radiusOffsetWorld: 0, fallbackRadiusPx: rFallback,
-                                        baseRadiusWorld: rW, alpha: min(1.0, max(0.0, fade)), viewportSize: vpPx)
+                                        baseRadiusWorld: rW, vertexScale: vertexScale,
+                                        alpha: min(fillSIMD.w, max(0.0, fade)), viewportSize: vpPx)
                     }
                 }
 
-                // drawFillingWithVertices (0x1003a6168): player-owned cells get the
-                // 0xC0C0C0 @ 0.75 highlight; every other cell gets a (r - 10) / r
-                // disc in its own colour.  Skinned non-player cells return before
-                // this pass in the real client.
-                if isLocal || skinTex == nil {
-                    let innerScale = max(0.0, (rW - 10.0) / max(1.0, rW))
-                    let innerColor: SIMD4<Float> = isLocal
-                        ? SIMD4<Float>(0xC0 / 255.0, 0xC0 / 255.0, 0xC0 / 255.0, 0.75)
-                        : fillSIMD
+                // drawFillingWithVertices (0x1003a528c):
+                //   * player-owned cells draw 0xC0C0C0 at the FULL radius with
+                //     alpha*0.75 (after the skin, so it is a translucent wash);
+                //   * other unskinned cells draw the opaque (r-10)/r disc in their
+                //     own colour.
+                // Skinned non-player cells return before this pass in the client.
+                if skinTex != nil {
+                    if isLocal {
+                        let wash = SIMD4<Float>(0xC0 / 255.0, 0xC0 / 255.0, 0xC0 / 255.0, fillSIMD.w * 0.75)
+                        if c.deformedVertices.count >= 8 {
+                            appendScaledFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
+                                            scale: 1.0, color: wash)
+                        } else {
+                            appendDiskFan(cx: sx, cy: sy, radius: max(1.5, rW * zoomPx), count: segCount, color: wash)
+                        }
+                        flushSolid(enc: enc, viewportSize: vpPx)
+                    }
+                } else if isLocal {
+                    let wash = SIMD4<Float>(0xC0 / 255.0, 0xC0 / 255.0, 0xC0 / 255.0, fillSIMD.w * 0.75)
                     if c.deformedVertices.count >= 8 {
                         appendScaledFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
-                                        scale: innerScale, color: innerColor)
+                                        scale: 1.0, color: wash)
                     } else {
-                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW - 10.0) * zoomPx),
-                                      count: segCount, color: innerColor)
+                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, rW * zoomPx), count: segCount, color: wash)
+                    }
+                    flushSolid(enc: enc, viewportSize: vpPx)
+                } else {
+                    if c.deformedVertices.count >= 8 {
+                        appendScaledFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
+                                        scale: innerScale, color: fillSIMD)
+                    } else {
+                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW - 10.0 / max(0.01, ptZoom)) * zoomPx),
+                                      count: segCount, color: fillSIMD)
                     }
                     flushSolid(enc: enc, viewportSize: vpPx)
                 }

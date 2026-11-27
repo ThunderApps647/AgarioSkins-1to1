@@ -519,7 +519,8 @@ struct OnlineGameView: View {
                         .zIndex(1)
                     }
                     actionButtons
-                    modMenuIcon(geometry: geometry)
+                    // No floating mod-menu launcher: the original HUD only has
+                    // the Controls-*.ccbi split/shoot buttons.
                     if showModMenu { modMenuPanel(geometry: geometry) }
                 }
                 if connectionPhase == .playing && leavePopupMounted {

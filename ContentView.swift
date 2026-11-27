@@ -5043,32 +5043,9 @@ struct ContentView: View {
                 }
                 
                 if isPlaying && !isLeavePopupPresented {
-                    // Floating launcher: draggable "mod-menu-btn" asset (the base's menuIcon.png slot).
-                    Image("mod-menu-btn")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 50, height: 50)
-                        .contentShape(Rectangle())
-                        .offset(modMenuIconOffset)
-                        .position(x: geometry.size.width - 50, y: 150)
-                        .gesture(
-                            DragGesture(coordinateSpace: .global)
-                                .onChanged { val in
-                                    modMenuIconOffset = CGSize(
-                                        width: lastModMenuIconOffset.width + val.translation.width,
-                                        height: lastModMenuIconOffset.height + val.translation.height
-                                    )
-                                }
-                                .onEnded { _ in
-                                    lastModMenuIconOffset = modMenuIconOffset
-                                }
-                        )
-                        .onTapGesture {
-                            // The base fades the menu in/out over 0.5s.
-                            withAnimation(.easeInOut(duration: 0.5)) { showModMenu.toggle() }
-                        }
-                        .zIndex(99)
-                    
+                    // The original client has no floating mod-menu launcher; the
+                    // draggable gear was an extra overlay and is intentionally not
+                    // drawn.  Mod state remains available to the simulation.
                     if showModMenu {
                         XelahotModMenuPanel(
                             title: "Mod Menu",
@@ -12180,7 +12157,6 @@ struct ActionButtonsHUD: View, Equatable {
     let onFeedDown: () -> Void
     let onFeedUp: () -> Void
 
-    @State private var macroPressed = false
     @State private var feedPressed = false
     @State private var feedSequencePlayID = 0
 
@@ -12198,22 +12174,10 @@ struct ActionButtonsHUD: View, Equatable {
         GeometryReader { geometry in
             let s = OriginalGameplay.uiScale(for: geometry.size)
             let buttonSide = 65.0 * s
-            let macroSide = buttonSide
             let leadInset = max(0, geometry.safeAreaInsets.leading - 6)
             let trailInset = max(0, geometry.safeAreaInsets.trailing - 6)
             let sceneW = max(1, geometry.size.width - leadInset - trailInset)
             let ccbName: String = controlLayout == 0 ? "Controls-Left.ccbi" : (controlLayout == 1 ? "Controls-Sides.ccbi" : "Controls-Right.ccbi")
-            let macroX: CGFloat = {
-                if controlLayout == 0 {
-                    return leadInset + sceneW * 0.137 + buttonSide * 1.18
-                } else if controlLayout == 1 {
-                    return leadInset + sceneW * 0.92 - buttonSide * 1.18
-                } else {
-                    return leadInset + sceneW * 0.863 - buttonSide * 1.18
-                }
-            }()
-            let shootCenterY = geometry.size.height * 0.875
-
             let splitHitOverlay = AnyView(
                 ImmediatePressSurface(onDown: { if canSplit { onSplit() } }, onUp: {})
                     .frame(width: buttonSide, height: buttonSide)
@@ -12269,21 +12233,9 @@ struct ActionButtonsHUD: View, Equatable {
                 .frame(width: sceneW, height: geometry.size.height)
                 .padding(.leading, leadInset)
 
-                Image("macro")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: macroSide, height: macroSide)
-                    .scaleEffect(macroButtonScale)
-                    .overlay(
-                        ImmediatePressSurface(onDown: { macroPressed = true; onMacroDown() },
-                                              onUp: { macroPressed = false; onMacroUp() })
-                    )
-                    .opacity(canFeed ? (macroPressed ? 0.55 : 1.0) : 0.45)
-                    .allowsHitTesting(canFeed)
-                    .position(x: macroX, y: shootCenterY)
-                    .accessibilityLabel("Fast eject")
-                    .accessibilityIdentifier("hud.macro")
-                    .accessibilityAddTraits(.isButton)
+                // Original Controls-*.ccbi only contains the split and shoot
+                // buttons.  The extra macro button was a custom overlay and is
+                // intentionally absent here.
             }
         }
     }
@@ -13284,7 +13236,7 @@ struct MainMenu: View {
         return GeometryReader { geo in
             let sideInset = max(geo.safeAreaInsets.leading, geo.safeAreaInsets.trailing)
             let sceneW = max(1, geo.size.width - sideInset * 2)
-            ZStack {
+            ZStack(alignment: .topLeading) {
                 Color.white.edgesIgnoringSafeArea(.all)
                 CCBISceneView(
                     ccbFile: "MenuShopSkins.ccbi",
@@ -13302,14 +13254,23 @@ struct MainMenu: View {
                         visibilityOverrides: [
                             "_scrollbarNode": false
                         ],
-                        slotViews: [
-                            "_tabsNode": tabsSlot,
-                            "_tableNode": tableSlot
-                        ],
                         designScaleModifier: { _ in s }
                     )
                 )
                 .frame(width: sceneW, height: geo.size.height)
+
+                // MenuShopSkins.ccbi stores _tabsNode at 81% of the scene height but
+                // its slot content is hosted by a 30pt wrapper, so attaching the
+                // SwiftUI tabs/table to those slots collapses them against the
+                // header.  Lay them out below the 50.25pt GenericHeader instead.
+                VStack(spacing: 0) {
+                    Color.clear.frame(height: 56.25 * s)
+                    tabsSlot
+                    Color.clear.frame(height: 6 * s)
+                    tableSlot
+                }
+                .frame(width: sceneW, height: geo.size.height, alignment: .top)
+                .padding(.horizontal, sideInset)
             }
         }
         .frame(width: containerSize.width, height: containerSize.height)
