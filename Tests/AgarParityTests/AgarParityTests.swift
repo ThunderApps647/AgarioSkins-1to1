@@ -1104,8 +1104,10 @@ final class AgarParityTests: XCTestCase {
             box.zoom = 0.5
             box.showSkins = true
             box.showMassText = true
-            var skinCell = group[0]
-            skinCell.skinName = "Dragon"
+            var skinCell = PlayerCell(ownerID: ownerA, position: CGPoint(x: 3000, y: 3000), mass: 100, targetMass: 100, color: .green, name: "A", skinName: "Dragon")
+            skinCell.deformedVertices = group[0].deformedVertices
+            skinCell.vertexDisplacements = group[0].vertexDisplacements
+            skinCell.vertexRadii = group[0].vertexRadii
             box.playerCells = [skinCell]
             box.botCells = [group[2]]
             var vir = [Virus(position: CGPoint(x: 3200, y: 3100))]
