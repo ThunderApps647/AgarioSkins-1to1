@@ -197,24 +197,46 @@ final class AgarParityTests: XCTestCase {
             return image
         }
 
-        func renderSwiftUI<V: View>(_ view: V, size: CGSize, waitSec: TimeInterval = 0.65) throws -> UIImage {
-            let window = UIWindow(frame: CGRect(origin: .zero, size: size))
-            let host = UIHostingController(rootView: AnyView(view.frame(width: size.width, height: size.height).background(Color.white)))
-            host.view.frame = window.bounds
-            window.rootViewController = host
-            window.makeKeyAndVisible()
-            host.view.setNeedsLayout()
-            host.view.layoutIfNeeded()
-            RunLoop.main.run(until: Date().addingTimeInterval(waitSec))
-            host.view.layoutIfNeeded()
-            let fmt = UIGraphicsImageRendererFormat()
-            fmt.scale = 2.0
-            fmt.opaque = true
-            let img = UIGraphicsImageRenderer(size: size, format: fmt).image { _ in
-                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+        func renderSwiftUI<V: View>(_ view: V, size: CGSize, waitSec: TimeInterval = 0.75) throws -> UIImage {
+            let root = AnyView(view.frame(width: size.width, height: size.height).background(Color.white))
+            if let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first,
+               let keyWin = scene.windows.first(where: { $0.isKeyWindow }) ?? scene.windows.first {
+                let host = UIHostingController(rootView: root)
+                let origFrame = keyWin.frame
+                keyWin.frame = CGRect(origin: .zero, size: size)
+                host.view.frame = CGRect(origin: .zero, size: size)
+                host.view.backgroundColor = .white
+                let parentVC = keyWin.rootViewController
+                if let parentVC {
+                    parentVC.addChild(host)
+                    parentVC.view.addSubview(host.view)
+                    host.didMove(toParent: parentVC)
+                } else {
+                    keyWin.addSubview(host.view)
+                }
+                host.view.setNeedsLayout()
+                host.view.layoutIfNeeded()
+                RunLoop.main.run(until: Date().addingTimeInterval(waitSec))
+                host.view.layoutIfNeeded()
+                let fmt = UIGraphicsImageRendererFormat()
+                fmt.scale = 2.0
+                fmt.opaque = true
+                let img = UIGraphicsImageRenderer(size: size, format: fmt).image { _ in
+                    host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
+                }
+                if parentVC != nil { host.willMove(toParent: nil) }
+                host.view.removeFromSuperview()
+                if parentVC != nil { host.removeFromParent() }
+                keyWin.frame = origFrame
+                if hasColorVariance(img) {
+                    return img
+                }
             }
-            window.isHidden = true
-            window.rootViewController = nil
+            let renderer = ImageRenderer(content: root)
+            renderer.scale = 2.0
+            renderer.proposedSize = .init(size)
+            let img = try XCTUnwrap(renderer.uiImage, "ImageRenderer returned nil")
+            XCTAssertTrue(hasColorVariance(img), "Rendered snapshot must not be solid/blank")
             return img
         }
 
@@ -279,15 +301,15 @@ final class AgarParityTests: XCTestCase {
             let pOwner = UUID()
             let tOwner = UUID()
             let bOwner = UUID()
-            let pCellEmote = PlayerCell(ownerID: pOwner, position: CGPoint(x: 4000, y: 4000), mass: 260, targetMass: 260, color: Color(hex: 0x00A8F3), name: "Captain Idris", skinName: "Dragon")
-            let pCellText = PlayerCell(ownerID: tOwner, position: CGPoint(x: 4220, y: 3980), mass: 220, targetMass: 220, color: Color(hex: 0x33D1FF), name: "Portolan", skinName: nil)
-            let bCell = PlayerCell(ownerID: bOwner, position: CGPoint(x: 4430, y: 4040), mass: 160, targetMass: 160, color: Color(hex: 0xFF6B35), name: "Rival", skinName: nil, isBot: true)
+            let pCellEmote = PlayerCell(ownerID: pOwner, position: CGPoint(x: 3960, y: 4000), mass: 260, targetMass: 260, color: Color(hex: 0x00A8F3), name: "Captain Idris", skinName: "Dragon")
+            let pCellText = PlayerCell(ownerID: tOwner, position: CGPoint(x: 4290, y: 3980), mass: 260, targetMass: 260, color: Color(hex: 0x33D1FF), name: "Portolan", skinName: nil)
+            let bCell = PlayerCell(ownerID: bOwner, position: CGPoint(x: 4530, y: 4040), mass: 160, targetMass: 160, color: Color(hex: 0xFF6B35), name: "Rival", skinName: nil, isBot: true)
             let mm = EjectedMassManager()
-            mm.add(position: CGPoint(x: 4160, y: 3910), direction: CGSize(width: 1, height: 0), initialSpeed: 0, color: .cyan, ownerID: pOwner, sourceCellID: pCellEmote.id, borderColor: .blue, now: 0)
+            mm.add(position: CGPoint(x: 4135, y: 3910), direction: CGSize(width: 1, height: 0), initialSpeed: 0, color: .cyan, ownerID: pOwner, sourceCellID: pCellEmote.id, borderColor: .blue, now: 0)
 
             let boxClassic = ArenaRenderBox()
             boxClassic.worldSize = OriginalGameplay.offlineArenaSideLength
-            boxClassic.cameraPos = CGPoint(x: 4180, y: 4000)
+            boxClassic.cameraPos = CGPoint(x: 4210, y: 4000)
             boxClassic.zoom = OriginalGameplay.calculateZoom(totalRadius: pCellEmote.cachedSolidRadius, cellCount: 1, viewportSize: phoneSize)
             boxClassic.showBoundaryOverlay = false
             boxClassic.playerCells = [pCellEmote]
@@ -322,6 +344,25 @@ final class AgarParityTests: XCTestCase {
             try saveSnapshot(soloImg, name: "06_Arena_Solo_Boundary.png")
             XCTAssertTrue(hasRedBoundaryPixels(soloImg), "Solo arena boundary overlay should render crimson border")
         }
+    }
+
+    private func hasColorVariance(_ image: UIImage) -> Bool {
+        guard let cg = image.cgImage,
+              let dp = cg.dataProvider,
+              let data = dp.data,
+              let ptr = CFDataGetBytePtr(data) else { return false }
+        let bpp = cg.bitsPerPixel / 8
+        let len = CFDataGetLength(data)
+        guard bpp >= 4, len >= 4 else { return false }
+        let r0 = ptr[0], g0 = ptr[1], b0 = ptr[2]
+        var i = bpp * 8
+        while i + 3 < len {
+            if abs(Int(ptr[i]) - Int(r0)) > 8 || abs(Int(ptr[i + 1]) - Int(g0)) > 8 || abs(Int(ptr[i + 2]) - Int(b0)) > 8 {
+                return true
+            }
+            i += bpp * 16
+        }
+        return false
     }
 
     private func hasRedBoundaryPixels(_ image: UIImage) -> Bool {
