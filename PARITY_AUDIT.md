@@ -20,6 +20,12 @@ Inside `drawCustom` (`0x1003a4654`):
 | 7 | Name label child z=1 | child node | `drawNameAndBadge` | in order |
 | 8 | Mass label child z=2 | child node | `drawMassNumber` after name | fixed |
 
+Virus cells reuse passes 1 and 2 with `calculateVirusEdgeRadiusDelta` (`0x1003a49fc`):
+`delta = radius * virusEdgeRadiusMultiplier + 5`, added to alternating vertices. The outline
+therefore draws at `r + delta + 10` and the inner fill at `r + delta + 5`. The Swift virus
+branch now uses offsets `+10` / `+5`; it previously used `+5` / `-5`, shrinking every virus
+by 5-10 world points outside the spike tips.
+
 Skin UVs now use the decompiled `vertex/(2r)+0.5` formula (`calcTexCoordsInto`, `0x1003a5354`):
 `uvScale = 1/baseRadiusWorld`, removing the old `(5/r)+1` scale that sampled outside the skin and relied on `clampToEdge`.
 

@@ -881,16 +881,19 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 // SoftBodyCellView::calculateVirusEdgeRadiusDelta (0x1003a49fc)
                 let spikeDelta = rW * Float(OriginalGameplay.virusEdgeRadiusMultiplier) + 5.0
                 if v.deformedVertices.count >= 8 {
+                    // calculateVirusEdgeRadiusDelta stores r*0.02 + 5; the outline then
+                    // scales by (r+10)/r and the inner fill by (r+5)/r, exactly like
+                    // drawOutlineWithVertices does for normal cells.
                     appendDeformedFan(cx: sx, cy: sy, verts: v.deformedVertices, zoomPx: zoomPx,
-                                      radiusOffsetWorld: 5.0, isVirus: true, virusSpikeDeltaWorld: spikeDelta, color: borderColVirus)
+                                      radiusOffsetWorld: 10.0, isVirus: true, virusSpikeDeltaWorld: spikeDelta, color: borderColVirus)
                     appendDeformedFan(cx: sx, cy: sy, verts: v.deformedVertices, zoomPx: zoomPx,
-                                      radiusOffsetWorld: -5.0, isVirus: true, virusSpikeDeltaWorld: spikeDelta, color: fillColVirus)
+                                      radiusOffsetWorld: 5.0, isVirus: true, virusSpikeDeltaWorld: spikeDelta, color: fillColVirus)
                 } else {
                     let vCount = min(120, max(30, (2 * Int(floor(max(1, rW * cocosZoom)))) & ~1))
                     appendVirusFan(cx: sx, cy: sy, radiusWorld: rW, zoomPx: zoomPx, pointCount: vCount,
-                                   radiusOffsetWorld: 5.0, spikeDeltaWorld: spikeDelta, color: borderColVirus)
+                                   radiusOffsetWorld: 10.0, spikeDeltaWorld: spikeDelta, color: borderColVirus)
                     appendVirusFan(cx: sx, cy: sy, radiusWorld: rW, zoomPx: zoomPx, pointCount: vCount,
-                                   radiusOffsetWorld: -5.0, spikeDeltaWorld: spikeDelta, color: fillColVirus)
+                                   radiusOffsetWorld: 5.0, spikeDeltaWorld: spikeDelta, color: fillColVirus)
                 }
                 flushSolid(enc: enc, viewportSize: vpPx)
 
