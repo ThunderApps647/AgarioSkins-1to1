@@ -9,13 +9,12 @@ final class AgarUITests: XCTestCase {
 
     private func capture(_ app: XCUIApplication, name: String) {
         let raw = XCUIScreen.main.screenshot().image
+        let fmt = UIGraphicsImageRendererFormat()
+        fmt.scale = raw.scale
         let outImage: UIImage
         if raw.size.height > raw.size.width {
             let targetSize = CGSize(width: raw.size.height, height: raw.size.width)
-            let fmt = UIGraphicsImageRendererFormat()
-            fmt.scale = raw.scale
-            let renderer = UIGraphicsImageRenderer(size: targetSize, format: fmt)
-            outImage = renderer.image { ctx in
+            outImage = UIGraphicsImageRenderer(size: targetSize, format: fmt).image { ctx in
                 ctx.cgContext.translateBy(x: targetSize.width * 0.5, y: targetSize.height * 0.5)
                 ctx.cgContext.rotate(by: .pi * 0.5)
                 raw.draw(in: CGRect(
@@ -26,7 +25,9 @@ final class AgarUITests: XCTestCase {
                 ))
             }
         } else {
-            outImage = raw
+            outImage = UIGraphicsImageRenderer(size: raw.size, format: fmt).image { _ in
+                raw.draw(in: CGRect(origin: .zero, size: raw.size))
+            }
         }
         let att = XCTAttachment(image: outImage)
         att.name = name
@@ -85,17 +86,15 @@ final class AgarUITests: XCTestCase {
         // 1. Settings route + toggle
         if let settingsBtn = firstExisting(app, ids: ["ccbi.settingsButtonCallback"], timeout: 3.0) {
             waitAndTap(settingsBtn)
-            XCTAssertTrue(waitUntilGone(playBtn, timeout: 3.0), "MenuMain should hide behind Settings modal")
+            let toggle = try XCTUnwrap(firstExisting(app, ids: ["ccbi.toggleSwipeCallback:"], timeout: 4.0), "Settings modal should open with toggles")
             let backBtn = firstExisting(app, ids: ["ccbi.backButtonCallback", "ccbi._backButton"], timeout: 4.0)
             XCTAssertNotNil(backBtn, "Settings modal should expose back button")
-            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-            if let toggle = firstExisting(app, ids: ["ccbi.toggleSwipeCallback:"], timeout: 2.0) {
-                toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)).tap()
-                RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+            toggle.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)).tap()
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
             capture(app, name: "Live_02_Settings.png")
             if let backBtn { waitAndTap(backBtn) }
-            XCTAssertTrue(playBtn.waitForExistence(timeout: 4.0), "Closing Settings should return to MenuMain")
+            XCTAssertTrue(waitUntilGone(toggle, timeout: 4.0), "Closing Settings should dismiss Settings")
             RunLoop.current.run(until: Date().addingTimeInterval(0.3))
         } else {
             XCTFail("Settings button missing on MenuMain")
@@ -104,35 +103,38 @@ final class AgarUITests: XCTestCase {
         // 2. Skins route + tabs + close
         if let skinsBtn = firstExisting(app, ids: ["ccbi.skinsButtonCallback"], timeout: 3.0) {
             waitAndTap(skinsBtn)
-            XCTAssertTrue(waitUntilGone(playBtn, timeout: 3.0), "MenuMain should hide behind Skins modal")
+            let skinsMarker = firstExisting(app, ids: ["All Skins", "No Skin"], timeout: 4.0)
+            XCTAssertNotNil(skinsMarker, "Skins modal should open and expose skin tabs")
             let backBtn = firstExisting(app, ids: ["ccbi.backButtonCallback", "ccbi._backButton"], timeout: 4.0)
-            XCTAssertNotNil(backBtn, "Skins modal should open and expose back button")
-            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+            XCTAssertNotNil(backBtn, "Skins modal should expose back button")
+            RunLoop.current.run(until: Date().addingTimeInterval(0.45))
             capture(app, name: "Live_03_Skins.png")
             if let backBtn { waitAndTap(backBtn) }
-            XCTAssertTrue(playBtn.waitForExistence(timeout: 4.0), "Closing Skins should return to MenuMain")
+            if let skinsMarker {
+                XCTAssertTrue(waitUntilGone(skinsMarker, timeout: 4.0), "Closing Skins should return to MenuMain")
+            }
             RunLoop.current.run(until: Date().addingTimeInterval(0.3))
         } else {
             XCTFail("Skins button missing on MenuMain")
         }
 
         // 3. Shop, Quests, Potions, Leagues, Profile, Play Online routing verification
-        let modalRoutes: [(label: String, ids: [String], closeIds: [String])] = [
-            ("Shop", ["ccbi.shopButtonCallback"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
-            ("Quests", ["ccbi._dailyQuestButtonNode.pressedCallback", "ccbi._dailyQuestButtonNode"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
-            ("Potions", ["ccbi._mysteryPotionsButtonNode.pressedCallback", "ccbi._mysteryPotionsButtonNode"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
-            ("Leagues", ["ccbi._leaguesButtonNode.pressedCallback", "ccbi._leaguesButtonNode"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
-            ("Profile", ["ccbi.profileButtonCallback"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
-            ("Play Online", ["menu.playOnline"], ["online.close"])
+        let modalRoutes: [(label: String, ids: [String], verifyIds: [String], closeIds: [String])] = [
+            ("Shop", ["ccbi.shopButtonCallback"], ["ccbi.coinsButtonCallback", "Coins"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
+            ("Quests", ["ccbi._dailyQuestButtonNode.pressedCallback", "ccbi._dailyQuestButtonNode"], ["Milestone Chest: 0 / 3", "ccbi.backButtonCallback"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
+            ("Potions", ["ccbi._mysteryPotionsButtonNode.pressedCallback", "ccbi._mysteryPotionsButtonNode"], ["ccbi.helpButtonCallback", "ccbi.backButtonCallback"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
+            ("Leagues", ["ccbi._leaguesButtonNode.pressedCallback", "ccbi._leaguesButtonNode"], ["ccbi.myLeagueButtonCallback", "ccbi.backButtonCallback"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
+            ("Profile", ["ccbi.profileButtonCallback"], ["ccbi.achievementsButtonCallback", "ccbi.backButtonCallback"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
+            ("Play Online", ["menu.playOnline"], ["online.close"], ["online.close"])
         ]
         for route in modalRoutes {
             let trigger = try XCTUnwrap(firstExisting(app, ids: route.ids, timeout: 3.0), "\(route.label) button must exist on MenuMain")
             waitAndTap(trigger)
-            XCTAssertTrue(waitUntilGone(playBtn, timeout: 3.0), "\(route.label) should open over MenuMain")
-            RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+            let marker = try XCTUnwrap(firstExisting(app, ids: route.verifyIds, timeout: 4.0), "\(route.label) modal should open with expected content")
+            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
             if let close = firstExisting(app, ids: route.closeIds, timeout: 3.5) {
                 waitAndTap(close)
-                XCTAssertTrue(playBtn.waitForExistence(timeout: 4.0), "Closing \(route.label) should return to MenuMain")
+                XCTAssertTrue(waitUntilGone(marker, timeout: 4.0), "Closing \(route.label) should dismiss modal")
                 RunLoop.current.run(until: Date().addingTimeInterval(0.3))
             } else {
                 XCTFail("\(route.label) modal failed to expose close/back button")

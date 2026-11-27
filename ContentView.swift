@@ -13620,6 +13620,7 @@ struct MainMenu: View {
                 )
                 .padding(.horizontal, sideInset)
                 .allowsHitTesting(!hasModalOverlay)
+                .accessibilityElement(children: hasModalOverlay ? .ignore : .contain)
                 .accessibilityHidden(hasModalOverlay)
                 .zIndex(1)
 
