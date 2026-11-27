@@ -133,6 +133,9 @@ final class AgarUITests: XCTestCase {
             waitAndTap(trigger)
             let marker = try XCTUnwrap(firstExisting(app, ids: route.verifyIds, timeout: 4.0), "\(route.label) modal should open with expected content")
             RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+            if route.label == "Potions" {
+                capture(app, name: "Live_02b_Potions.png")
+            }
             if let close = firstExisting(app, ids: route.closeIds, timeout: 3.5) {
                 waitAndTap(close)
                 XCTAssertTrue(waitUntilGone(marker, timeout: 4.0), "Closing \(route.label) should dismiss modal")

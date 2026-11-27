@@ -364,6 +364,10 @@ final class AgarParityTests: XCTestCase {
         for fontName in requiredFonts {
             XCTAssertNotNil(UIFont(name: fontName, size: 16), "Font '\(fontName)' failed to resolve via UIFont(name:size:)")
         }
+        XCTAssertEqual(MyFont.normalizedPostScriptName(for: "Fonts/Bundle/Lato-Regular.ttf"), "Lato-Regular")
+        XCTAssertEqual(MyFont.normalizedPostScriptName(for: ""), "Helvetica")
+        XCTAssertNotEqual(MyFont.uiFont(named: "Lato-Regular.ttf", size: 14).fontName, "OpenSans-Bold")
+        XCTAssertTrue(MyFont.uiFont(named: "Lato-Regular.ttf", size: 14).fontName.contains("Lato"))
     }
 
     // MARK: - Pillar 4A: All 23 Disassembled CCBI Easing Curves
@@ -833,5 +837,54 @@ final class AgarParityTests: XCTestCase {
         let expectedMass = 10000.0 * pow(rate, 2.0 * 50.0 * 0.02)
         let actualMass = Double(AgarPhysicsCore.applyOfflineMassDecay(mass: 10000, isPlayer: true, dt: 0.02))
         XCTAssertEqual(actualMass, expectedMass, accuracy: 1e-4)
+
+        // Verify AppDelegate iPad FixedWidth 768 vs iPhone FixedHeight 320 UI scale & resourceScaleFactor
+        XCTAssertEqual(Double(OriginalGameplay.uiScale(for: CGSize(width: 1024, height: 768), isPhoneOverride: false)), 1024.0 / 768.0, accuracy: tol)
+        XCTAssertEqual(Double(OriginalGameplay.uiScale(for: CGSize(width: 852, height: 393), isPhoneOverride: true)), 393.0 / 320.0, accuracy: tol)
+        XCTAssertEqual(Double(OriginalGameplay.resourceScaleFactor(isPhoneOverride: true)), 0.46875, accuracy: tol)
+        XCTAssertEqual(Double(OriginalGameplay.resourceScaleFactor(isPhoneOverride: false)), 1.0, accuracy: tol)
+    }
+
+    func testVirusPopWallSplitAndAudioParity() throws {
+        // 1. Recursive virus-pop mass split handles non-power-of-2 caps (e.g. 12 remaining slots)
+        let pieces12 = AgarPhysicsCore.calculateVirusSplitMass(mass: 1000.0, maxSplits: 12)
+        XCTAssertEqual(pieces12.count, 12)
+        XCTAssertEqual(pieces12.reduce(0, +), 1000.0, accuracy: 1e-6)
+        XCTAssertGreaterThanOrEqual(pieces12.last ?? 0, OriginalGameplay.minSplitMass)
+
+        // 2. Wall split squash clamp at all 8 angles uses 0.4 * r (percentageOfCellToSquash)
+        let ws = OriginalGameplay.offlineArenaSideLength
+        let r: CGFloat = 120.0
+        for k in 0..<8 {
+            let a = CGFloat(k) * (.pi / 4.0)
+            let raw = CGPoint(x: (cos(a) >= 0 ? ws : 0) + cos(a) * 100.0,
+                              y: (sin(a) >= 0 ? ws : 0) + sin(a) * 100.0)
+            let clamped = AgarPhysicsCore.clampSquashPosition(raw, radius: r, worldSize: ws)
+            let minMargin = r * OriginalGameplay.percentageOfCellToSquash
+            XCTAssertGreaterThanOrEqual(clamped.x, minMargin - 1e-4)
+            XCTAssertLessThanOrEqual(clamped.x, ws - minMargin + 1e-4)
+            XCTAssertGreaterThanOrEqual(clamped.y, minMargin - 1e-4)
+            XCTAssertLessThanOrEqual(clamped.y, ws - minMargin + 1e-4)
+        }
+
+        // 3. Soft-body virus deformation runs and preserves deformed vertices across zoom changes
+        var viruses = [Virus(position: CGPoint(x: 40, y: 4000))]
+        let vis = CGRect(x: 0, y: 3600, width: 800, height: 800)
+        for _ in 0..<5 {
+            AgarPhysicsCore.deformViruses(viruses: &viruses, visibleWorldRect: vis, worldSize: ws, dt: 1.0 / 60.0, cocosZoom: 0.40)
+        }
+        let prevCount = viruses[0].deformedVertices.count
+        XCTAssertGreaterThanOrEqual(prevCount, 30)
+        AgarPhysicsCore.deformViruses(viruses: &viruses, visibleWorldRect: vis, worldSize: ws, dt: 1.0 / 60.0, cocosZoom: 0.55)
+        XCTAssertGreaterThan(viruses[0].deformedVertices.count, prevCount)
+
+        // 4. SoundManager binary cooldowns, volumes, and pitch jitter
+        XCTAssertEqual(AgarSFX.split.binaryCooldownSec, 0.150, accuracy: 1e-6)
+        XCTAssertEqual(AgarSFX.shoot.binaryCooldownSec, 0.150, accuracy: 1e-6)
+        XCTAssertEqual(AgarSFX.menuClick.binaryCooldownSec, 0.200, accuracy: 1e-6)
+        XCTAssertEqual(AgarSFX.eatCell.binaryCooldownSec, 0.0, accuracy: 1e-6)
+        XCTAssertEqual(AgarSFX.menuClick.binaryVolume, 0.25, accuracy: 1e-6)
+        XCTAssertEqual(AgarSFX.split.binaryPitchJitter, 0.05, accuracy: 1e-6)
+        XCTAssertEqual(AgarSFX.virusPop.binaryPitchJitter, 0.20, accuracy: 1e-6)
     }
 }

@@ -532,8 +532,7 @@ final class TextSpriteCache {
     static let badgeStrokeColor = UIColor(red: 0x80 / 255.0, green: 0x68 / 255.0, blue: 0x18 / 255.0, alpha: 1.0)
     
     private func font(_ size: CGFloat) -> UIFont {
-        return UIFont(name: "OpenSans-Bold", size: size)
-            ?? UIFont.systemFont(ofSize: size, weight: .bold)
+        MyFont.requireCustomFont(named: "OpenSans-Bold", size: size)
     }
     
     private func rasterize(_ string: String, tile: CGSize?,
@@ -1758,14 +1757,15 @@ class FoodManager: ObservableObject {
         let maxY = Int(ceil(viewport.maxY / gridSize))
         
         let step = max(1, everyNth)
-        var seen = 0
         var drawn = 0
         for x in gridRange(minX, maxX) {
             for y in gridRange(minY, maxY) {
                 if let bucket = grid[GridKey(x: x, y: y)] {
                     for food in bucket {
-                        seen += 1
-                        if step > 1 && seen % step != 0 { continue }
+                        if step > 1 {
+                            let h = Int(truncatingIfNeeded: (Int(food.position.x) &* 73856093) ^ (Int(food.position.y) &* 19349663))
+                            if abs(h) % step != 0 { continue }
+                        }
                         action(food)
                         drawn += 1
                         if drawn >= limit { return }
@@ -2008,6 +2008,9 @@ struct Virus: Identifiable {
     var fedMass: CGFloat = 0
     let splitThreshold: CGFloat = CGFloat(OriginalGameplay.mass(forRadius: OriginalGameplay.virusSplitRadius)) - 2
     var velocity: CGSize = .zero
+    var deformedVertices: [CGPoint] = []
+    var vertexDisplacements: [CGFloat] = []
+    var vertexRadii: [CGFloat] = []
     
     var radius: CGFloat {
         return OriginalGameplay.radius(forMass: mass)
@@ -4672,8 +4675,8 @@ struct ContentView: View {
     
     @State private var isFeedingHeld: Bool = false
     @State private var feedHoldStartTime: Date? = nil
-    private let feedHoldThreshold: TimeInterval = 1.4
-    private let spamFeedInterval: TimeInterval = 0.076
+    private let feedHoldThreshold: TimeInterval = 2.0
+    private let spamFeedInterval: TimeInterval = 0.060
     @State private var lastSpamFeedTime: TimeInterval = 0.0
     @State private var feedButtonScale: CGFloat = 1.0
     
@@ -5106,18 +5109,18 @@ struct ContentView: View {
                 }
                 
                 if isPlaying && isGameOverPresented {
-                    MatchResultsModalView(
+                    ContinueGameModalView(
                         highScore: highScore,
                         tokensCollected: tokenCount,
                         survivalSeconds: matchSurvivalSeconds,
-                        onPlayAgain: {
+                        onContinue: {
                             isGameOverPresented = false
-        isDeathSequencePending = false
+                            isDeathSequencePending = false
                             spawnInitialObjects()
                         },
-                        onMainMenu: {
+                        onCloseToMenu: {
                             isGameOverPresented = false
-        isDeathSequencePending = false
+                            isDeathSequencePending = false
                             exitMatchToMainMenu()
                         }
                     )
@@ -6014,10 +6017,10 @@ struct ContentView: View {
         let travelAngle = baseAngle + Double.random(in: -OriginalGameplay.directionAngleVariation...OriginalGameplay.directionAngleVariation)
         let travelDirection = CGSize(width: CGFloat(cos(travelAngle)),
                                      height: CGFloat(sin(travelAngle))).normalized()
-        let edgeDistance = max(0, cell.cachedSolidRadius - OriginalGameplay.shotMassBaseRadiusCGFloat)
+        let edgeDistance = cell.cachedSolidRadius - 2.0 * OriginalGameplay.shotMassBaseRadiusCGFloat
         let startPosition = CGPoint(
-            x: cell.position.x + travelDirection.width * edgeDistance,
-            y: cell.position.y + travelDirection.height * edgeDistance
+            x: cell.position.x + baseDirection.width * edgeDistance,
+            y: cell.position.y + baseDirection.height * edgeDistance
         )
         let speedVariation = Double.random(in: (1.0 - OriginalGameplay.spawnFoodVelocityVariation)...(1.0 + OriginalGameplay.spawnFoodVelocityVariation))
         let initialSpeed = CGFloat(OriginalGameplay.ejectImpulsePerSecond * speedVariation * min(1.6, max(0.30, distanceScale)))
@@ -10556,12 +10559,7 @@ struct ContentView: View {
                 var spawnPos = cells[index].position
                 spawnPos.x += launchDirection.width * spawnOffset
                 spawnPos.y += launchDirection.height * spawnOffset
-                
-                let physicsRadius = visualRadius
-                if spawnPos.x < physicsRadius { spawnPos.x = physicsRadius }
-                if spawnPos.x > worldSize - physicsRadius { spawnPos.x = worldSize - physicsRadius }
-                if spawnPos.y < physicsRadius { spawnPos.y = physicsRadius }
-                if spawnPos.y > worldSize - physicsRadius { spawnPos.y = worldSize - physicsRadius }
+                spawnPos = AgarPhysicsCore.clampSquashPosition(spawnPos, radius: visualRadius, worldSize: worldSize)
                 
                 var newCell = PlayerCell(
                     ownerID: cells[index].ownerID,
@@ -10609,7 +10607,7 @@ struct ContentView: View {
             // in place, so no old/default heading leaks through the pause transition.
             playerLastSplitDirection = .zero
             playerSplitTargetID = nil
-            SoundManager.shared.play(.split, minInterval: 0.005)
+            SoundManager.shared.playBinary(.split)
             executeSplit(
                 on: &playerCells,
                 for: pCell.ownerID,
@@ -10631,7 +10629,7 @@ struct ContentView: View {
                 splitDirection = directionToCenter.normalized()
             }
         }
-        SoundManager.shared.play(.split, minInterval: 0.005)
+        SoundManager.shared.playBinary(.split)
         recordPlayerSplitIntent(direction: splitDirection, now: CACurrentMediaTime())
         executeSplit(on: &playerCells, for: pCell.ownerID, direction: splitDirection)
     }
@@ -10650,12 +10648,20 @@ struct ContentView: View {
         )
         AgarPhysicsCore.deformVertices(
             cells: &botCells,
-            neighborsByOwner: false,
+            neighborsByOwner: true,
             visibleWorldRect: visibleWorldRect,
             worldSize: worldSize,
             dt: dt,
             cocosZoom: cocosZoom,
-            massManager: nil
+            massManager: massManager
+        )
+        AgarPhysicsCore.deformViruses(
+            viruses: &viruses,
+            visibleWorldRect: visibleWorldRect,
+            worldSize: worldSize,
+            dt: dt,
+            cocosZoom: cocosZoom,
+            massManager: massManager
         )
     }
     
@@ -10843,8 +10849,7 @@ struct ContentView: View {
                     var spawn = botCells[action.cellIndex].position
                     spawn.x += direction.width * spawnOffset
                     spawn.y += direction.height * spawnOffset
-                    spawn.x = min(worldSize - childRadius, max(childRadius, spawn.x))
-                    spawn.y = min(worldSize - childRadius, max(childRadius, spawn.y))
+                    spawn = AgarPhysicsCore.clampSquashPosition(spawn, radius: childRadius, worldSize: worldSize)
                     var newCell = PlayerCell(
                         ownerID: botCells[action.cellIndex].ownerID,
                         position: spawn,
@@ -10869,12 +10874,12 @@ struct ContentView: View {
                     newCell.aiCaution = botCells[action.cellIndex].aiCaution
                     let impulseScale = CGFloat.random(in: 0.85...1.15)
                     newCell.velocity.width += direction.width * impulse * impulseScale
-                    newCell.velocity.height += direction.height * impulseScale * impulse
+                    newCell.velocity.height += direction.height * impulse * impulseScale
                     botCells.append(newCell)
                 }
             } else {
                 guard action.cellIndex < playerCells.count else { continue }
-                SoundManager.shared.play(.virusPop, minInterval: 0.06)
+                SoundManager.shared.playBinary(.virusPop)
                 let poppedHalvesFont = playerCells[action.cellIndex].targetMass + CGFloat(OriginalGameplay.virusBaseMass) >= massFontHalfThreshold
                 let parentVelocity = playerCells[action.cellIndex].velocity
                 playerCells[action.cellIndex].mass = pieceMass
@@ -10894,8 +10899,7 @@ struct ContentView: View {
                     var spawn = playerCells[action.cellIndex].position
                     spawn.x += direction.width * spawnOffset
                     spawn.y += direction.height * spawnOffset
-                    spawn.x = min(worldSize - childRadius, max(childRadius, spawn.x))
-                    spawn.y = min(worldSize - childRadius, max(childRadius, spawn.y))
+                    spawn = AgarPhysicsCore.clampSquashPosition(spawn, radius: childRadius, worldSize: worldSize)
                     var newCell = PlayerCell(
                         ownerID: playerCells[action.cellIndex].ownerID,
                         position: spawn,
@@ -11193,7 +11197,7 @@ struct ContentView: View {
             }
         }
         if didEject {
-            SoundManager.shared.play(.shoot, minInterval: 0.060)
+            SoundManager.shared.playBinary(.shoot)
         }
     }
     
@@ -11396,19 +11400,7 @@ struct ContentView: View {
     /// whose last parent can still split (radius >= minRadiusToSplit) and whose
     /// owner stays under the 16-cell cap. Every final piece has equal mass.
     private func calculateVirusSplitMass(mass: CGFloat, maxSplits: Int) -> [CGFloat] {
-        guard mass > 0, maxSplits >= 2 else { return [mass] }
-        let cap = min(maxSplits, 16)
-        let minSplitMass = CGFloat(OriginalGameplay.minSplitMass)
-        var pieces: [CGFloat] = [mass]
-        while pieces.count < cap {
-            guard let maxIdx = pieces.indices.max(by: { pieces[$0] < pieces[$1] }),
-                  pieces[maxIdx] >= minSplitMass else { break }
-            let half = pieces[maxIdx] * 0.5
-            pieces[maxIdx] = half
-            pieces.append(half)
-        }
-        pieces.sort(by: >)
-        return pieces
+        AgarPhysicsCore.calculateVirusSplitMass(mass: mass, maxSplits: maxSplits)
     }
     
     private func pause() {
@@ -12011,8 +12003,7 @@ struct LeaderboardHUDButton: View {
 
     private func fittedRowText(_ full: String, maxWidth: CGFloat) -> String {
         guard maxWidth > 0 else { return full }
-        let font = UIFont(name: "OpenSans-Bold", size: rowFontSize)
-            ?? UIFont.systemFont(ofSize: rowFontSize, weight: .bold)
+        let font = MyFont.requireCustomFont(named: "OpenSans-Bold", size: rowFontSize)
         func width(_ s: String) -> CGFloat {
             (s as NSString).size(withAttributes: [.font: font]).width
         }
@@ -12194,10 +12185,11 @@ struct ActionButtonsHUD: View, Equatable {
     let onMacroUp: () -> Void
     let onFeedDown: () -> Void
     let onFeedUp: () -> Void
-    
+
     @State private var macroPressed = false
     @State private var feedPressed = false
-    
+    @State private var feedSequencePlayID = 0
+
     static func == (lhs: ActionButtonsHUD, rhs: ActionButtonsHUD) -> Bool {
         return lhs.canSplit == rhs.canSplit
         && lhs.canFeed == rhs.canFeed
@@ -12206,7 +12198,7 @@ struct ActionButtonsHUD: View, Equatable {
         && lhs.macroButtonScale == rhs.macroButtonScale
         && lhs.controlLayout == rhs.controlLayout
     }
-    
+
     var body: some View {
         // Controls-Left.ccbi / Controls-Sides.ccbi / Controls-Right.ccbi (65x65 * uiScale slots)
         GeometryReader { geometry in
@@ -12228,75 +12220,29 @@ struct ActionButtonsHUD: View, Equatable {
             }()
             let shootCenterY = geometry.size.height * 0.875
 
-            let bgSprite = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/spritesheets/Bundle/All/ingameUI/splitshot_bg.png")?.image
-            let splitIcon = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/spritesheets/Bundle/All/ingameUI/split.png")?.image
-            let shotIcon = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/spritesheets/Bundle/All/ingameUI/shot.png")?.image
-
-            let splitSlot = AnyView(
-                ZStack {
-                    Group {
-                        if let bgSprite {
-                            Image(uiImage: bgSprite).resizable().aspectRatio(contentMode: .fit)
-                        } else {
-                            Image("hud-splitshot-bg").resizable().aspectRatio(contentMode: .fit)
-                        }
-                    }
+            let splitHitOverlay = AnyView(
+                ImmediatePressSurface(onDown: { if canSplit { onSplit() } }, onUp: {})
                     .frame(width: buttonSide, height: buttonSide)
-                    Group {
-                        if let splitIcon {
-                            Image(uiImage: splitIcon).resizable().aspectRatio(contentMode: .fit)
-                        } else {
-                            Image("hud-split").resizable().aspectRatio(contentMode: .fit)
-                        }
-                    }
-                    .frame(width: buttonSide * 0.56, height: buttonSide * 0.56)
-                }
-                .overlay(
-                    ImmediatePressSurface(onDown: { if canSplit { onSplit() } }, onUp: {})
-                )
-                .allowsHitTesting(canSplit)
-                .accessibilityLabel("Split cell")
-                .accessibilityIdentifier("hud.split")
-                .accessibilityAddTraits(.isButton)
+                    .allowsHitTesting(canSplit)
+                    .accessibilityLabel("Split cell")
+                    .accessibilityIdentifier("hud.split")
+                    .accessibilityAddTraits(.isButton)
             )
 
-            let ejectSlot = AnyView(
-                ZStack {
-                    Group {
-                        if let bgSprite {
-                            Image(uiImage: bgSprite).resizable().aspectRatio(contentMode: .fit)
-                        } else {
-                            Image("hud-splitshot-bg").resizable().aspectRatio(contentMode: .fit)
-                        }
+            let shootHitOverlay = AnyView(
+                ImmediatePressSurface(
+                    onDown: {
+                        feedPressed = true
+                        feedSequencePlayID += 1
+                        onFeedDown()
+                    },
+                    onUp: {
+                        feedPressed = false
+                        feedSequencePlayID += 1
+                        onFeedUp()
                     }
-                    .frame(width: buttonSide, height: buttonSide)
-                    Group {
-                        if let shotIcon {
-                            Image(uiImage: shotIcon).resizable().aspectRatio(contentMode: .fit)
-                        } else {
-                            Image("hud-shot").resizable().aspectRatio(contentMode: .fit)
-                        }
-                    }
-                    .frame(width: buttonSide * 0.56, height: buttonSide * 0.56)
-
-                    Circle()
-                        .fill(Color.black.opacity(0.15))
-                        .frame(width: buttonSide, height: buttonSide)
-                        .scaleEffect(isFeedingHeld ? 1.4 : 0.0)
-                        .clipShape(Circle())
-                        .opacity(isFeedingHeld ? 1.0 : 0.0)
-                        .animation(
-                            isFeedingHeld
-                            ? .easeIn(duration: feedHoldThreshold)
-                            : .easeOut(duration: 0.1),
-                            value: isFeedingHeld
-                        )
-                }
-                .scaleEffect(feedButtonScale)
-                .overlay(
-                    ImmediatePressSurface(onDown: { feedPressed = true; onFeedDown() },
-                                          onUp: { feedPressed = false; onFeedUp() })
                 )
+                .frame(width: buttonSide, height: buttonSide)
                 .allowsHitTesting(canFeed)
                 .accessibilityLabel("Eject mass")
                 .accessibilityIdentifier("hud.feed")
@@ -12310,11 +12256,13 @@ struct ActionButtonsHUD: View, Equatable {
                     "_shootButton": canFeed ? (feedPressed ? 0.60 : 1.0) : 0.50,
                     "_alternativeShootButton": canFeed ? (feedPressed ? 0.60 : 1.0) : 0.50
                 ],
-                replacingSlotViews: [
-                    "_splitButton": splitSlot,
-                    "_alternativeSplitButton": splitSlot,
-                    "_shootButton": ejectSlot,
-                    "_alternativeShootButton": ejectSlot
+                activeSequenceName: isFeedingHeld ? "Fill" : "Default Timeline",
+                sequencePlayID: feedSequencePlayID,
+                slotViews: [
+                    "_splitButton": splitHitOverlay,
+                    "_alternativeSplitButton": splitHitOverlay,
+                    "_shootButton": shootHitOverlay,
+                    "_alternativeShootButton": shootHitOverlay
                 ],
                 designScaleModifier: { _ in s }
             )
@@ -12422,70 +12370,45 @@ struct EmojiWidgetHUD: View, Equatable {
         GeometryReader { geometry in
             let s = OriginalGameplay.uiScale(for: geometry.size)
             let btnSide = 39.1724 * s
-            let pad = 5.1094 * s
-            let leadPad = max(0, geometry.safeAreaInsets.leading) + pad
-            let topPad = max(0, geometry.safeAreaInsets.top) + 49.3912 * s
-            let iconSprite = CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/spritesheets/Bundle/All/ingameUI/Icon_Emoji.png")?.image
-            let hudBtnMcfs = CCBIAtlasStore.shared.mcfs(for: "FramedSprites/Bundle/MCFS_hud_button.plist")
-            let trayMcfs = CCBIAtlasStore.shared.mcfs(for: "FramedSprites/Bundle/MCFS_leaderboard_content_float.plist")
+            let leadInset = max(0, geometry.safeAreaInsets.leading - 4)
+            let topInset = max(0, geometry.safeAreaInsets.top)
+            let sceneW = max(1, geometry.size.width - leadInset)
+            let sceneH = max(1, geometry.size.height - topInset)
+            let seqName: String? = isOpen ? "enter" : (toggleSeqID > 0 ? "leave" : "Default Timeline")
 
-            VStack(alignment: .leading, spacing: 2 * s) {
-                Button(action: onToggle) {
-                    ZStack {
-                        if let hudBtnMcfs {
-                            let pair = hudBtnMcfs.uiImageAndInsets(forUIScale: s)
-                            Image(uiImage: pair.0)
-                                .resizable(capInsets: pair.1, resizingMode: .stretch)
-                        } else {
-                            MCFSFrame(name: "mcfs-hud-button")
-                        }
-                        if let iconSprite {
-                            Image(uiImage: iconSprite)
+            let selectorList = AnyView(
+                VStack(spacing: 4 * s) {
+                    ForEach(emotes, id: \.self) { asset in
+                        Button(action: { onSelect(asset) }) {
+                            Image(asset)
                                 .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: btnSide * 0.68, height: btnSide * 0.68)
+                                .scaledToFill()
+                                .frame(width: btnSide * 0.72, height: btnSide * 0.72)
+                                .clipShape(Circle())
+                                .opacity(isOnCooldown ? 0.45 : 1.0)
                         }
+                        .buttonStyle(CCBIMenuItemButtonStyle())
+                        .disabled(isOnCooldown)
+                        .accessibilityIdentifier("hud.emote.\(asset)")
                     }
-                    .frame(width: btnSide, height: btnSide)
                 }
-                .buttonStyle(CCBIMenuItemButtonStyle())
-                .accessibilityIdentifier("ccbi.onToggle")
-                .accessibilityLabel("Emotes")
+                .padding(.vertical, 4 * s)
+            )
 
-                if isOpen {
-                    VStack(spacing: 4 * s) {
-                        ForEach(emotes, id: \.self) { asset in
-                            Button(action: { onSelect(asset) }) {
-                                Image(asset)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: btnSide * 0.72, height: btnSide * 0.72)
-                                    .clipShape(Circle())
-                                    .opacity(isOnCooldown ? 0.45 : 1.0)
-                            }
-                            .buttonStyle(CCBIMenuItemButtonStyle())
-                            .disabled(isOnCooldown)
-                            .accessibilityIdentifier("hud.emote.\(asset)")
-                        }
-                    }
-                    .padding(.vertical, 5 * s)
-                    .frame(width: btnSide)
-                    .background(
-                        Group {
-                            if let trayMcfs {
-                                let pair = trayMcfs.uiImageAndInsets(forUIScale: s)
-                                Image(uiImage: pair.0).resizable(capInsets: pair.1, resizingMode: .stretch)
-                            } else {
-                                MCFSFrame(name: "mcfs-leaderboard-content-float")
-                            }
-                        }
-                    )
-                    .transition(.opacity)
-                }
-            }
-            .padding(.leading, leadPad)
-            .padding(.top, topPad)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            CCBISceneView(
+                ccbFile: "EmojiWidget.ccbi",
+                context: CCBIBindingContext(
+                    actions: ["onToggle": onToggle],
+                    activeSequenceName: seqName,
+                    sequencePlayID: toggleSeqID,
+                    slotViews: ["_selector": selectorList],
+                    heightOverrides: ["_selectorArea": 76],
+                    designScaleModifier: { _ in s }
+                )
+            )
+            .frame(width: sceneW, height: sceneH)
+            .padding(.leading, leadInset)
+            .padding(.top, topInset)
         }
     }
 }
@@ -12647,8 +12570,7 @@ private struct ReliableNicknameField: UIViewRepresentable {
             attributes: [.foregroundColor: UIColor(white: 0.62, alpha: 1.0)]
         )
         field.textAlignment = .center
-        field.font = UIFont(name: "OpenSans-Bold", size: fontSize)
-            ?? UIFont.systemFont(ofSize: fontSize, weight: .bold)
+        field.font = MyFont.requireCustomFont(named: "OpenSans-Bold", size: fontSize)
         field.textColor = textColor
         field.tintColor = .systemBlue
         field.borderStyle = .none
@@ -12671,8 +12593,7 @@ private struct ReliableNicknameField: UIViewRepresentable {
         if field.text != text {
             field.text = text
         }
-        let targetFont = UIFont(name: "OpenSans-Bold", size: fontSize)
-            ?? UIFont.systemFont(ofSize: fontSize, weight: .bold)
+        let targetFont = MyFont.requireCustomFont(named: "OpenSans-Bold", size: fontSize)
         if field.font != targetFont {
             field.font = targetFont
         }
@@ -12742,8 +12663,7 @@ private struct ReliableLevelField: UIViewRepresentable {
                         for: .editingChanged)
         field.text = String(level)
         field.textAlignment = .center
-        field.font = UIFont(name: "OpenSans-Bold", size: 20)
-        ?? UIFont.systemFont(ofSize: 20, weight: .bold)
+        field.font = MyFont.requireCustomFont(named: "OpenSans-Bold", size: 20)
         field.textColor = .black
         field.tintColor = .systemBlue
         field.borderStyle = .none
@@ -13759,7 +13679,7 @@ struct MainMenu: View {
                         }
                         .zIndex(2)
                     default:
-                        infoModalOverlay(title: tab, scale: s, containerSize: geometry.size).zIndex(2)
+                        EmptyView()
                     }
                 }
 

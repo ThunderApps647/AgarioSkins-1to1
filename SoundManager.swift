@@ -30,6 +30,15 @@ enum AgarSFX: String, CaseIterable {
         default: return 1.0
         }
     }
+
+    /// Exact Mach-O pitch jitter (`a5` in `0x1000e670c` callers).
+    var binaryPitchJitter: Float {
+        switch self {
+        case .split, .shoot, .menuClick: return 0.05
+        case .eatCell, .eatOwnCell, .virusPop: return 0.20
+        case .gameOver: return 0.0
+        }
+    }
 }
 
 struct SoundEvent: Equatable {
@@ -55,6 +64,7 @@ final class SoundManager {
             var players: [AVAudioPlayer] = []
             for _ in 0..<poolSize {
                 if let p = try? AVAudioPlayer(contentsOf: url) {
+                    p.enableRate = true
                     p.prepareToPlay()
                     players.append(p)
                 }
@@ -75,7 +85,11 @@ final class SoundManager {
         return out
     }
 
-    func play(_ sfx: AgarSFX, minInterval: CFTimeInterval = 0.04) {
+    func play(_ sfx: AgarSFX) {
+        play(sfx, minInterval: sfx.binaryCooldownSec, volume: sfx.binaryVolume, simTime: nil, tick: 0)
+    }
+
+    func play(_ sfx: AgarSFX, minInterval: CFTimeInterval) {
         play(sfx, minInterval: minInterval, volume: sfx.binaryVolume, simTime: nil, tick: 0)
     }
 
@@ -101,6 +115,8 @@ final class SoundManager {
         guard let list = pools[sfx], !list.isEmpty else { return }
         let target = list.first(where: { !$0.isPlaying }) ?? list[0]
         target.volume = Float(volume)
+        let jitter = sfx.binaryPitchJitter
+        target.rate = jitter > 0 ? Float.random(in: (1.0 - jitter)...(1.0 + jitter)) : 1.0
         target.currentTime = 0
         target.play()
     }

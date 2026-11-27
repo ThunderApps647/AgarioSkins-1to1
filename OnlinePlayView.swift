@@ -99,7 +99,7 @@ struct ServerBrowserView: View {
 
                 Text("PLAY ONLINE")
                     .font(.custom("UbuntuSans-Bold", size: 28))
-                    .foregroundColor(.white).shadow(radius: 5)
+                    .foregroundColor(.white)
 
                 if !partyCode.isEmpty {
                     Text("Party \(partyCode) - party members who join the same server play together")
@@ -318,8 +318,8 @@ struct OnlineGameView: View {
     @State private var centerAimUntilCursorMoves = true
     @State private var isFeedingHeld = false
     @State private var feedHoldStartTime: Date? = nil
-    private let feedHoldThreshold: TimeInterval = 1.4
-    private let spamFeedInterval: TimeInterval = 0.076
+    private let feedHoldThreshold: TimeInterval = 2.0
+    private let spamFeedInterval: TimeInterval = 0.060
     @State private var lastSpamFeedTime: TimeInterval = 0
     @State private var feedButtonScale: CGFloat = 1.0
     @State private var isMacroHeld = false
@@ -686,7 +686,7 @@ struct OnlineGameView: View {
                          controlLayout: controlLayout,
                          onSplit: {
                              if canSplit() {
-                                 SoundManager.shared.play(.split, minInterval: 0.005)
+                                 SoundManager.shared.playBinary(.split)
                                  net.sendSplit()
                              }
                          },
@@ -810,34 +810,18 @@ struct OnlineGameView: View {
     }
 
     private var deathOverlay: some View {
-        ZStack {
-            Color.black.opacity(0.55).edgesIgnoringSafeArea(.all)
-            VStack(spacing: 18) {
-                Text("You were eaten!")
-                    .font(.custom("OpenSans-Bold", size: 26)).foregroundColor(.white)
-                Text("Score: \(highScore)")
-                    .font(.custom("OpenSans-Bold", size: 18)).foregroundColor(.white.opacity(0.85))
-                HStack(spacing: 14) {
-                    Button(action: {
-                        connectionPhase = .connecting
-                        net.sendRespawn()
-                    }) {
-                        Text("Respawn")
-                            .font(.custom("OpenSans-Bold", size: 18)).foregroundColor(.white)
-                            .padding(.horizontal, 28).padding(.vertical, 12)
-                            .background(Color.blue.cornerRadius(14))
-                    }
-                    Button(action: { leaveMatch() }) {
-                        Text("Leave")
-                            .font(.custom("OpenSans-Bold", size: 18)).foregroundColor(.white)
-                            .padding(.horizontal, 28).padding(.vertical, 12)
-                            .background(Color.red.opacity(0.85).cornerRadius(14))
-                    }
-                }
+        ContinueGameModalView(
+            highScore: highScore,
+            tokensCollected: 0,
+            survivalSeconds: 0,
+            onContinue: {
+                connectionPhase = .connecting
+                net.sendRespawn()
+            },
+            onCloseToMenu: {
+                leaveMatch()
             }
-            .padding(30)
-            .background(Color(white: 0.12).cornerRadius(20))
-        }
+        )
     }
 
     // MARK: session

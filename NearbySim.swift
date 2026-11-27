@@ -978,9 +978,8 @@ final class SrvWorld {
             var spawnPos = cells[index].position
             spawnPos.x += launchDirection.x * spawnOffset
             spawnPos.y += launchDirection.y * spawnOffset
-            let physicsRadius = visualRadius
-            spawnPos.x = min(ws - physicsRadius, max(physicsRadius, spawnPos.x))
-            spawnPos.y = min(ws - physicsRadius, max(physicsRadius, spawnPos.y))
+            spawnPos.x = AgarPhysicsCore.clampSquashCoordinate(spawnPos.x, radius: visualRadius, worldSize: ws)
+            spawnPos.y = AgarPhysicsCore.clampSquashCoordinate(spawnPos.y, radius: visualRadius, worldSize: ws)
 
             var newCell = SrvCell(id: newID(), ownerID: ownerID, position: spawnPos,
                                mass: newMass, targetMass: newMass,
@@ -1588,11 +1587,11 @@ final class SrvWorld {
         if cells[i].splitTimer > 0 {
             cells[i].splitTimer -= dt
         }
-        let hardPhysicsRadius = cells[i].cachedRadius
-        if cells[i].position.x < hardPhysicsRadius { cells[i].position.x = hardPhysicsRadius; cells[i].velocity.x = 0 }
-        else if cells[i].position.x > ws - hardPhysicsRadius { cells[i].position.x = ws - hardPhysicsRadius; cells[i].velocity.x = 0 }
-        if cells[i].position.y < hardPhysicsRadius { cells[i].position.y = hardPhysicsRadius; cells[i].velocity.y = 0 }
-        else if cells[i].position.y > ws - hardPhysicsRadius { cells[i].position.y = ws - hardPhysicsRadius; cells[i].velocity.y = 0 }
+        let radius = cells[i].cachedRadius
+        let clampedX = AgarPhysicsCore.clampSquashCoordinate(cells[i].position.x, radius: radius, worldSize: ws)
+        if clampedX != cells[i].position.x { cells[i].position.x = clampedX; cells[i].velocity.x = 0 }
+        let clampedY = AgarPhysicsCore.clampSquashCoordinate(cells[i].position.y, radius: radius, worldSize: ws)
+        if clampedY != cells[i].position.y { cells[i].position.y = clampedY; cells[i].velocity.y = 0 }
     }
 
     private func moveBots(dt: Double) {
@@ -1886,17 +1885,7 @@ final class SrvWorld {
     /// parent can still split (radius >= minRadiusToSplit) and whose owner stays
     /// under the 16-cell cap. Every final piece has equal mass.
     func calculateVirusSplitMass(mass: Double, maxSplits: Int) -> [Double] {
-        guard mass > 0, maxSplits >= 2 else { return [mass] }
-        var pieces = 1
-        var parentRadius = radiusForMass(mass)
-        let cap = min(maxSplits, 16)
-        while parentRadius >= OriginalGameplay.minRadiusToSplit,
-              pieces * 2 <= cap {
-            pieces *= 2
-            parentRadius /= 2.0.squareRoot()
-        }
-        guard pieces > 1 else { return [mass] }
-        return Array(repeating: mass / Double(pieces), count: pieces)
+        AgarPhysicsCore.calculateVirusSplitMass(mass: mass, maxSplits: maxSplits)
     }
 
     private func handleVirusCollisions(index: SrvCellIndex) {
@@ -1972,8 +1961,8 @@ final class SrvWorld {
                 var spawn = cells[cellIdx].position
                 spawn.x += direction.x * spawnOffset
                 spawn.y += direction.y * spawnOffset
-                spawn.x = min(ws - pieceRadius, max(pieceRadius, spawn.x))
-                spawn.y = min(ws - pieceRadius, max(pieceRadius, spawn.y))
+                spawn.x = AgarPhysicsCore.clampSquashCoordinate(spawn.x, radius: pieceRadius, worldSize: ws)
+                spawn.y = AgarPhysicsCore.clampSquashCoordinate(spawn.y, radius: pieceRadius, worldSize: ws)
                 var newCell = SrvCell(id: newID(), ownerID: cells[cellIdx].ownerID,
                                    position: spawn,
                                    mass: pieceMass, targetMass: pieceMass,

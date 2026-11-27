@@ -752,7 +752,9 @@ struct PotionsModalView: View {
         let tier = slot.tier
         let isReady = slot.isReady(now: nowTimestamp)
         let isBrewing = slot.isBrewing(now: nowTimestamp)
+        let anyOtherBrewing = potionStore.slots.contains { $0.id != slot.id && $0.isBrewing(now: nowTimestamp) }
         let isStored = (tier != nil && !isReady && !isBrewing)
+        let isBusy = isStored && anyOtherBrewing
         let isEmpty = (tier == nil)
         let rem = Int(ceil(slot.remainingSeconds(now: nowTimestamp)))
         let rushCost = slot.rushDNACost(now: nowTimestamp)
@@ -765,10 +767,10 @@ struct PotionsModalView: View {
 
         let vis: [String: Bool] = [
             "_emptyNode": isEmpty,
-            "_collectedNode": isStored,
+            "_collectedNode": isStored && !isBusy,
             "_brewingNode": isBrewing,
             "_readyNode": isReady,
-            "_busyNode": false,
+            "_busyNode": isBusy,
             "_ftueBackgroundNode": false,
             "_accelerateBrewingButton": false,
             "_doubleOpenReadyButton": false,
@@ -780,15 +782,28 @@ struct PotionsModalView: View {
             "_headerTimerLabel": timerString,
             "_brewingTimer": timerString,
             "_brewingNodeButtonLabel": "\(rushCost)",
+            "_busyNodeButtonLabel": "\(rushCost)",
             "_potionTypeLabel": tier?.rawValue ?? ""
         ]
 
         let slots: [String: AnyView] = tier != nil ? [
             "_potionParentNode": AnyView(
-                Image(tier!.iconAsset)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 56 * s, height: 70 * s)
+                CCBISceneView(
+                    ccbFile: "VisualPotion.ccbi",
+                    centerRoot: true,
+                    context: CCBIBindingContext(
+                        replacingSlotViews: [
+                            "_potionSprite": AnyView(
+                                Image(tier!.iconAsset)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 56 * s, height: 70 * s)
+                            )
+                        ],
+                        designScaleModifier: { _ in s }
+                    )
+                )
+                .frame(width: 64 * s, height: 74 * s)
             )
         ] : [:]
 
@@ -1171,12 +1186,12 @@ struct GiftsNewsModalView: View {
     }
 }
 
-struct MatchResultsModalView: View {
+struct ContinueGameModalView: View {
     let highScore: Int
     let tokensCollected: Int
     let survivalSeconds: Int
-    let onPlayAgain: () -> Void
-    let onMainMenu: () -> Void
+    let onContinue: () -> Void
+    let onCloseToMenu: () -> Void
 
     @State private var awardedTier: PotionTier? = nil
     @State private var checkedAward = false
@@ -1184,84 +1199,40 @@ struct MatchResultsModalView: View {
     var body: some View {
         GeometryReader { geometry in
             let s = OriginalGameplay.uiScale(for: geometry.size)
-            let timeStr = String(format: "%dm %02ds", survivalSeconds / 60, survivalSeconds % 60)
-
-            let statsLabels: [String: String] = [
-                "_highestMassValue": "\(highScore)",
-                "_foodEatenLabel": "Tokens:",
-                "_foodEatenValue": "\(tokensCollected)",
-                "_cellsEatenLabel": "Time Alive:",
-                "_cellsEatenValue": timeStr
-            ]
-            let statsVis: [String: Bool] = [
-                "_timeAliveLabel": false,
-                "_timeAliveValue": false,
-                "_leaderboardTimeLabel": false,
-                "_leaderboardTimeValue": false,
-                "_topPositionLabel": false,
-                "_topPositionValue": false
-            ]
-
-            AgarModalContainer(dismissOnBackdrop: false, onClose: onMainMenu) { _ in
-                VStack(spacing: 8 * s) {
-                    CCBISceneView(
-                        ccbFile: "ClassicMatchStats.ccbi",
-                        centerRoot: true,
-                        context: CCBIBindingContext(
-                            labelOverrides: statsLabels,
-                            visibilityOverrides: statsVis,
-                            designScaleModifier: { _ in s }
-                        )
-                    )
-                    .frame(width: 160 * s, height: 189 * s)
-                    .frame(height: 122 * s, alignment: .top)
-                    .clipped()
-
-                    if let dropped = awardedTier {
-                        HStack(spacing: 8 * s) {
-                            Image(dropped.iconAsset).resizable().scaledToFit().frame(width: 26 * s, height: 32 * s)
-                            VStack(alignment: .leading, spacing: 1 * s) {
-                                Text("\(dropped.rawValue) Mystery Potion Earned!")
-                                    .font(.custom("OpenSans-Bold", size: 11.5 * s))
-                                    .foregroundColor(Color(hex: 0x3D4347))
-                                Text("Open Menu → Potions to brew it.")
-                                    .font(.custom("Lato-Regular", size: 10 * s))
-                                    .foregroundColor(Color(hex: 0x43A81D))
-                            }
-                            Spacer()
-                        }
-                        .padding(8 * s)
-                        .background(MCFSFrame(name: "mcfs-white-green"))
-                    }
-
-                    HStack(spacing: 10 * s) {
-                        Button(action: {
-                            SoundManager.shared.play(.menuClick)
-                            onMainMenu()
-                        }) {
-                            Text("Menu")
-                                .font(.custom("OpenSans-Bold", size: 14 * s))
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 36 * s)
-                        }
-                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-orange"))
-                        Button(action: {
-                            SoundManager.shared.play(.menuClick)
-                            onPlayAgain()
-                        }) {
-                            Text("Play Again")
-                                .font(.custom("OpenSans-Bold", size: 14 * s))
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 36 * s)
-                        }
-                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
-                    }
+            let subtitle: String = {
+                if let dropped = awardedTier {
+                    return "Score: \(highScore) · \(dropped.rawValue) Potion!"
                 }
-                .padding(14 * s)
-                .frame(width: min(geometry.size.width * 0.88, 300 * s))
-                .background(MCFSFrame(name: "mcfs-white-gray"))
+                return "Score: \(highScore) · Continue your match?"
+            }()
+
+            ZStack {
+                Color.black.opacity(0.55).edgesIgnoringSafeArea(.all)
+                CCBISceneView(
+                    ccbFile: "ContinueGame.ccbi",
+                    centerRoot: true,
+                    context: CCBIBindingContext(
+                        actions: [
+                            "closeButtonCallback": onCloseToMenu,
+                            "continueButtonCallback": onContinue,
+                            "watchVideoButtonCallback": onContinue,
+                            "buyButtonCallback": onContinue
+                        ],
+                        labelOverrides: [
+                            "_title": "Continue?",
+                            "_innerFrameText": subtitle
+                        ],
+                        visibilityOverrides: [
+                            "_buyButton": false,
+                            "_watchVideoButton": false,
+                            "_continueButton": true,
+                            "_timerbar": false,
+                            "_innerImageText": false
+                        ],
+                        designScaleModifier: { _ in s }
+                    )
+                )
+                .frame(width: geometry.size.width, height: geometry.size.height)
             }
             .onAppear {
                 if !checkedAward {

@@ -84,7 +84,7 @@ private final class ArenaTextureCache {
     private var labelOrder: [LabelCacheKey] = []
     private var width30Cache: [String: Float] = [:]
     private lazy var font30: UIFont = {
-        UIFont(name: "OpenSans-Bold", size: 30) ?? UIFont.systemFont(ofSize: 30, weight: .bold)
+        MyFont.requireCustomFont(named: "OpenSans-Bold", size: 30)
     }()
     private let maxLabelCache = 280
 
@@ -165,20 +165,24 @@ private final class ArenaTextureCache {
         }
 
         let fontSize = CGFloat(quantized)
-        let uiFont = UIFont(name: "OpenSans-Bold", size: fontSize)
-            ?? UIFont.systemFont(ofSize: fontSize, weight: .bold)
+        let uiFont = MyFont.requireCustomFont(named: "OpenSans-Bold", size: fontSize)
 
-        let attrs: [NSAttributedString.Key: Any] = [
+        let strokeAttrs: [NSAttributedString.Key: Any] = [
             .font: uiFont,
-            .foregroundColor: UIColor.white,
+            .foregroundColor: UIColor.clear,
             .strokeColor: strokeColor,
-            .strokeWidth: strokeWidthPct
+            .strokeWidth: abs(strokeWidthPct) * 2.0
         ]
-        let attrStr = NSAttributedString(string: text, attributes: attrs)
-        let bounds = attrStr.boundingRect(with: CGSize(width: 1024, height: 256),
-                                          options: [.usesLineFragmentOrigin, .usesFontLeading],
-                                          context: nil).integral
-        let pad: CGFloat = ceil(fontSize * 0.20)
+        let fillAttrs: [NSAttributedString.Key: Any] = [
+            .font: uiFont,
+            .foregroundColor: UIColor.white
+        ]
+        let strokeStr = NSAttributedString(string: text, attributes: strokeAttrs)
+        let fillStr = NSAttributedString(string: text, attributes: fillAttrs)
+        let bounds = strokeStr.boundingRect(with: CGSize(width: 1024, height: 256),
+                                            options: [.usesLineFragmentOrigin, .usesFontLeading],
+                                            context: nil).integral
+        let pad: CGFloat = ceil(fontSize * 0.22)
         let w = max(8, Int(bounds.width + pad * 2))
         let h = max(8, Int(bounds.height + pad * 2))
         let size = CGSize(width: w, height: h)
@@ -186,11 +190,15 @@ private final class ArenaTextureCache {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1.0
         format.opaque = false
-        let rendered = UIGraphicsImageRenderer(size: size, format: format).image { _ in
-            attrStr.draw(in: CGRect(x: pad - bounds.minX,
-                                    y: pad - bounds.minY,
-                                    width: bounds.width + 4,
-                                    height: bounds.height + 4))
+        let rendered = UIGraphicsImageRenderer(size: size, format: format).image { ctx in
+            ctx.cgContext.setLineJoin(.round)
+            ctx.cgContext.setLineCap(.round)
+            let drawRect = CGRect(x: pad - bounds.minX,
+                                  y: pad - bounds.minY,
+                                  width: bounds.width + 4,
+                                  height: bounds.height + 4)
+            strokeStr.draw(in: drawRect)
+            fillStr.draw(in: drawRect)
         }
         guard let tex = uploadImage(rendered) else { return nil }
 
@@ -210,12 +218,12 @@ private final class ArenaTextureCache {
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1.0
         format.opaque = false
-        let circ = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { ctx in
-            let rect = CGRect(x: 0, y: 0, width: side, height: side)
-            UIBezierPath(ovalIn: rect).addClip()
-            image.draw(in: rect)
+        // Preserve native perimeter texels unclipped so MTLSamplerAddressMode.clampToEdge
+        // stretches edge pixels cleanly on deforming/shrinking SoftBodyCellView skins.
+        let unclipped = UIGraphicsImageRenderer(size: CGSize(width: side, height: side), format: format).image { _ in
+            image.draw(in: CGRect(x: 0, y: 0, width: side, height: side))
         }
-        return uploadImage(circ)
+        return uploadImage(unclipped)
     }
 
     private func uploadImage(_ image: UIImage) -> MTLTexture? {
@@ -433,7 +441,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         solidBuf.removeAll(keepingCapacity: true)
     }
 
-    private func drawTexturedFan(enc: MTLRenderCommandEncoder, texture: MTLTexture, cx: Float, cy: Float, verts: [CGPoint], zoomPx: Float, radiusOffsetWorld: Float, fallbackRadiusPx: Float, baseRadiusWorld: Float, alpha: Float, viewportSize: SIMD2<Float>) {
+    private func drawTexturedFan(enc: MTLRenderCommandEncoder, texture: MTLTexture, cx: Float, cy: Float, verts: [CGPoint], zoomPx: Float, radiusOffsetWorld: Float, fallbackRadiusPx: Float, baseRadiusWorld: Float, isPartyCell: Bool = false, alpha: Float, viewportSize: SIMD2<Float>) {
         var tv: [TexVertex] = []
         let tint = SIMD4<Float>(alpha, alpha, alpha, alpha) // premultiplied alpha
         if verts.count >= 8 && baseRadiusWorld > 1 {
@@ -442,7 +450,10 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
             let center = TexVertex(pixelPos: SIMD2<Float>(cx, cy), texCoord: SIMD2<Float>(0.5, 0.5), tint: tint)
             var pxPts = [SIMD2<Float>](repeating: .zero, count: n)
             var uvs = [SIMD2<Float>](repeating: .zero, count: n)
-            let invR = 1.0 / Float(baseRadiusWorld)
+            // SoftBodyCellView::scale = (5.0 / r) + 1.0, shrinkGLForPartyCell = 1.0 - (6.0 / (r * scale))
+            let cellScale = (5.0 / baseRadiusWorld) + 1.0
+            let partyScale = isPartyCell ? max(Float(0.5), 1.0 - 6.0 / (baseRadiusWorld * cellScale)) : 1.0
+            let uvScale = (cellScale * partyScale) / max(1.0, baseRadiusWorld)
             for i in 0..<n {
                 let v = verts[i]
                 let vx = Float(v.x)
@@ -450,7 +461,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 let len = max(0.0001, hypotf(vx, vy))
                 pxPts[i] = SIMD2<Float>(cx + vx * zoomPx + (vx / len) * radiusOffsetWorld * zoomPx,
                                         cy + vy * zoomPx + (vy / len) * radiusOffsetWorld * zoomPx)
-                uvs[i] = SIMD2<Float>(0.5 + 0.5 * (vx * invR), 0.5 + 0.5 * (vy * invR))
+                uvs[i] = SIMD2<Float>(0.5 + 0.5 * (vx * uvScale), 0.5 + 0.5 * (vy * uvScale))
             }
             for i in 0..<n {
                 let next = (i + 1) % n
@@ -656,17 +667,11 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
             enc.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         }
 
-        // 3. Food Pellets (10-gon vertex fan per FoodCellView, 1 batched draw)
+        // 3. Food Pellets (10-gon vertex fan per FoodCellView, 1 batched draw, zero modulo-skip flicker)
         let foodPxR = max(0.75 * scale, Float(Food.radius) * zoomPx)
-        let foodStride: Int = {
-            if ptZoom < 0.08 { return 4 }
-            if ptZoom < 0.16 { return 3 }
-            if ptZoom < 0.32 { return 2 }
-            return 1
-        }()
         let foodSegs = foodPxR < 4.0 ? 8 : 10
         let paletteSIMD: [SIMD4<Float>] = Food.palette.map { rgba($0) }
-        box.foodManager?.forEachVisibleFood(in: worldVisible, limit: 3000, everyNth: foodStride) { f in
+        box.foodManager?.forEachVisibleFood(in: worldVisible, limit: 5000, everyNth: 1) { f in
             let sx = Float(f.position.x) * zoomPx + screenOffX
             let sy = Float(f.position.y) * zoomPx + screenOffY
             let col = f.colorIndex < paletteSIMD.count ? paletteSIMD[f.colorIndex] : SIMD4<Float>(1, 0, 0, 1)
@@ -803,11 +808,18 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 let rW = Float(v.radius)
                 // SoftBodyCellView::calculateVirusEdgeRadiusDelta (0x1003a49fc)
                 let spikeDelta = rW * Float(OriginalGameplay.virusEdgeRadiusMultiplier) + 5.0
-                let vCount = min(120, max(30, (2 * Int(floor(max(1, rW * cocosZoom)))) & ~1))
-                appendVirusFan(cx: sx, cy: sy, radiusWorld: rW, zoomPx: zoomPx, pointCount: vCount,
-                               radiusOffsetWorld: 5.0, spikeDeltaWorld: spikeDelta, color: borderColVirus)
-                appendVirusFan(cx: sx, cy: sy, radiusWorld: rW, zoomPx: zoomPx, pointCount: vCount,
-                               radiusOffsetWorld: -5.0, spikeDeltaWorld: spikeDelta, color: fillColVirus)
+                if v.deformedVertices.count >= 8 {
+                    appendDeformedFan(cx: sx, cy: sy, verts: v.deformedVertices, zoomPx: zoomPx,
+                                      radiusOffsetWorld: 5.0, isVirus: true, virusSpikeDeltaWorld: spikeDelta, color: borderColVirus)
+                    appendDeformedFan(cx: sx, cy: sy, verts: v.deformedVertices, zoomPx: zoomPx,
+                                      radiusOffsetWorld: -5.0, isVirus: true, virusSpikeDeltaWorld: spikeDelta, color: fillColVirus)
+                } else {
+                    let vCount = min(120, max(30, (2 * Int(floor(max(1, rW * cocosZoom)))) & ~1))
+                    appendVirusFan(cx: sx, cy: sy, radiusWorld: rW, zoomPx: zoomPx, pointCount: vCount,
+                                   radiusOffsetWorld: 5.0, spikeDeltaWorld: spikeDelta, color: borderColVirus)
+                    appendVirusFan(cx: sx, cy: sy, radiusWorld: rW, zoomPx: zoomPx, pointCount: vCount,
+                                   radiusOffsetWorld: -5.0, spikeDeltaWorld: spikeDelta, color: fillColVirus)
+                }
                 flushSolid(enc: enc, viewportSize: vpPx)
 
             case .cell(let c, let isLocal):
@@ -846,7 +858,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                     drawTexturedFan(enc: enc, texture: skinTex, cx: sx, cy: sy,
                                     verts: c.deformedVertices, zoomPx: zoomPx,
                                     radiusOffsetWorld: innerOff, fallbackRadiusPx: rFallback,
-                                    baseRadiusWorld: Float(c.cachedVisualRadius), alpha: skinAlpha, viewportSize: vpPx)
+                                    baseRadiusWorld: Float(c.cachedVisualRadius), isPartyCell: showPartyBorder, alpha: skinAlpha, viewportSize: vpPx)
 
                     let altSince: TimeInterval? = isLocal
                         ? box.dualSkinSwapShowingSince
@@ -858,7 +870,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                         drawTexturedFan(enc: enc, texture: altTex, cx: sx, cy: sy,
                                         verts: c.deformedVertices, zoomPx: zoomPx,
                                         radiusOffsetWorld: innerOff, fallbackRadiusPx: rFallback,
-                                        baseRadiusWorld: Float(c.cachedVisualRadius), alpha: min(1.0, max(0.0, fade)), viewportSize: vpPx)
+                                        baseRadiusWorld: Float(c.cachedVisualRadius), isPartyCell: showPartyBorder, alpha: min(1.0, max(0.0, fade)), viewportSize: vpPx)
                     }
                 }
 

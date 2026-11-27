@@ -197,10 +197,31 @@ enum OriginalGameplay {
         CGFloat(impulseDecay(dt: Double(dt)))
     }
 
-    /// Cocos2d `.ccbi` design point scale (`480x320` base resolution).
-    static func uiScale(for size: CGSize) -> CGFloat {
-        let s = min(max(size.height, 1) / 320.0, max(size.width, 1) / 480.0)
+    /// Screen-point scale matching `AppDelegate` (`0x1002a714c`) + `CCGLView initWithPointBound:`:
+    /// iPhone uses FixedHeight `320` (clamped by `480` width); iPad uses FixedWidth `768` (`w / 768.0`).
+    static func uiScale(for size: CGSize, isPhoneOverride: Bool? = nil) -> CGFloat {
+        let w = max(size.width, 1)
+        let h = max(size.height, 1)
+        #if canImport(UIKit)
+        let isPhone = isPhoneOverride ?? (UIDevice.current.userInterfaceIdiom != .pad)
+        #else
+        let isPhone = isPhoneOverride ?? true
+        #endif
+        if !isPhone {
+            return max(0.5, w / 768.0)
+        }
+        let s = min(h / 320.0, w / 480.0)
         return max(0.5, s)
+    }
+
+    /// Resource scale factor (`sub_100B0465C`): `0.46875` (`15/32`) on iPhone, `1.0` on iPad.
+    static func resourceScaleFactor(isPhoneOverride: Bool? = nil) -> CGFloat {
+        #if canImport(UIKit)
+        let isPhone = isPhoneOverride ?? (UIDevice.current.userInterfaceIdiom != .pad)
+        #else
+        let isPhone = isPhoneOverride ?? true
+        #endif
+        return isPhone ? 0.46875 : 1.0
     }
 
     static func menuBackgroundSpritePath(for size: CGSize) -> String {

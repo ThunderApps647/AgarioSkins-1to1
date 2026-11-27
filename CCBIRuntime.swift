@@ -1627,10 +1627,9 @@ private struct CCBINodeRenderer: View {
 
             let fontName: String = {
                 if case let .str(fn) = child.props["fontName"], !fn.isEmpty {
-                    let base = URL(fileURLWithPath: fn).deletingPathExtension().lastPathComponent
-                    return base.lowercased() == "lato-heavy" ? "Lato-Heavy" : base
+                    return MyFont.normalizedPostScriptName(for: fn)
                 }
-                return "OpenSans-Bold"
+                return "Helvetica"
             }()
             let fontSizeDesign: CGFloat = {
                 if case let .fltInt(sz, _) = child.props["fontSize"] { return sz }
@@ -1642,9 +1641,7 @@ private struct CCBINodeRenderer: View {
                 let w = evalDim(rw, unit: wu, parent: parentSize.width)
                 if w > 1.0 { reqW = w }
             }
-            let uiFont = UIFont(name: fontName, size: max(7, fontSizeDesign))
-                ?? UIFont(name: "OpenSans-Bold", size: max(7, fontSizeDesign))
-                ?? UIFont.systemFont(ofSize: max(7, fontSizeDesign), weight: .bold)
+            let uiFont = MyFont.uiFont(named: fontName, size: max(7, fontSizeDesign))
             let rect = (rawText as NSString).boundingRect(
                 with: CGSize(width: reqW > 0 ? reqW : 10000, height: 10000),
                 options: [.usesLineFragmentOrigin, .usesFontLeading],
@@ -1911,11 +1908,9 @@ private struct CCBINodeRenderer: View {
 
         let fontName: String = {
             if case let .str(fn) = node.props["fontName"], !fn.isEmpty {
-                let base = URL(fileURLWithPath: fn).deletingPathExtension().lastPathComponent
-                if base.lowercased() == "lato-heavy" { return "Lato-Heavy" }
-                return base
+                return MyFont.normalizedPostScriptName(for: fn)
             }
-            return "OpenSans-Bold"
+            return "Helvetica"
         }()
 
         let fontSizeDesign: CGFloat = {
@@ -1944,9 +1939,7 @@ private struct CCBINodeRenderer: View {
     private func measureLabelDesignSize(parentDesignSize: CGSize) -> CGSize {
         let spec = resolveLabelTextAndFont()
         guard !spec.text.isEmpty else { return .zero }
-        let uiFont = UIFont(name: spec.fontName, size: max(7, spec.fontSizeDesign))
-            ?? UIFont(name: "OpenSans-Bold", size: max(7, spec.fontSizeDesign))
-            ?? UIFont.systemFont(ofSize: max(7, spec.fontSizeDesign), weight: .bold)
+        let uiFont = MyFont.uiFont(named: spec.fontName, size: max(7, spec.fontSizeDesign))
         let req = requestedLabelDimensions(parentDesignSize: parentDesignSize)
         let singleLine = isSingleLineLabel()
         if req.width > 1.0 && req.height > 1.0 && !singleLine {
