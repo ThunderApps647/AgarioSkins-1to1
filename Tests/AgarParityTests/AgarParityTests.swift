@@ -221,7 +221,7 @@ final class AgarParityTests: XCTestCase {
             targetBotCount: .constant(55),
             feedBotCount: .constant(0),
             botSkill: .constant(1.0),
-            lastMatchStats: LastMatchStats(highestMass: 1840, foodEaten: 412, cellsEaten: 9, timeAliveSeconds: 268, leaderboardTimeSeconds: 112, topLeaderboardPosition: 2),
+            lastMatchStats: MatchSummaryStats(highestMass: 1840, foodEaten: 412, cellsEaten: 9, timeAliveSec: 268, leaderboardTimeSec: 112, topPosition: 2),
             onPlayOnline: {}
         )
         try saveSnapshot(renderSwiftUI(menuView, size: phoneSize), name: "01_MenuMain.png")
@@ -252,7 +252,7 @@ final class AgarParityTests: XCTestCase {
                 ],
                 onPause: {}
             )
-            EmojiWidgetHUD(isOpen: true, toggleSeqID: 1, isOnCooldown: false, onToggle: {}, onSelectEmote: { _ in })
+            EmojiWidgetHUD(isOpen: true, toggleSeqID: 1, isOnCooldown: false, onToggle: {}, onSelect: { _ in })
             ActionButtonsHUD(canSplit: true, canFeed: true, isFeedingHeld: false, feedButtonScale: 1.0, macroButtonScale: 1.0, feedHoldThreshold: 1.4, controlLayout: 2, onSplit: {}, onMacroDown: {}, onMacroUp: {}, onFeedDown: {}, onFeedUp: {})
             JoystickView(
                 joystickOffset: .constant(CGSize(width: 24 * s, height: -12 * s)),
@@ -281,7 +281,7 @@ final class AgarParityTests: XCTestCase {
             boxClassic.viruses = [Virus(position: CGPoint(x: 3820, y: 4120))]
             boxClassic.massManager = mm
             boxClassic.ownerLevels = [pOwner: 42]
-            boxClassic.activeEmoteAsset = "emote-laugh"
+            boxClassic.activeEmoteAsset = "emoji-tongue"
             boxClassic.activeEmoteStartedAt = 0
             boxClassic.activeEmoteExpiresAt = 1000
 
