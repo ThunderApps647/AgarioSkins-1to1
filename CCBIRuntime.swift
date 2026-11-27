@@ -1322,8 +1322,10 @@ private struct CCBINodeRenderer: View {
 
             if let handler = blockHandler ?? varTapHandler {
                 let accName = resolveBlockSelector() ?? (!node.varName.isEmpty ? node.varName : node.stableID)
-                let scopedAcc = context.scopePath.isEmpty ? accName : "\(context.scopePath.joined(separator: ".")).\(accName)"
-                let accID = "ccbi.\(scopedAcc)"
+                let scopedPrefix = context.ancestorVars.reversed().first { anc in
+                    context.actions["\(anc).\(accName)"] != nil || context.tapVarActions["\(anc).\(accName)"] != nil
+                }
+                let accID = scopedPrefix.map { "ccbi.\($0).\(accName)" } ?? "ccbi.\(accName)"
                 if context.useImmediateTouch {
                     CCBIImmediateTapWrapper(
                         action: {
