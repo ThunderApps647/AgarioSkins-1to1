@@ -88,7 +88,7 @@ def main():
     ap.add_argument("--sim-dir", required=True, help="Directory with Simulator PNGs")
     ap.add_argument("--ref-dir", default="Tests/AgarParityTests/Fixtures/ccbi_ref")
     ap.add_argument("--out-dir", default="build/diff_heatmaps")
-    ap.add_argument("--min-ssim", type=float, default=0.70)
+    ap.add_argument("--min-ssim", type=float, default=0.92)
     args = ap.parse_args()
 
     os.makedirs(args.out_dir, exist_ok=True)

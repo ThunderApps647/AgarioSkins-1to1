@@ -12413,28 +12413,6 @@ struct EmojiWidgetHUD: View, Equatable {
     }
 }
 
-struct ActiveEmoteBubble: View {
-    let assetName: String
-    let cellPosition: CGPoint
-    let cellRadius: CGFloat
-    let smoothedCamera: CGPoint
-    let zoomLevel: CGFloat
-    let screenSize: CGSize
-
-    var body: some View {
-        let sx = (cellPosition.x - smoothedCamera.x) * zoomLevel + screenSize.width / 2
-        let sy = (cellPosition.y - smoothedCamera.y) * zoomLevel + screenSize.height / 2
-        let side = max(36, min(180, cellRadius * 1.45 * zoomLevel))
-        Image(assetName)
-            .resizable()
-            .scaledToFill()
-            .frame(width: side, height: side)
-            .clipShape(Circle())
-            .position(x: sx, y: sy)
-            .allowsHitTesting(false)
-    }
-}
-
 /// The nickname box could end up focused (blinking caret, paste menu working) with no software
 /// keyboard: the text-input session was alive, but the keyboard scene never attached, and a
 /// plain reloadInputViews() cannot revive a session in that state. This field now *verifies*

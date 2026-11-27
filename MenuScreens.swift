@@ -792,22 +792,10 @@ struct PotionsModalView: View {
 
         let slots: [String: AnyView] = tier != nil ? [
             "_potionParentNode": AnyView(
-                CCBISceneView(
-                    ccbFile: "VisualPotion.ccbi",
-                    centerRoot: true,
-                    context: CCBIBindingContext(
-                        replacingSlotViews: [
-                            "_potionSprite": AnyView(
-                                Image(tier!.iconAsset)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(width: 56 * s, height: 70 * s)
-                            )
-                        ],
-                        designScaleModifier: { _ in s }
-                    )
-                )
-                .frame(width: 64 * s, height: 74 * s)
+                Image(tier!.iconAsset)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 56 * s, height: 70 * s)
             )
         ] : [:]
 

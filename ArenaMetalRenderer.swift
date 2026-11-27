@@ -929,7 +929,23 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                     }
                 }
 
-                // Cell labels + League Badges + friend-pfp (SoftBodyCellView: OpenSans-Bold white w/ outline)
+                // Emote bubble over local cells clipped to cell polygon (`CellOverlayImage::drawWithVertices` 0x1002e2ae8)
+                // Drawn BEFORE name/mass/badge labels (`SoftBodyCellView` z:2 child order) so text stays readable on top.
+                if isLocal, let emoteName = box.activeEmoteAsset, nowTS < box.activeEmoteExpiresAt,
+                   let emoteTex = texCache.texture(named: emoteName) {
+                    let elapsed = nowTS - box.activeEmoteStartedAt
+                    let remaining = box.activeEmoteExpiresAt - nowTS
+                    let alpha = Float(min(1.0, min(elapsed / 0.12, remaining / 0.2)))
+                    let rFallback = max(1.5, (rW + innerOff) * zoomPx)
+                    if alpha > 0.01 && rFallback > 4 {
+                        drawTexturedFan(enc: enc, texture: emoteTex, cx: sx, cy: sy,
+                                        verts: c.deformedVertices, zoomPx: zoomPx,
+                                        radiusOffsetWorld: innerOff, fallbackRadiusPx: rFallback,
+                                        baseRadiusWorld: Float(c.cachedVisualRadius), alpha: alpha, viewportSize: vpPx)
+                    }
+                }
+
+                // Cell labels + League Badges + friend-pfp (SoftBodyCellView: OpenSans-Bold white w/ outline, z:2)
                 let screenSolidR = Float(c.cachedSolidRadius) * zoomPx
                 if screenSolidR > 12.0 * scale {
                     let level = box.ownerLevels[c.ownerID]
@@ -1021,21 +1037,6 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                         let nameY = box.showMassText ? (sy - screenSolidR * 0.10) : sy
                         drawNameAndBadge(text: c.name, lvl: level, cx: sx, cy: nameY, targetFontPx: fontPx)
                         if box.showMassText { drawMassNumber(massPx, cx: sx, cy: sy + screenSolidR * 0.65) }
-                    }
-                }
-
-                // Emote bubble over local cells clipped to cell polygon (`CellOverlayImage::drawWithVertices` 0x1002e2ae8)
-                if isLocal, let emoteName = box.activeEmoteAsset, nowTS < box.activeEmoteExpiresAt,
-                   let emoteTex = texCache.texture(named: emoteName) {
-                    let elapsed = nowTS - box.activeEmoteStartedAt
-                    let remaining = box.activeEmoteExpiresAt - nowTS
-                    let alpha = Float(min(1.0, min(elapsed / 0.12, remaining / 0.2)))
-                    let rFallback = max(1.5, (rW + innerOff) * zoomPx)
-                    if alpha > 0.01 && rFallback > 4 {
-                        drawTexturedFan(enc: enc, texture: emoteTex, cx: sx, cy: sy,
-                                        verts: c.deformedVertices, zoomPx: zoomPx,
-                                        radiusOffsetWorld: innerOff, fallbackRadiusPx: rFallback,
-                                        baseRadiusWorld: Float(c.cachedVisualRadius), alpha: alpha, viewportSize: vpPx)
                     }
                 }
             }

@@ -538,7 +538,17 @@ def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: As
                     spr_name = "backgroundWide.png"
             img = lib.get_sprite(spr_name) or lib.get_mcfs_image(props.get("descriptionName", ""))
             if img is not None and nw_s > 1 and nh_s > 1:
-                resized = img.resize((max(1, int(round(nw_s * px_scale))), max(1, int(round(nh_s * px_scale)))), Image.Resampling.LANCZOS)
+                tw, th = max(1, int(round(nw_s * px_scale))), max(1, int(round(nh_s * px_scale)))
+                if node["varName"] == "_background" and "background" in spr_name.lower():
+                    # Aspect-fill (scaledToFill) matching MenuMain SwiftUI background
+                    scale_fill = max(tw / img.width, th / img.height)
+                    fw, fh = max(tw, int(round(img.width * scale_fill))), max(th, int(round(img.height * scale_fill)))
+                    scaled = img.resize((fw, fh), Image.Resampling.LANCZOS)
+                    cx_off = (fw - tw) // 2
+                    cy_off = (fh - th) // 2
+                    resized = scaled.crop((cx_off, cy_off, cx_off + tw, cy_off + th))
+                else:
+                    resized = img.resize((tw, th), Image.Resampling.LANCZOS)
                 col = props.get("color")
                 if isinstance(col, tuple) and col[0] == "rgba" and (col[1] < 0.99 or col[2] < 0.99 or col[3] < 0.99):
                     r, g, b, a = resized.split()
@@ -587,6 +597,37 @@ def render_ccbi(ccbi_name: str, w_pt: float, h_pt: float, is_ipad: bool, lib: As
             origin_y = (dh - rh) * 0.5
 
     draw_node(root, (origin_x, origin_y, dw, dh))
+
+    # Composite dynamic slot CCBIs that C++ controllers instantiate at runtime
+    if ccbi_name == "MenuMain":
+        # ClassicButton.ccbi at _staticPlayButtonsContainer left slot + Play Online green button
+        cb_path = os.path.join(CCBI_DIR, "ClassicButton.ccbi")
+        if os.path.exists(cb_path):
+            with open(cb_path, "rb") as f:
+                cb_root = CCBIReader(f.read()).parse()
+            draw_node(cb_root, (dw * 0.5 - 126.0, dh * 0.5 - 10.0, 120.0, 80.0))
+        gr_img = lib.get_mcfs_image("MCFS_green.plist")
+        if gr_img is not None:
+            bw, bh = int(round(120.0 * px_scale)), int(round(80.0 * px_scale))
+            bx, by = int(round((dw * 0.5 + 6.0) * px_scale)), int(round((dh * 0.5 - 10.0) * px_scale))
+            canvas.alpha_composite(gr_img.resize((bw, bh), Image.Resampling.LANCZOS), (bx, by))
+        # CoinsBar + DNABar top-right
+        for idx, bar_name in enumerate(["DNABar.ccbi", "CoinsBar.ccbi"]):
+            bp = os.path.join(CCBI_DIR, bar_name)
+            if os.path.exists(bp):
+                with open(bp, "rb") as f:
+                    b_root = CCBIReader(f.read()).parse()
+                bx = dw - 106.0 * (2 - idx) - 8.0
+                draw_node(b_root, (bx, 8.0, 100.0, 24.0))
+    elif ccbi_name == "MenuMysteryPotions":
+        ps_path = os.path.join(CCBI_DIR, "PotionSlot.ccbi")
+        if os.path.exists(ps_path):
+            with open(ps_path, "rb") as f:
+                ps_root = CCBIReader(f.read()).parse()
+            slot_w = (dw - 40.0) / 3.0
+            for idx in range(3):
+                draw_node(ps_root, (12.0 + idx * (slot_w + 8.0), 74.0, slot_w, 195.0))
+
     return canvas, manifest_nodes
 
 
@@ -601,8 +642,8 @@ def main():
     manifest = {"iPhone": {}, "iPad": {}}
     bg_cache = {}
     for name in targets:
-        for dev, (w, h, is_ipad) in [("iPhone", (852.0, 393.0, False)), ("iPad", (1024.0, 768.0, True))]:
-            img, nodes = render_ccbi(name, w, h, is_ipad, lib)
+        for dev, (w, h, is_ipad, sc) in [("iPhone", (874.0, 402.0, False, 3.0)), ("iPad", (1376.0, 1032.0, True, 2.0))]:
+            img, nodes = render_ccbi(name, w, h, is_ipad, lib, out_scale=sc)
             if name == "MenuMain":
                 bg_cache[dev] = img
             elif name in ("MenuPause", "ContinueGame", "MenuBattleResultPopup") and dev in bg_cache:
