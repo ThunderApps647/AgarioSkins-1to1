@@ -153,6 +153,8 @@ struct ShopModalView: View {
     var body: some View {
         GeometryReader { geometry in
             let s = max(1.0, min(OriginalGameplay.uiScale(for: geometry.size), geometry.size.width / 460.0))
+            let sideInset = max(geometry.safeAreaInsets.leading, geometry.safeAreaInsets.trailing)
+            let sceneW = max(1, geometry.size.width - sideInset * 2)
 
             ZStack {
                 Color.white.edgesIgnoringSafeArea(.all)
@@ -223,7 +225,7 @@ struct ShopModalView: View {
                                 designScaleModifier: { _ in s }
                             )
                         )
-                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .frame(width: sceneW, height: geometry.size.height)
 
                     case .boosts, .xp:
                         let isMass = (section == .boosts)
@@ -306,7 +308,7 @@ struct ShopModalView: View {
                                     designScaleModifier: { geo in min(s, geo.height / 320.0) }
                                 )
                             )
-                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .frame(width: sceneW, height: geometry.size.height)
 
                             if !statusMessage.isEmpty {
                                 Text(statusMessage)
@@ -369,7 +371,7 @@ struct ShopModalView: View {
                             ]
                         )
                     )
-                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .frame(width: sceneW, height: geometry.size.height)
                 }
             }
         }

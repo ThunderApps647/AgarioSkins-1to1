@@ -755,17 +755,25 @@ private struct CCBINodeRenderer: View {
             let swiftAnchorX = anchor.x
             let swiftAnchorY = 1.0 - anchor.y
 
-            let core = nodeContent(designSize: resolvedSize, subFileRoot: subFileRoot)
-                .frame(width: resolvedSize.width > 0 ? resolvedSize.width * scaleFactor : nil,
-                       height: resolvedSize.height > 0 ? resolvedSize.height * scaleFactor : nil,
-                       alignment: .topLeading)
-                .scaleEffect(x: scaleX, y: scaleY, anchor: UnitPoint(x: swiftAnchorX, y: swiftAnchorY))
+            let isZeroContainer = (resolvedSize.width <= 0 && resolvedSize.height <= 0)
+            let isSlotReplaced = context.scopedLookup(context.replacingSlotViews, varName: node.varName) != nil
+                || (context.scopedLookup(context.slotViews, varName: node.varName) != nil && (
+                    node.varName == "_playerAvatar" ||
+                    node.varName == "_rewardSprite" ||
+                    node.varName == "_buttonIcon" ||
+                    node.varName == "_skinsButtonSprite" ||
+                    node.varName == "_staticPlayButtonsContainer"
+                ))
+
+            let visual = nodeContent(designSize: resolvedSize, subFileRoot: subFileRoot)
+                .frame(width: max(0, resolvedSize.width * scaleFactor),
+                       height: max(0, resolvedSize.height * scaleFactor),
+                       alignment: isZeroContainer ? .center : .topLeading)
+                .scaleEffect(x: isSlotReplaced ? 1.0 : scaleX,
+                             y: isSlotReplaced ? 1.0 : scaleY,
+                             anchor: UnitPoint(x: swiftAnchorX, y: swiftAnchorY))
                 .rotationEffect(.degrees(Double(rotationDeg)), anchor: UnitPoint(x: swiftAnchorX, y: swiftAnchorY))
                 .opacity(Double(max(0, min(1, opacity))))
-                .position(
-                    x: (posSX + (0.5 - swiftAnchorX) * resolvedSize.width) * scaleFactor,
-                    y: (posSY + (0.5 - swiftAnchorY) * resolvedSize.height) * scaleFactor
-                )
 
             let varTapHandler = context.scopedLookup(context.tapVarActions, varName: node.varName)
             let blockHandler: (() -> Void)? = {
@@ -777,13 +785,21 @@ private struct CCBINodeRenderer: View {
                 return nil
             }()
 
+            let targetPos = CGPoint(
+                x: (posSX + (0.5 - swiftAnchorX) * resolvedSize.width) * scaleFactor,
+                y: (posSY + (0.5 - swiftAnchorY) * resolvedSize.height) * scaleFactor
+            )
+
             if let handler = blockHandler ?? varTapHandler {
-                core.contentShape(Rectangle()).onTapGesture {
-                    SoundManager.shared.play(.menuClick)
-                    handler()
-                }
+                visual
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        SoundManager.shared.play(.menuClick)
+                        handler()
+                    }
+                    .position(targetPos)
             } else {
-                core
+                visual.position(targetPos)
             }
         }
     }
@@ -847,7 +863,8 @@ private struct CCBINodeRenderer: View {
             node.cls == "CCLabelTTF" ||
             node.cls == "CCHybridMenu" || node.base == "CCHybridMenu" ||
             node.cls == "CCMenu" || node.base == "CCMenu" ||
-            node.cls == "MCAlignmentNode" || node.base == "MCAlignmentNode"
+            node.cls == "MCAlignmentNode" || node.base == "MCAlignmentNode" ||
+            node.cls == "MCSpineNode" || node.base == "MCSpineNode"
         ) {
             return CGPoint(x: 0.5, y: 0.5)
         }
@@ -915,8 +932,11 @@ private struct CCBINodeRenderer: View {
             return entry.designSize
         }
         if case let .size(rw, rh, wu, hu, _) = node.props["contentSize"] {
-            var w = evalDim(rw, unit: wu, parent: parentSize.width)
-            var h = evalDim(rh, unit: hu, parent: parentSize.height)
+            let isSpine = (node.cls == "MCSpineNode" || node.base == "MCSpineNode")
+            let effWU = (isSpine && wu == 2 && rw > 2.0) ? 0 : wu
+            let effHU = (isSpine && hu == 2 && rh > 2.0) ? 0 : hu
+            var w = evalDim(rw, unit: effWU, parent: parentSize.width)
+            var h = evalDim(rh, unit: effHU, parent: parentSize.height)
             if w == 0 && h == 0, let entry = spriteEntryForNode(node) {
                 w = entry.designSize.width
                 h = entry.designSize.height
@@ -1080,7 +1100,7 @@ private struct CCBINodeRenderer: View {
             node.varName == "_staticPlayButtonsContainer"
         ))
 
-        ZStack(alignment: .topLeading) {
+        ZStack(alignment: (wPx == 0 && hPx == 0) ? .center : .topLeading) {
             if suppressDefaultsForSlot, let customSlot {
                 customSlot.frame(width: wPx > 0 ? wPx : nil, height: hPx > 0 ? hPx : nil)
             } else if let subRoot = subFileRoot {
@@ -1215,7 +1235,7 @@ private struct CCBINodeRenderer: View {
         return (nr, ng, nb, na)
     }
 
-    private func buildLabelView(designSize: CGSize) -> CCBILabelView {
+    private func buildLabelView(designSize: CGSize) -> some View {
         let spec = resolveLabelTextAndFont()
         let fc = normalizedRGBA(node.props["fontColor"])
         let cc = normalizedRGBA(node.props["color"])
@@ -1240,6 +1260,26 @@ private struct CCBINodeRenderer: View {
             if case let .int(h) = node.props["horizontalAlignment"] {
                 if h == 0 { return .leading }
                 if h == 2 { return .trailing }
+                return .center
+            }
+            let ap = resolveAnchorPoint(node: node)
+            if ap.x < 0.25 { return .leading }
+            if ap.x > 0.75 { return .trailing }
+            return .center
+        }()
+
+        let hAlign: HorizontalAlignment = {
+            switch align {
+            case .leading: return .leading
+            case .trailing: return .trailing
+            default: return .center
+            }
+        }()
+
+        let vAlign: VerticalAlignment = {
+            if case let .int(v) = node.props["verticalAlignment"] {
+                if v == 0 { return .top }
+                if v == 2 { return .bottom }
             }
             return .center
         }()
@@ -1254,6 +1294,11 @@ private struct CCBINodeRenderer: View {
             outlineWidth: outlinePx,
             alignment: align,
             constrainWidth: reqW > 0 || designSize.width > 0
+        )
+        .frame(
+            width: designSize.width > 0 ? designSize.width * scaleFactor : nil,
+            height: designSize.height > 0 ? designSize.height * scaleFactor : nil,
+            alignment: Alignment(horizontal: hAlign, vertical: vAlign)
         )
     }
 }

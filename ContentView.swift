@@ -13091,30 +13091,35 @@ struct MainMenu: View {
             }
         )
 
-        return ZStack {
-            Color.white.edgesIgnoringSafeArea(.all)
-            CCBISceneView(
-                ccbFile: "MenuShopSkins.ccbi",
-                context: CCBIBindingContext(
-                    actions: [
-                        "backButtonCallback": { withAnimation { showSkinsModal = false } },
-                        "_backButton": { withAnimation { showSkinsModal = false } },
-                        "coinBarCallback": { showSkinsModal = false; activeInfoTab = "Shop" },
-                        "DNABarCallback": { showSkinsModal = false; activeInfoTab = "Shop" }
-                    ],
-                    labelOverrides: [
-                        "_coinBar._barCurrencyValue": "\(coinsCount)",
-                        "_dnaBar._barCurrencyValue": "\(dnaCount)"
-                    ],
-                    slotViews: [
-                        "_tabsNode": tabsSlot,
-                        "_tableNode": tableSlot
-                    ],
-                    designScaleModifier: { _ in s }
+        return GeometryReader { geo in
+            let sideInset = max(geo.safeAreaInsets.leading, geo.safeAreaInsets.trailing)
+            let sceneW = max(1, geo.size.width - sideInset * 2)
+            ZStack {
+                Color.white.edgesIgnoringSafeArea(.all)
+                CCBISceneView(
+                    ccbFile: "MenuShopSkins.ccbi",
+                    context: CCBIBindingContext(
+                        actions: [
+                            "backButtonCallback": { withAnimation { showSkinsModal = false } },
+                            "_backButton": { withAnimation { showSkinsModal = false } },
+                            "coinBarCallback": { showSkinsModal = false; activeInfoTab = "Shop" },
+                            "DNABarCallback": { showSkinsModal = false; activeInfoTab = "Shop" }
+                        ],
+                        labelOverrides: [
+                            "_coinBar._barCurrencyValue": "\(coinsCount)",
+                            "_dnaBar._barCurrencyValue": "\(dnaCount)"
+                        ],
+                        slotViews: [
+                            "_tabsNode": tabsSlot,
+                            "_tableNode": tableSlot
+                        ],
+                        designScaleModifier: { _ in s }
+                    )
                 )
-            )
-            .frame(width: containerSize.width, height: containerSize.height)
+                .frame(width: sceneW, height: geo.size.height)
+            }
         }
+        .frame(width: containerSize.width, height: containerSize.height)
     }
 
     private func infoModalOverlay(title: String, scale s: CGFloat, containerSize: CGSize) -> some View {
@@ -13181,8 +13186,13 @@ struct MainMenu: View {
                     ccbFile: "MenuMain.ccbi",
                     context: CCBIBindingContext(
                         actions: [
-                            "pressedCallback": { activeInfoTab = "Potions" },
+                            "_leaguesButtonNode.pressedCallback": { activeInfoTab = "Leagues" },
+                            "_mysteryPotionsButtonNode.pressedCallback": { activeInfoTab = "Potions" },
+                            "_dailyQuestButtonNode.pressedCallback": { activeInfoTab = "Quests" },
+                            "_freeCoinsButtonNode.pressedCallback": { activeInfoTab = "Gifts" },
                             "_leaguesButton": { activeInfoTab = "Leagues" },
+                            "_mysteryPotionsButton": { activeInfoTab = "Potions" },
+                            "_dailyQuestButton": { activeInfoTab = "Quests" },
                             "_dailyQuestButtonNode": { activeInfoTab = "Quests" },
                             "_freeCoinsButtonNode": { activeInfoTab = "Gifts" },
                             "skinsButtonCallback": { showSkinsModal = true },
@@ -13230,7 +13240,7 @@ struct MainMenu: View {
                             "_leaguesButton._badgeNode": false,
                             "_dailyQuestButtonNode._badgeNode": false,
                             "_partyModeBadge": !partyCode.isEmpty,
-                            "_badgeNode": potionStore.readyCount(now: Date().timeIntervalSince1970) > 0
+                            "_mysteryPotionsButtonNode._badgeNode": potionStore.readyCount(now: Date().timeIntervalSince1970) > 0
                         ],
                         slotViews: {
                             var slots: [String: AnyView] = [
@@ -13269,9 +13279,10 @@ struct MainMenu: View {
                                         .frame(width: 18 * s, height: 18 * s)
                                 ),
                                 "_staticPlayButtonsContainer": AnyView(
-                                    HStack(spacing: 10 * s) {
+                                    HStack(spacing: 12 * s) {
                                         CCBISceneView(
                                             ccbFile: "ClassicButton.ccbi",
+                                            centerRoot: true,
                                             context: CCBIBindingContext(
                                                 actions: [
                                                     "playButtonCallback": {
@@ -13288,26 +13299,34 @@ struct MainMenu: View {
                                             SoundManager.shared.play(.menuClick)
                                             onPlayOnline()
                                         }) {
-                                            VStack(spacing: 4 * s) {
-                                                Image("menu-party-icon").resizable().scaledToFit().frame(width: 30 * s, height: 26 * s)
-                                                menuStrokedText("Play Online", size: 13 * s)
+                                            ZStack {
+                                                if let shMcfs = CCBIAtlasStore.shared.mcfs(for: "FramedSprites/Bundle/MCFS_shadow.plist") {
+                                                    let pair = shMcfs.uiImageAndInsets(forUIScale: s)
+                                                    Image(uiImage: pair.0)
+                                                        .resizable(capInsets: pair.1, resizingMode: .stretch)
+                                                        .frame(width: 117 * s, height: 26 * s)
+                                                        .offset(y: 28 * s)
+                                                }
+                                                if let grMcfs = CCBIAtlasStore.shared.mcfs(for: "FramedSprites/Bundle/MCFS_green.plist") {
+                                                    let pair = grMcfs.uiImageAndInsets(forUIScale: s)
+                                                    Image(uiImage: pair.0)
+                                                        .resizable(capInsets: pair.1, resizingMode: .stretch)
+                                                        .frame(width: 120 * s, height: 80 * s)
+                                                }
+                                                Image("menu-party-icon")
+                                                    .resizable()
+                                                    .scaledToFit()
+                                                    .frame(width: 30 * s, height: 26 * s)
+                                                    .offset(y: -8 * s)
+                                                Text("Play Online")
+                                                    .font(.custom("OpenSans-Bold", size: 13 * s))
+                                                    .foregroundColor(.white)
+                                                    .shadow(color: Color.black.opacity(0.45), radius: 0, x: 0, y: 1)
+                                                    .offset(y: 16 * s)
                                             }
                                             .frame(width: 120 * s, height: 80 * s)
                                         }
-                                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-green"))
-
-                                        Button(action: {
-                                            SoundManager.shared.play(.menuClick)
-                                            partyJoinCode = ""
-                                            withAnimation { showPartyMenu = true }
-                                        }) {
-                                            VStack(spacing: 4 * s) {
-                                                Image(partyCode.isEmpty ? "party-bigicon" : "ui-star-icon").resizable().scaledToFit().frame(width: 28 * s, height: 28 * s)
-                                                menuStrokedText(partyCode.isEmpty ? "Party" : partyCode, size: 13.5 * s)
-                                            }
-                                            .frame(width: 120 * s, height: 80 * s)
-                                        }
-                                        .buttonStyle(MCFSBevelStyle(frameAsset: "mcfs-light-blue"))
+                                        .buttonStyle(.plain)
                                     }
                                 )
                             ]
