@@ -11725,6 +11725,7 @@ struct TopBarHUD: View, Equatable {
     let inParty: Bool
     let leaderboardRows: [LeaderboardHUDRow]
     let onPause: () -> Void
+    var initialLeaderboardExpanded: Bool = false
     
     static func == (lhs: TopBarHUD, rhs: TopBarHUD) -> Bool {
         return lhs.score == rhs.score
@@ -11804,7 +11805,7 @@ struct TopBarHUD: View, Equatable {
                         .allowsHitTesting(false)
                     }
 
-                    LeaderboardHUDButton(rows: leaderboardRows, uiScale: s)
+                    LeaderboardHUDButton(rows: leaderboardRows, uiScale: s, initialExpanded: initialLeaderboardExpanded)
                         .padding(.top, pad)
                         .padding(.trailing, max(pad, trailPad))
                 }
@@ -11874,6 +11875,15 @@ private struct StrokedHUDText: View {
 struct LeaderboardHUDButton: View {
     let rows: [LeaderboardHUDRow]
     var uiScale: CGFloat = 1.25
+    var initialExpanded: Bool = false
+
+    init(rows: [LeaderboardHUDRow], uiScale: CGFloat = 1.25, initialExpanded: Bool = false) {
+        self.rows = rows
+        self.uiScale = uiScale
+        self.initialExpanded = initialExpanded
+        _expandedH = State(initialValue: initialExpanded)
+        _expandedV = State(initialValue: initialExpanded)
+    }
 
     private var collapsedSide: CGFloat { 39.17 * uiScale }
     private let expansionFactor: CGFloat = 3.5

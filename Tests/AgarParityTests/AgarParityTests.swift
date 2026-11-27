@@ -197,14 +197,25 @@ final class AgarParityTests: XCTestCase {
             return image
         }
 
-        func renderSwiftUI<V: View>(_ view: V, size: CGSize) throws -> UIImage {
-            let wrapped = view
-                .frame(width: size.width, height: size.height)
-                .background(Color.white)
-            let renderer = ImageRenderer(content: wrapped)
-            renderer.scale = 2.0
-            renderer.proposedSize = .init(size)
-            return try XCTUnwrap(renderer.uiImage, "ImageRenderer returned nil")
+        func renderSwiftUI<V: View>(_ view: V, size: CGSize, waitSec: TimeInterval = 0.65) throws -> UIImage {
+            let window = UIWindow(frame: CGRect(origin: .zero, size: size))
+            let host = UIHostingController(rootView: AnyView(view.frame(width: size.width, height: size.height).background(Color.white)))
+            host.view.frame = window.bounds
+            window.rootViewController = host
+            window.makeKeyAndVisible()
+            host.view.setNeedsLayout()
+            host.view.layoutIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(waitSec))
+            host.view.layoutIfNeeded()
+            let fmt = UIGraphicsImageRendererFormat()
+            fmt.scale = 2.0
+            fmt.opaque = true
+            let img = UIGraphicsImageRenderer(size: size, format: fmt).image { _ in
+                window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            }
+            window.isHidden = true
+            window.rootViewController = nil
+            return img
         }
 
         // 1. MenuMain
@@ -250,7 +261,8 @@ final class AgarParityTests: XCTestCase {
                     LeaderboardHUDRow(rank: 5, name: "Bot_Epsilon", isPlayer: false),
                     LeaderboardHUDRow(rank: 10, name: "Captain Idris", isPlayer: true)
                 ],
-                onPause: {}
+                onPause: {},
+                initialLeaderboardExpanded: true
             )
             EmojiWidgetHUD(isOpen: true, toggleSeqID: 1, isOnCooldown: false, onToggle: {}, onSelect: { _ in })
             ActionButtonsHUD(canSplit: true, canFeed: true, isFeedingHeld: false, feedButtonScale: 1.0, macroButtonScale: 1.0, feedHoldThreshold: 1.4, controlLayout: 2, onSplit: {}, onMacroDown: {}, onMacroUp: {}, onFeedDown: {}, onFeedUp: {})
@@ -260,27 +272,29 @@ final class AgarParityTests: XCTestCase {
                 uiScale: s
             )
         }
-        try saveSnapshot(renderSwiftUI(hudView, size: phoneSize), name: "04_HUD_Joystick.png")
+        try saveSnapshot(renderSwiftUI(hudView, size: phoneSize, waitSec: 0.45), name: "04_HUD_Joystick.png")
 
         // 5 & 6. Metal Offscreen Snapshots: Classic Arena (No Border) & Solo Boundary Overlay
         if MTLCreateSystemDefaultDevice() != nil {
             let pOwner = UUID()
+            let tOwner = UUID()
             let bOwner = UUID()
-            let pCell = PlayerCell(ownerID: pOwner, position: CGPoint(x: 4000, y: 4000), mass: 260, targetMass: 260, color: Color(hex: 0x00A8F3), name: "Captain Idris", skinName: "Dragon")
-            let bCell = PlayerCell(ownerID: bOwner, position: CGPoint(x: 4320, y: 4030), mass: 160, targetMass: 160, color: Color(hex: 0xFF6B35), name: "Rival", skinName: nil, isBot: true)
+            let pCellEmote = PlayerCell(ownerID: pOwner, position: CGPoint(x: 4000, y: 4000), mass: 260, targetMass: 260, color: Color(hex: 0x00A8F3), name: "Captain Idris", skinName: "Dragon")
+            let pCellText = PlayerCell(ownerID: tOwner, position: CGPoint(x: 4220, y: 3980), mass: 220, targetMass: 220, color: Color(hex: 0x33D1FF), name: "Portolan", skinName: nil)
+            let bCell = PlayerCell(ownerID: bOwner, position: CGPoint(x: 4430, y: 4040), mass: 160, targetMass: 160, color: Color(hex: 0xFF6B35), name: "Rival", skinName: nil, isBot: true)
             let mm = EjectedMassManager()
-            mm.add(position: CGPoint(x: 4160, y: 3960), direction: CGSize(width: 1, height: 0), initialSpeed: 0, color: .cyan, ownerID: pOwner, sourceCellID: pCell.id, borderColor: .blue, now: 0)
+            mm.add(position: CGPoint(x: 4160, y: 3910), direction: CGSize(width: 1, height: 0), initialSpeed: 0, color: .cyan, ownerID: pOwner, sourceCellID: pCellEmote.id, borderColor: .blue, now: 0)
 
             let boxClassic = ArenaRenderBox()
             boxClassic.worldSize = OriginalGameplay.offlineArenaSideLength
-            boxClassic.cameraPos = CGPoint(x: 4100, y: 4000)
-            boxClassic.zoom = OriginalGameplay.calculateZoom(totalRadius: pCell.cachedSolidRadius, cellCount: 1, viewportSize: phoneSize)
+            boxClassic.cameraPos = CGPoint(x: 4180, y: 4000)
+            boxClassic.zoom = OriginalGameplay.calculateZoom(totalRadius: pCellEmote.cachedSolidRadius, cellCount: 1, viewportSize: phoneSize)
             boxClassic.showBoundaryOverlay = false
-            boxClassic.playerCells = [pCell]
-            boxClassic.botCells = [bCell]
+            boxClassic.playerCells = [pCellEmote]
+            boxClassic.botCells = [pCellText, bCell]
             boxClassic.viruses = [Virus(position: CGPoint(x: 3820, y: 4120))]
             boxClassic.massManager = mm
-            boxClassic.ownerLevels = [pOwner: 42]
+            boxClassic.ownerLevels = [pOwner: 42, tOwner: 42]
             boxClassic.activeEmoteAsset = "emoji-tongue"
             boxClassic.activeEmoteStartedAt = 0
             boxClassic.activeEmoteExpiresAt = 1000
