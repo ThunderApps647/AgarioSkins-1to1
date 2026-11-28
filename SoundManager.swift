@@ -104,7 +104,14 @@ final class SoundManager {
             spyEvents?.append(SoundEvent(soundID: sfx.rawValue, tick: tick, volume: volume))
             return
         }
-        guard UserDefaults.standard.object(forKey: "macro.soundEnabled") as? Bool ?? true else { return }
+        let enabledKey = sfx == .menuClick ? "macro.menuSoundEnabled" : "macro.arenaSoundEnabled"
+        let enabled: Bool
+        if let specific = UserDefaults.standard.object(forKey: enabledKey) as? Bool {
+            enabled = specific
+        } else {
+            enabled = UserDefaults.standard.object(forKey: "macro.soundEnabled") as? Bool ?? true
+        }
+        guard enabled else { return }
         let now = simTime ?? CACurrentMediaTime()
         if let prev = lastPlayed[sfx], (now - prev) < minInterval { return }
         lastPlayed[sfx] = now

@@ -12656,6 +12656,15 @@ struct MainMenu: View {
     @AppStorage("macro.showSkins") private var showSkins: Bool = true
     @AppStorage("macro.showEmojiWidget") private var showEmojiWidget: Bool = true
     @AppStorage("macro.soundEnabled") private var soundEnabled: Bool = true
+    @AppStorage("macro.menuSoundEnabled") private var menuSoundEnabled: Bool = true
+    @AppStorage("macro.arenaSoundEnabled") private var arenaSoundEnabled: Bool = true
+    @AppStorage("macro.showNicknames") private var showNicknames: Bool = true
+    @AppStorage("macro.showQuest") private var showQuestProgress: Bool = true
+    @AppStorage("macro.showNotifications") private var showNotifications: Bool = true
+    @AppStorage("macro.showOnlineStatus") private var showOnlineStatus: Bool = true
+    @AppStorage("macro.directionOnTouch") private var directionOnTouch: Bool = false
+    @AppStorage("macro.targetedAdvertising") private var targetedAdvertising: Bool = false
+    @AppStorage("macro.language") private var language: String = "English"
     @AppStorage("macro.stopOnRelease") private var stopOnRelease: Bool = false
     @AppStorage("macro.controlLayout") private var controlLayout: Int = 2
     @AppStorage("macro.coins") private var coinsCount: Int = 1000
@@ -13631,24 +13640,47 @@ struct MainMenu: View {
         let settingsTableSlot = AnyView(
             ScrollView(showsIndicators: false) {
                 LazyVStack(alignment: .leading, spacing: 0) {
+                    lightSettingHeader("Account", scale: s)
+                    lightSettingBlueButton("Logout", buttonText: "Logout", scale: s) { playerName = "" }
+
                     lightSettingHeader("Game Options", scale: s)
+                    lightSettingBlueButton("Language", buttonText: "Change", scale: s) {}
+                    lightSettingToggle("Stop on Release", isOn: $stopOnRelease, scale: s)
+                    lightSettingToggle("Direction on Touch", isOn: $directionOnTouch, scale: s)
+                    lightSettingControlLayout(scale: s)
+                    lightSettingToggle("Menu Sounds", isOn: $menuSoundEnabled, scale: s)
+                    lightSettingToggle("Game Sounds", isOn: $arenaSoundEnabled, scale: s)
                     lightSettingToggle("Show Mass", isOn: $showMassText, scale: s)
                     lightSettingToggle("Show Arrow", isOn: $showArrow, scale: s)
+                    lightSettingToggle("Show Nicknames", isOn: $showNicknames, scale: s)
                     lightSettingToggle("Show Skins", isOn: $showSkins, scale: s)
-                    lightSettingToggle("Show Level", isOn: $showPlayerLevel, scale: s)
                     lightSettingToggle("Show Emojis Button", isOn: $showEmojiWidget, scale: s)
                     lightSettingToggle("Dark Background", isOn: $darkModeGrid, scale: s)
-                    lightSettingToggle("Stop on Release", isOn: $stopOnRelease, scale: s)
+                    lightSettingToggle("Show Level", isOn: $showPlayerLevel, scale: s)
+                    lightSettingToggle("Show Quest", isOn: $showQuestProgress, scale: s)
+                    lightSettingToggle("Show Notifications", isOn: $showNotifications, scale: s)
+                    lightSettingToggle("Show Online Status", isOn: $showOnlineStatus, scale: s)
+                    lightSettingBlueButton("Restore Purchases", buttonText: "Restore", scale: s) {}
 
-                    lightSettingHeader("Sounds", scale: s)
-                    lightSettingToggle("Menu Sounds", isOn: $soundEnabled, scale: s)
-                    lightSettingToggle("Game Sounds", isOn: $soundEnabled, scale: s)
-
-                    lightSettingHeader("Buttons", scale: s)
-                    lightSettingControlLayout(scale: s)
+                    lightSettingHeader("Privacy", scale: s)
+                    lightSettingBlueButton("Privacy Policy", buttonText: "View", scale: s) {}
+                    lightSettingBlueButton("Terms and Conditions", buttonText: "View", scale: s) {}
+                    lightSettingBlueButton("Mini Games Information", buttonText: "View", scale: s) {}
+                    lightSettingToggle("Targeted Advertising", isOn: $targetedAdvertising, scale: s)
 
                     lightSettingHeader("Info", scale: s)
-                    lightSettingButton("Version", value: originalVersionString, scale: s) {}
+                    lightSettingOrangeButton("More Games", buttonText: "View", scale: s) {}
+                    lightSettingBlueButton("Contact Support", buttonText: "Contact", scale: s) {}
+                    lightSettingBlueButton("Join Agar.io on Instagram", buttonText: "Follow", scale: s) {}
+                    lightSettingBlueButton("Join Agar.io on Facebook", buttonText: "Join", scale: s) {}
+                    lightSettingBlueButton("Check out Agar.io Youtube Channel", buttonText: "Subscribe", scale: s) {}
+                    lightSettingBlueButton("Credits", buttonText: "View", scale: s) {}
+
+                    lightSettingValueRow("UID:", value: "—", scale: s)
+                    lightSettingValueRow("Apple ID:", value: "—", scale: s)
+                    lightSettingValueRow("Version", value: originalVersionString, scale: s)
+                    lightSettingBlueButton("Region:", buttonText: "US", scale: s) {}
+                    lightSettingOrangeButton("Delete Account", buttonText: "Delete", scale: s) {}
                 }
                 .padding(.horizontal, 5 * s)
                 .padding(.vertical, 4 * s)
@@ -13759,6 +13791,103 @@ struct MainMenu: View {
         .frame(height: 50.5 * s)
         .contentShape(Rectangle())
         .onTapGesture { action() }
+    }
+
+    private func lightSettingBlueButton(_ title: String, buttonText: String, scale s: CGFloat, action: @escaping () -> Void) -> some View {
+        lightSettingActionButton(title, buttonText: buttonText, scale: s, frameName: "mcfs-blue", action: action)
+    }
+
+    private func lightSettingOrangeButton(_ title: String, buttonText: String, scale s: CGFloat, action: @escaping () -> Void) -> some View {
+        lightSettingActionButton(title, buttonText: buttonText, scale: s, frameName: "mcfs-orange", action: action)
+    }
+
+    private func lightSettingActionButton(_ title: String, buttonText: String, scale s: CGFloat, frameName: String, action: @escaping () -> Void) -> some View {
+        CCBISceneView(
+            ccbFile: "MenuSettingsNode_26.2.0.ccbi",
+            centerRoot: true,
+            context: CCBIBindingContext(
+                actions: ["hintButtonCallback": action, "hintButtonCallback:": action],
+                labelOverrides: [
+                    "_leftLabel": title,
+                    "_rightLabel": ""
+                ],
+                visibilityOverrides: [
+                    "_titleLabel": false,
+                    "_firstTitleLabel": false,
+                    "_leftSmallLabel": false,
+                    "_rightLabel": false,
+                    "_toggleSwipe": false,
+                    "_hint": false,
+                    "_leftToggle": false,
+                    "_centerToggle": false,
+                    "_rightToggle": false,
+                    "_greenButton": false,
+                    "_facebookLoginButton": false,
+                    "_googleButton": false,
+                    "_appleButton": false,
+                    "_orangeButton": frameName == "mcfs-orange",
+                    "_instagramButton": false,
+                    "_facebookButton": false,
+                    "_youtubeButton": false,
+                    "_blueButton": frameName == "mcfs-blue"
+                ],
+                replacingSlotViews: [
+                    (frameName == "mcfs-orange" ? "_orangeButton" : "_blueButton"): AnyView(
+                        ZStack {
+                            MCFSFrame(name: frameName)
+                            Text(buttonText)
+                                .font(.custom("OpenSans-Bold", size: 14 * s))
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                                .padding(.horizontal, 6 * s)
+                        }
+                        .frame(width: 100 * s, height: 38 * s)
+                    )
+                ],
+                designScaleModifier: { _ in s }
+            )
+        )
+        .frame(height: 50.5 * s)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            SoundManager.shared.play(.menuClick)
+            action()
+        }
+    }
+
+    private func lightSettingValueRow(_ title: String, value: String, scale s: CGFloat) -> some View {
+        CCBISceneView(
+            ccbFile: "MenuSettingsNode_26.2.0.ccbi",
+            centerRoot: true,
+            context: CCBIBindingContext(
+                labelOverrides: [
+                    "_leftLabel": title,
+                    "_rightLabel": value
+                ],
+                visibilityOverrides: [
+                    "_titleLabel": false,
+                    "_firstTitleLabel": false,
+                    "_leftSmallLabel": false,
+                    "_toggleSwipe": false,
+                    "_hint": false,
+                    "_leftToggle": false,
+                    "_centerToggle": false,
+                    "_rightToggle": false,
+                    "_greenButton": false,
+                    "_facebookLoginButton": false,
+                    "_googleButton": false,
+                    "_appleButton": false,
+                    "_orangeButton": false,
+                    "_instagramButton": false,
+                    "_facebookButton": false,
+                    "_youtubeButton": false,
+                    "_blueButton": false
+                ],
+                designScaleModifier: { _ in s }
+            )
+        )
+        .frame(height: 50.5 * s)
     }
 
     private func lightSettingRowSwitch(_ title: String, isOn: Binding<Bool>, scale s: CGFloat) -> some View {
