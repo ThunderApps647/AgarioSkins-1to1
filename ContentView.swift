@@ -4577,7 +4577,7 @@ struct ContentView: View {
     // Start Menu Modifiable Settings
     @State private var targetBotCount: Int = 20
     @State private var targetFeedBotCount: Int = 15
-    @State private var botStartMass: CGFloat = 95
+    @State private var botStartMass: CGFloat = 31
     /// "Randomize Bot Start Mass": the lobby's opening wave of bots spawns anywhere from
     /// 40 to 10,000 mass (skewed toward the low/mid range like a real in-progress server),
     /// while every bot that dies and respawns afterwards re-enters at a fresh-spawn
