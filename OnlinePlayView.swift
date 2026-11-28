@@ -657,7 +657,8 @@ struct OnlineGameView: View {
         if lastJoystickDirection != .zero {
             PlayerArrow(geometry: geometry, joystickIsDragging: joystickIsDragging,
                         joystickOffset: joystickOffset, lastJoystickDirection: lastJoystickDirection,
-                        playerCells: playerCells, playerCenter: playerCenter, zoomLevel: $zoomLevel)
+                        playerCells: playerCells, playerCenter: playerCenter,
+                        cameraCenter: smoothedPlayerPosition, zoomLevel: $zoomLevel)
         }
         if joystickIsDragging {
             JoystickView(joystickOffset: $joystickOffset, joystickBasePosition: $joystickBasePosition, uiScale: OriginalGameplay.uiScale(for: geometry.size))
