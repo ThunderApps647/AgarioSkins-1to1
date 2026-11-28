@@ -2010,7 +2010,8 @@ class FoodManager: ObservableObject {
 struct Token: Identifiable {
     let id = UUID()
     var position: CGPoint
-    let radius: CGFloat = 26
+    /// Slice_Gameplay foodBaseRadius = 10 (diameter 20 world units).
+    let radius: CGFloat = 10
 }
 
 /// One food pellet / ejected-mass pellet / token being magnet-sucked into the cell
@@ -11479,7 +11480,10 @@ struct ContentView: View {
         for _ in 0..<OriginalGameplay.offlineVirusCount { viruses.append(spawnSingleVirusSafely()) }
     }
     private func spawnInitialTokens() {
-        for _ in 0..<OriginalGameplay.offlineFoodCount { tokens.append(spawnSingleToken(existing: tokens)) }
+        // Offline pellets live in FoodManager (one authoritative food system).
+        // The legacy Token array duplicated every pellet with the HUD snowflake
+        // artwork, doubling the food supply and the mass on every pickup.
+        tokens.removeAll()
     }
     
     /// Exact Agar.io virus shatter distribution (`AgarCell::eatVirus`): the cell

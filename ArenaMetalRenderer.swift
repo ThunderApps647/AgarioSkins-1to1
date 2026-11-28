@@ -311,6 +311,19 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
     private let texCache: ArenaTextureCache
     var box: ArenaRenderBox
 
+    /// Agar.io food palette.  Tokens are flat coloured discs, matching the
+    /// eight-colour pickup set used by the Cocos arena.
+    static let tokenPalette: [SIMD4<Float>] = [
+        SIMD4<Float>(1.00, 0.00, 0.00, 1.0),
+        SIMD4<Float>(1.00, 0.50, 0.00, 1.0),
+        SIMD4<Float>(1.00, 0.92, 0.00, 1.0),
+        SIMD4<Float>(0.00, 0.85, 0.00, 1.0),
+        SIMD4<Float>(0.00, 0.85, 0.90, 1.0),
+        SIMD4<Float>(0.00, 0.31, 1.00, 1.0),
+        SIMD4<Float>(0.55, 0.00, 1.00, 1.0),
+        SIMD4<Float>(1.00, 0.00, 0.85, 1.0),
+    ]
+
     private var solidBuf: [SolidVertex] = []
     private var trigCache: [Int: [(cos: Float, sin: Float)]] = [:]
     /// `-[BaseArenaView createCell:updateRate:]` (0x1003736c4): a new cell is
@@ -876,9 +889,6 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         for c in box.botCells { liveCellIDs.insert(c.id) }
         cellSpawnTimes = cellSpawnTimes.filter { liveCellIDs.contains($0.key) || nowTS - $0.value < 2.0 }
         for id in liveCellIDs where cellSpawnTimes[id] == nil { cellSpawnTimes[id] = nowTS }
-        let tokTex = texCache.bundledSpriteTexture(named: "token-snowflake")
-            ?? texCache.texture(named: "token-snowflake") ?? texCache.texture(named: "token")
-        let tokSide = Float(52.0) * zoomPx
         let rOutShot = (shotR + 5.0) * zoomPx
         let rInShot = max(1.0, (shotR * (shotR - 5.0) / (shotR + 5.0)) * zoomPx)
         let segsShot = max(7, min(1000, Int(floor(max(1, shotR * box.softBodyZoom)))))
@@ -887,10 +897,8 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         drawables.reserveCapacity(box.tokens.count + box.playerCells.count + box.botCells.count + box.animatingEatenCells.count + box.viruses.count + 64)
         let myOwner = box.playerCells.first?.ownerID
 
-        if tokTex != nil {
-            for tok in box.tokens where worldVisible.contains(tok.position) {
-                drawables.append(.token(tok))
-            }
+        for tok in box.tokens where worldVisible.contains(tok.position) {
+            drawables.append(.token(tok))
         }
         if let mm = box.massManager {
             mm.forEachVisibleMass(in: worldVisible) { m in
@@ -938,12 +946,17 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
             fanScale = 1.0
             switch item {
             case .token(let tok):
-                if let tokTex {
-                    flushSolid(enc: enc, viewportSize: vpPx)
-                    let sx = Float(tok.position.x) * zoomPx + screenOffX
-                    let sy = Float(tok.position.y) * zoomPx + screenOffY
-                    drawQuad(enc: enc, texture: tokTex, centerX: sx, centerY: sy, width: tokSide * 0.9, height: tokSide, alpha: 1.0, viewportSize: vpPx)
-                }
+                // Food pellets in the client are flat palette-coloured discs at
+                // foodBaseRadius (10 world units).  The snowflake artwork belongs to
+                // the HUD currency counter, not to arena food.
+                let sx = Float(tok.position.x) * zoomPx + screenOffX
+                let sy = Float(tok.position.y) * zoomPx + screenOffY
+                let idx = Int(tok.id.uuidString.prefix(8), radix: 16) ?? 0
+                let palette = Self.tokenPalette
+                appendDiskFan(cx: sx, cy: sy,
+                              radius: Float(tok.radius) * zoomPx,
+                              count: 18,
+                              color: palette[abs(idx) % palette.count])
 
             case .ejected(let m, let st):
                 let sx = Float(m.renderPosition.x) * zoomPx + screenOffX
