@@ -73,6 +73,15 @@ jobs:
             CODE_SIGN_IDENTITY="" | tee build/xctest_parity.log
           cp -R /tmp/agar_snapshots/* build/snapshots/ 2>/dev/null || true
           xcrun xcresulttool export attachments --path build/TestResults_Parity.xcresult --output-path build/snapshots/xcresult_parity_attachments 2>/dev/null || true
+      - name: Visual guard (baseline comparison)
+        if: always()
+        run: |
+          if [ ! -d Tests/Baselines ] || [ -z "$(ls -A Tests/Baselines 2>/dev/null)" ]; then
+            echo "visual_guard: no baselines committed yet, skipping"
+            exit 0
+          fi
+          python3 -m pip install --quiet pillow
+          python3 tools/visual_guard.py build/snapshots Tests/Baselines
       - if: always()
         uses: actions/upload-artifact@v4
         with:
