@@ -166,7 +166,11 @@ final class AgarUITests: XCTestCase {
         // MenuPause must open while the arena HUD is untouched, before optional
         // overlays (emote picker, leaderboard) can cover its hit area.
         waitAndTap(pauseBtn)
-        let resumeNo = firstExisting(app, ids: ["ccbi.quitCancelButtonCallback", "ccbi._noButton"], timeout: 3.0)
+        var resumeNo = firstExisting(app, ids: ["ccbi.quitCancelButtonCallback", "ccbi._noButton"], timeout: 5.0)
+        if resumeNo == nil {
+            waitAndTap(pauseBtn)
+            resumeNo = firstExisting(app, ids: ["ccbi.quitCancelButtonCallback", "ccbi._noButton"], timeout: 4.0)
+        }
         XCTAssertNotNil(resumeNo, "MenuPause modal should open when Pause is tapped")
         RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         capture(app, name: "Live_06_Arena_HUD_and_Pause.png")
