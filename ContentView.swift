@@ -1196,6 +1196,25 @@ enum SkinColorCatalog {
     }
 }
 
+/// English display names for `gameplayId` values, resolved from the original
+/// `Slice_Shop - Skins.plist` title keys and `en_text.json`.  The old UI invented
+/// "Skin #N" captions even though every official skin ships a product name.
+enum SkinNameCatalog {
+    static let names: [String: String] = {
+        guard let url = Bundle.main.url(forResource: "skin_names", withExtension: "json",
+                                        subdirectory: "AgarAssets"),
+              let data = try? Data(contentsOf: url),
+              let raw = try? JSONSerialization.jsonObject(with: data) as? [String: String]
+        else { return [:] }
+        return raw
+    }()
+
+    static func name(for skinName: String?) -> String? {
+        guard let skinName, let value = names[skinName], !value.isEmpty else { return nil }
+        return value
+    }
+}
+
 enum ArenaSpriteArt {
     /// The folder reference keeps the original PNG bytes, including alpha.
     /// Asset-catalog thinning flattened some event art onto white.
@@ -13286,7 +13305,7 @@ struct MainMenu: View {
                         ForEach(filteredSkins, id: \.self) { skin in
                             let isSelected = selectedSkinName == skin
                             let isDual = DualSkinCatalog.shared.isDual(skin)
-                            let cardTitle = "Skin #\(skin)"
+                            let cardTitle = SkinNameCatalog.name(for: skin) ?? "Skin #\(skin)"
                             let skinPreview = AnyView(
                                 ZStack(alignment: .topTrailing) {
                                     SkinSelectorPreview(skinName: skin)

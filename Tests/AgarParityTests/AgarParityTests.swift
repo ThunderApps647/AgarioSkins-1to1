@@ -1209,5 +1209,10 @@ final class AgarParityTests: XCTestCase {
         XCTAssertEqual(SkinSelectorPreview.resolvedAssetName(for: "1"), "skin_1")
         XCTAssertEqual(SkinColorCatalog.colors.count, 387)
         XCTAssertNotNil(SkinColorCatalog.color(for: "1"))
+        // Captions are the official product names, not "Skin #N" placeholders.
+        XCTAssertEqual(SkinNameCatalog.names.count, 387)
+        XCTAssertEqual(SkinNameCatalog.name(for: "1"), "Banana")
+        XCTAssertEqual(SkinNameCatalog.name(for: "20"), "Heart")
+        XCTAssertEqual(SkinNameCatalog.name(for: "160"), "Brave Heart Lion™")
     }
 }
