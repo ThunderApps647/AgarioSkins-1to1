@@ -10586,7 +10586,9 @@ struct ContentView: View {
             if currentCount + newCells.count < 16 && cells[item.index].targetMass >= 36 {
                 let index = item.index
                 let newMass = cells[index].targetMass / 2
-                let dynamicMergeTime = 30.0 + (Double(newMass) * 0.02)
+                // ValueMap timeToMergeBackMs = 30000; there is no mass term in the
+                // client merge countdown.
+                let dynamicMergeTime = 30.0
                 let visualRadius = OriginalGameplay.radius(forMass: newMass)
                 let ejectionForce = CGFloat(OriginalGameplay.splitImpulsePerSecond)
                 var launchDirection = splitDirection
@@ -10896,7 +10898,7 @@ struct ContentView: View {
                 botCells[action.cellIndex].mass = pieceMass
                 botCells[action.cellIndex].targetMass = pieceMass
                 botCells[action.cellIndex].lagMass = pieceMass
-                botCells[action.cellIndex].mergeTimer = 30.0 + Double(pieceMass) * 0.02
+                botCells[action.cellIndex].mergeTimer = 30.0
                 botCells[action.cellIndex].canMerge = false
                 botCells[action.cellIndex].refreshCachedRadii()
                 for k in 1..<massList.count {
@@ -10925,7 +10927,7 @@ struct ContentView: View {
                         mass: childMass,
                         targetMass: childMass,
                         velocity: parentVelocity,
-                        mergeTimer: 30.0 + Double(childMass) * 0.02,
+                        mergeTimer: 30.0,
                         canMerge: false,
                         splitTimer: 1.0,
                         color: botCells[action.cellIndex].color,
@@ -10953,7 +10955,7 @@ struct ContentView: View {
                 playerCells[action.cellIndex].mass = pieceMass
                 playerCells[action.cellIndex].targetMass = pieceMass
                 playerCells[action.cellIndex].lagMass = pieceMass
-                playerCells[action.cellIndex].mergeTimer = 30.0 + Double(pieceMass) * 0.02
+                playerCells[action.cellIndex].mergeTimer = 30.0
                 playerCells[action.cellIndex].canMerge = false
                 playerCells[action.cellIndex].refreshCachedRadii()
                 for k in 1..<massList.count {
@@ -10979,7 +10981,7 @@ struct ContentView: View {
                         mass: childMass,
                         targetMass: childMass,
                         velocity: parentVelocity,
-                        mergeTimer: 30.0 + Double(childMass) * 0.02,
+                        mergeTimer: 30.0,
                         canMerge: false,
                         splitTimer: 1.0,
                         color: playerCells[action.cellIndex].color,
