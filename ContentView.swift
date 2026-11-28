@@ -13641,7 +13641,7 @@ struct MainMenu: View {
             ScrollView(showsIndicators: false) {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     lightSettingHeader("Account", scale: s)
-                    lightSettingBlueButton("Logout", buttonText: "Logout", scale: s) { playerName = "" }
+                    lightSettingGreenButton("Logout", buttonText: "Logout", scale: s) { playerName = "" }
 
                     lightSettingHeader("Game Options", scale: s)
                     lightSettingBlueButton("Language", buttonText: "Change", scale: s) {}
@@ -13667,6 +13667,7 @@ struct MainMenu: View {
                     lightSettingBlueButton("Terms and Conditions", buttonText: "View", scale: s) {}
                     lightSettingBlueButton("Mini Games Information", buttonText: "View", scale: s) {}
                     lightSettingToggle("Targeted Advertising", isOn: $targetedAdvertising, scale: s)
+                    lightSettingBlueButton("Consent Management", buttonText: "Manage Options", scale: s) {}
 
                     lightSettingHeader("Info", scale: s)
                     lightSettingOrangeButton("More Games", buttonText: "View", scale: s) {}
@@ -13733,6 +13734,7 @@ struct MainMenu: View {
                     "_leftLabel": false,
                     "_leftSmallLabel": false,
                     "_rightLabel": false,
+                    "_firstTitleLabel": false,
                     "_toggleSwipe": false,
                     "_toggleLeftHint": false,
                     "_toggleRightHint": false,
@@ -13795,6 +13797,10 @@ struct MainMenu: View {
 
     private func lightSettingBlueButton(_ title: String, buttonText: String, scale s: CGFloat, action: @escaping () -> Void) -> some View {
         lightSettingActionButton(title, buttonText: buttonText, scale: s, frameName: "mcfs-blue", action: action)
+    }
+
+    private func lightSettingGreenButton(_ title: String, buttonText: String, scale s: CGFloat, action: @escaping () -> Void) -> some View {
+        lightSettingActionButton(title, buttonText: buttonText, scale: s, frameName: "mcfs-green", action: action)
     }
 
     private func lightSettingOrangeButton(_ title: String, buttonText: String, scale s: CGFloat, action: @escaping () -> Void) -> some View {
