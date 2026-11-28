@@ -705,6 +705,15 @@ final class CCBIAtlasStore: @unchecked Sendable {
         }
         ensureAtlasesLoadedLocked()
 
+        // Raw iOS images under GeneratedAssets/images are single files, not atlas
+        // frames.  Searching every atlas by basename can silently return a
+        // same-named legacy crop (the menu backgrounds are the known case), so
+        // resolve those paths from the bundle first.
+        if rawPath.hasPrefix("GeneratedAssets/images/") {
+            lock.unlock()
+            return rawSprite(for: rawPath)
+        }
+
         // Parse "GeneratedAssets/spritesheets/Bundle/All/<sheet>/<frame>"
         var targetSheet = explicitSheet.replacingOccurrences(of: ".plist", with: "")
         var targetFrame = URL(fileURLWithPath: rawPath).lastPathComponent
