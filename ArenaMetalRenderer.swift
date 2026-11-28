@@ -642,7 +642,9 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         let delay = 2.0 / 60.0
         guard age >= delay else { return 0.0 }
         let t = Float(min(1.0, max(0.0, (age - delay) / 0.5)))
-        return 0.1 + 0.9 * backOut(t)
+        // BaseArenaView makeCellWithCellState: CCScaleTo(0.001, 0.001) -> CCShow ->
+        // CCEaseBackOut(CCScaleTo(0.5, 1.0)); the cell is effectively a point on show.
+        return 0.001 + 0.999 * backOut(t)
     }
 
     func draw(in view: MTKView) {
