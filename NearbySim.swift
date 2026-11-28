@@ -994,7 +994,7 @@ final class SrvWorld {
                                mass: newMass, targetMass: newMass,
                                velocity: cells[index].velocity,
                                mergeTimer: dynamicMergeTime, splitTimer: 1.0)
-            newCell.splitImmunityTimer = 0.2
+            newCell.splitImmunityTimer = OriginalGameplay.splitCellCollideSeconds
             newCell.immuneToCellID = cells[index].id
             newCell.splitBornAt = time   // v5: split-run detection window
             if cells[index].targetMass >= 4000 { newCell.massFontHalved = true }
@@ -1979,7 +1979,7 @@ final class SrvWorld {
                                    mergeTimer: 30.0 + pieceMass * 0.02, splitTimer: 1.0)
                 newCell.velocity.x += direction.x * SrvRules.splitEjectionForce
                 newCell.velocity.y += direction.y * SrvRules.splitEjectionForce
-                newCell.splitImmunityTimer = 0.2
+                newCell.splitImmunityTimer = OriginalGameplay.splitCellCollideSeconds
                 newCell.immuneToCellID = cells[cellIdx].id
                 newCell.splitBornAt = time
                 newCell.massFontHalved = poppedHalvesFont

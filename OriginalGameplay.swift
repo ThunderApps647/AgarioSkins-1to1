@@ -36,6 +36,10 @@ enum OriginalGameplay {
     static let minVelocityToMove: Double = 0.01
     /// Split child offset from the parent centre (`mitosisPositionFactor` = 20).
     static let mitosisPositionFactor: Double = 20
+    /// `splitCellColideMs` = 30: new pieces ignore their parent for 30 ms.
+    static let splitCellCollideSeconds: TimeInterval = 0.03
+    /// `timeToMergeBackMs` = 30000, plus the per-mass term used by the server.
+    static let timeToMergeBackSeconds: TimeInterval = 30
 
     static let scaleFactorForEating: Double = 0.866
     /// Cell must be this much heavier than a virus to eat it (`1 / 0.866^2`).

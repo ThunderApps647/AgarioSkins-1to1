@@ -549,8 +549,8 @@ extension AgarPhysicsCore {
 
     /// Port of `SoftBodyCellView::checkCollisionsInto:` +
     /// `processCollisionWithCollidingCells:radiusDisplacement:x:y:`.
-    /// Collisions are sampled per vertex, not per cell circle, and include every visible
-    /// cell (own team, other bots, and viruses) exactly like the original parent-child scan.
+    /// Collisions are sampled per vertex. Rival cells and viruses indent the silhouette,
+    /// while a player's own pieces are skipped so split siblings do not squash each other.
     static func deformArena(
         playerCells: inout [PlayerCell],
         botCells: inout [PlayerCell],

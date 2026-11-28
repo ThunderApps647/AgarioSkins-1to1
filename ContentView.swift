@@ -4886,7 +4886,6 @@ struct ContentView: View {
                         activeEmoteExpiresAt: activeEmoteExpiresAt
                     )
                     .onAppear(perform: spawnInitialObjects)
-                    .transition(.opacity)
                     .zIndex(0)
                 } else {
                     MainMenu(
@@ -4905,7 +4904,6 @@ struct ContentView: View {
                         lastMatchStats: lastMatchStats,
                         onPlayOnline: { showOnlinePlay = true }
                     )
-                    .transition(.opacity)
                 }
                 
                 if isPlaying && !isLeavePopupPresented {
@@ -10600,10 +10598,10 @@ struct ContentView: View {
                     let a = baseAngle + jitter
                     launchDirection = CGSize(width: cos(a), height: sin(a))
                 }
-                // `mitosisPositionFactor` is a percentage of the cell radius, not a
-                // constant world-space gap. Using a flat 20 units buried a small
-                // split piece inside its parent and made large pieces launch late.
-                let spawnOffset = visualRadius * CGFloat(OriginalGameplay.mitosisPositionFactor) / 100.0
+                // `OfflineModeManager` split handler (0x100046fe8): the new piece is
+                // placed at parent + direction * mitosisPositionFactor. The value (20)
+                // is a flat world-space gap, not a percentage of the radius.
+                let spawnOffset = CGFloat(OriginalGameplay.mitosisPositionFactor)
                 let split = AgarPhysicsCore.splitPositions(
                     parent: cells[index].position,
                     direction: launchDirection,
@@ -10612,14 +10610,10 @@ struct ContentView: View {
                     worldSize: worldSize
                 )
                 let spawnPos = split.child
-                cells[index].position = split.parent
-                // If the wall clamped the child, aim the impulse along the actual
-                // parent->child separation rather than into the wall.
-                let actual = CGSize(width: spawnPos.x - split.parent.x,
-                                    height: spawnPos.y - split.parent.y)
-                if hypot(actual.width, actual.height) > 0.01 {
-                    launchDirection = actual.normalized()
-                }
+                // The parent never moves and the launch direction is never
+                // redirected: the server places the piece and keeps the requested
+                // impulse even when arena bounds clamp the spawn point. Re-aiming
+                // along parent->child made border splits fire backwards.
                 
                 var newCell = PlayerCell(
                     ownerID: cells[index].ownerID,
@@ -10628,7 +10622,7 @@ struct ContentView: View {
                     name: cells[index].name, skinName: cells[index].skinName, isBot: cells[index].isBot,
                     isFeedBot: cells[index].isFeedBot, aiSkillTier: cells[index].aiSkillTier
                 )
-                newCell.splitImmunityTimer = 0.2
+                newCell.splitImmunityTimer = OriginalGameplay.splitCellCollideSeconds
                 newCell.immuneToCellID = cells[index].id
                 // Font lineage: ONLY the new piece coming out of an at/above-threshold
                 // cell is born at the half ratio. The splitting cell itself keeps
@@ -10891,14 +10885,14 @@ struct ContentView: View {
                     let split = AgarPhysicsCore.splitPositions(
                         parent: botCells[action.cellIndex].position,
                         direction: direction,
-                        offset: childRadius * CGFloat(OriginalGameplay.mitosisPositionFactor) / 100.0,
+                        offset: CGFloat(OriginalGameplay.mitosisPositionFactor),
                         radius: childRadius,
                         worldSize: worldSize
                     )
-                    botCells[action.cellIndex].position = split.parent
+                    // split.parent is the unchanged pre-split position; only the
+                    // child is moved/clamped, matching AgarCell::eatVirus.
                     let spawn = split.child
-                    let actual = CGSize(width: spawn.x - split.parent.x, height: spawn.y - split.parent.y)
-                    let launch = hypot(actual.width, actual.height) > 0.01 ? actual.normalized() : direction
+                    let launch = direction
                     var newCell = PlayerCell(
                         ownerID: botCells[action.cellIndex].ownerID,
                         position: spawn,
@@ -10915,7 +10909,7 @@ struct ContentView: View {
                         isFeedBot: botCells[action.cellIndex].isFeedBot,
                         aiSkillTier: botCells[action.cellIndex].aiSkillTier
                     )
-                    newCell.splitImmunityTimer = 0.2
+                    newCell.splitImmunityTimer = OriginalGameplay.splitCellCollideSeconds
                     newCell.immuneToCellID = botCells[action.cellIndex].id
                     newCell.massFontHalved = poppedHalvesFont
                     newCell.massFontScale = poppedHalvesFont ? 0.5 : 1.0
@@ -10945,14 +10939,14 @@ struct ContentView: View {
                     let split = AgarPhysicsCore.splitPositions(
                         parent: playerCells[action.cellIndex].position,
                         direction: direction,
-                        offset: childRadius * CGFloat(OriginalGameplay.mitosisPositionFactor) / 100.0,
+                        offset: CGFloat(OriginalGameplay.mitosisPositionFactor),
                         radius: childRadius,
                         worldSize: worldSize
                     )
-                    playerCells[action.cellIndex].position = split.parent
+                    // split.parent is the unchanged pre-split position; only the
+                    // child is moved/clamped, matching AgarCell::eatVirus.
                     let spawn = split.child
-                    let actual = CGSize(width: spawn.x - split.parent.x, height: spawn.y - split.parent.y)
-                    let launch = hypot(actual.width, actual.height) > 0.01 ? actual.normalized() : direction
+                    let launch = direction
                     var newCell = PlayerCell(
                         ownerID: playerCells[action.cellIndex].ownerID,
                         position: spawn,
@@ -10966,7 +10960,7 @@ struct ContentView: View {
                         name: playerCells[action.cellIndex].name,
                         skinName: playerCells[action.cellIndex].skinName
                     )
-                    newCell.splitImmunityTimer = 0.2
+                    newCell.splitImmunityTimer = OriginalGameplay.splitCellCollideSeconds
                     newCell.immuneToCellID = playerCells[action.cellIndex].id
                     newCell.massFontHalved = poppedHalvesFont
                     newCell.massFontScale = poppedHalvesFont ? 0.5 : 1.0
@@ -11548,7 +11542,8 @@ struct ContentView: View {
         resetRecruitmentMotion()
         resetForcedFeedMotion()
         lastFrameTimestamp = 0
-        withAnimation(.easeInOut(duration: 0.22)) { isPlaying = false }
+        // Retail switches Cocos menu states directly; there is no scene fade.
+        isPlaying = false
         displayLink.stop()
     }
 }
@@ -13591,7 +13586,9 @@ struct MainMenu: View {
                                             context: CCBIBindingContext(
                                                 actions: [
                                                     "playButtonCallback": {
-                                                        withAnimation(.easeInOut(duration: 0.22)) { isPlaying = true }
+                                                        // Retail `StateMachine goToApplicationState:` swaps
+                                                        // scenes directly; no cross-fade is applied.
+                                                        isPlaying = true
                                                     }
                                                 ],
                                                 designScaleModifier: { _ in s }
@@ -14143,7 +14140,13 @@ struct PlayerArrow: View {
             x: screenCenter.x + (playerCenter.x - cameraCenter.x) * zoomLevel,
             y: screenCenter.y + (playerCenter.y - cameraCenter.y) * zoomLevel
         )
-        let rawOffset = extent * zoomLevel + 18 * s
+        // DirectionArrow::calculateTotalRadiusWithMassCenter: clamps the
+        // arrow's left tip to 44% of the window height, then the sprite
+        // (47x42 px @2x) hangs outward from that tip.
+        let arrowW = 23.5 * s
+        let arrowH = 21.0 * s
+        let tipOffset = min(extent * zoomLevel, geometry.size.height * 0.44)
+        let rawOffset = tipOffset + arrowW * 0.5
         let rawX = playerScreenCenter.x + (rawOffset * CGFloat(cos(angle)))
         let rawY = playerScreenCenter.y + (rawOffset * CGFloat(sin(angle)))
         
@@ -14162,7 +14165,7 @@ struct PlayerArrow: View {
                 Image(uiImage: dirSprite)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: 18 * s, height: 16 * s)
+                    .frame(width: arrowW, height: arrowH)
                     .rotationEffect(Angle(radians: angle))
             } else {
                 Image("arrow")
@@ -14174,7 +14177,6 @@ struct PlayerArrow: View {
             }
         }
         .position(x: clampedX, y: clampedY)
-        .opacity(0.65)
     }
 }
 

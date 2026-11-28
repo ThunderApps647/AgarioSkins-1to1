@@ -1010,22 +1010,10 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                     guard box.showSkins, let sName = c.skinName else { return nil }
                     return texCache.skinTexture(name: sName)
                 }()
-                // drawBackgroundForTextureTransparency: (0x1003a56d0) runs BEFORE
-                // the outline/body band and paints an opaque disc at the full cell
-                // radius in the cell colour.  The translucent body band and any
-                // transparent texels of the skin then blend against the cell body
-                // instead of the arena grid.  Doing this after the band (or only at
-                // the (r-10) core) left a see-through ring around every skin.
-                if skinTex != nil {
-                    if c.deformedVertices.count >= 8 {
-                        appendScaledFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
-                                        scale: spawn, color: fillSIMD)
-                    } else {
-                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, rW * zoomPx), count: segCount,
-                                      color: fillSIMD)
-                    }
-                    flushSolid(enc: enc, viewportSize: vpPx)
-                }
+                // drawBackgroundForTextureTransparency: (0x1003a56d0) is invoked from
+                // inside drawSkinTextureWithVertices, AFTER the body pass, and only when
+                // the cell opacity byte is not 255.  Arena cells are fully opaque, so no
+                // extra disc may be painted over the skin/body.
 
                 // Party cells use the dedicated branch in drawOutlineWithVertices:
                 // an opaque partySkinOuterOutlineColor disc at r, then
@@ -1045,8 +1033,20 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                         appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW - 5.0 / max(0.01, ptZoom) * spawn) * zoomPx),
                                       count: segCount, color: innerCol)
                     }
+                    // A party cell without a skin still gets the (r - 10) body fill from
+                    // drawFillingWithVertices; with a skin the original skips the body
+                    // pass entirely and the skin covers the party disc.
+                    if skinTex == nil {
+                        if c.deformedVertices.count >= 8 {
+                            appendScaledFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
+                                            scale: innerScale * spawn, color: fillSIMD)
+                        } else {
+                            appendDiskFan(cx: sx, cy: sy, radius: max(1.5, rW * innerScale * spawn * zoomPx),
+                                          count: segCount, color: fillSIMD)
+                        }
+                    }
                     flushSolid(enc: enc, viewportSize: vpPx)
-                } else if !(showPartyBorder && skinTex != nil) {
+                } else {
                     if isSmall {
                         if c.deformedVertices.count >= 8 {
                             appendDeformedFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
@@ -1060,12 +1060,12 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                         if c.deformedVertices.count >= 8 {
                             appendDeformedFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
                                               radiusOffsetWorld: borderOff, isVirus: false, virusSpikeDeltaWorld: 0,
-                                              color: showPartyBorder ? partyRingCol : borderSIMD)
+                                              color: borderSIMD)
                             appendDeformedFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
                                               radiusOffsetWorld: bodyOff, isVirus: false, virusSpikeDeltaWorld: 0, color: bodyBandSIMD)
                         } else {
                             appendDiskFan(cx: sx, cy: sy, radius: (rW + borderOff * spawn) * zoomPx, count: segCount,
-                                          color: showPartyBorder ? partyRingCol : borderSIMD)
+                                          color: borderSIMD)
                             appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW + bodyOff * spawn) * zoomPx), count: segCount, color: bodyBandSIMD)
                         }
                     }

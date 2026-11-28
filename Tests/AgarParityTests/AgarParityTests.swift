@@ -1215,4 +1215,56 @@ final class AgarParityTests: XCTestCase {
         XCTAssertEqual(SkinNameCatalog.name(for: "20"), "Heart")
         XCTAssertEqual(SkinNameCatalog.name(for: "160"), "Brave Heart Lion™")
     }
+
+    func testSoftBodyDeformsAgainstRivalAndVirusButNotSibling() {
+        let world: CGFloat = 30_000
+        let rect = CGRect(x: 0, y: 0, width: world, height: world)
+        let owner = UUID()
+        let rival = UUID()
+
+        // r = 50. A rival cell and a virus each sit exactly one radii sum away,
+        // so their silhouettes touch the player's right and top edges.
+        var player = PlayerCell(ownerID: owner, position: CGPoint(x: 1000, y: 1000),
+                                mass: 25, targetMass: 25, color: .red, name: "p")
+        var bot = PlayerCell(ownerID: rival, position: CGPoint(x: 1100, y: 1000),
+                             mass: 25, targetMass: 25, color: .blue, name: "b", isBot: true)
+        var virus = Virus(position: CGPoint(x: 1000, y: 1150), mass: 100, targetMass: 100)
+        var players = [player]
+        var bots = [bot]
+        var viruses = [virus]
+        for _ in 0..<20 {
+            AgarPhysicsCore.deformArena(playerCells: &players, botCells: &bots, viruses: &viruses,
+                                        visibleWorldRect: rect, worldSize: world, dt: 1.0 / 60.0,
+                                        cocosZoom: 0.69)
+        }
+        player = players[0]
+        XCTAssertEqual(player.deformedVertices.count, player.vertexRadii.count)
+        XCTAssertFalse(player.deformedVertices.isEmpty)
+        let maxX = player.deformedVertices.map { $0.x }.max() ?? 0
+        let maxY = player.deformedVertices.map { $0.y }.max() ?? 0
+        let minX = player.deformedVertices.map { $0.x }.min() ?? 0
+        let minY = player.deformedVertices.map { $0.y }.min() ?? 0
+        XCTAssertLessThan(maxX, 48.0, "player must indent against the rival on its right")
+        XCTAssertLessThan(maxY, 48.0, "player must indent against the virus above it")
+        XCTAssertGreaterThan(-minX, 48.0, "the opposite side must stay at full radius")
+        XCTAssertGreaterThan(-minY, 48.0, "the opposite side must stay at full radius")
+
+        // Same-owner pieces must not squash each other.
+        var siblingA = PlayerCell(ownerID: owner, position: CGPoint(x: 5000, y: 5000),
+                                  mass: 25, targetMass: 25, color: .red, name: "a")
+        var siblingB = PlayerCell(ownerID: owner, position: CGPoint(x: 5100, y: 5000),
+                                  mass: 25, targetMass: 25, color: .red, name: "b")
+        var siblings = [siblingA, siblingB]
+        var noBots: [PlayerCell] = []
+        var noViruses: [Virus] = []
+        for _ in 0..<20 {
+            AgarPhysicsCore.deformArena(playerCells: &siblings, botCells: &noBots, viruses: &noViruses,
+                                        visibleWorldRect: rect, worldSize: world, dt: 1.0 / 60.0,
+                                        cocosZoom: 0.69)
+        }
+        siblingA = siblings[0]
+        let siblingMaxX = siblingA.deformedVertices.map { $0.x }.max() ?? 0
+        XCTAssertGreaterThan(siblingMaxX, 48.0, "siblings must not deform each other")
+    }
+
 }
