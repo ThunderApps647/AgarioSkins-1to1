@@ -32,6 +32,8 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.agario.recreation
         PRODUCT_NAME: "Agar.io"
+        MARKETING_VERSION: "26.2.0"
+        CURRENT_PROJECT_VERSION: "26.2.0"
         PRODUCT_MODULE_NAME: AgarioApp
         ENABLE_TESTABILITY: YES
         TARGETED_DEVICE_FAMILY: "1,2"
