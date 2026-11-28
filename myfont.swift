@@ -42,7 +42,7 @@ public struct MyFont {
         case "opensans-semibolditalic": return "OpenSans-SemiboldItalic"
         case "ubuntu-bold": return "Ubuntu-Bold"
         case "ubuntu-medium": return "Ubuntu-Medium"
-        case "ubuntu-semibold": return "Ubuntu-Semibold"
+        case "ubuntu-semibold": return "UbuntuSans-SemiBold"
         case "ubuntusans-bold": return "UbuntuSans-Bold"
         default: return base
         }

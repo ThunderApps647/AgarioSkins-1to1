@@ -11881,6 +11881,7 @@ struct LeaderboardHUDButton: View {
     private var rowFontSize: CGFloat { 14 * uiScale }
     private var rowSlot: CGFloat { 20 * uiScale }
     private var rowsVerticalMargin: CGFloat { 5 * uiScale }
+    private var rowsBottomPadding: CGFloat { 8 * uiScale }
     private var pfpSide: CGFloat { 17 * uiScale }
     private var pfpRingWidth: CGFloat { 1.5 * uiScale }
 
@@ -11907,7 +11908,7 @@ struct LeaderboardHUDButton: View {
         return max(widgetDesignWidth, iconInset + iconSize + iconTextGap + labelWidth + iconInset * 0.7)
     }
     private var expandedHeight: CGFloat {
-        headerBottom + separatorHeight + rowsVerticalMargin * 2
+        headerBottom + separatorHeight + rowsVerticalMargin * 2 + rowsBottomPadding
             + rowSlot * CGFloat(max(rows.count, 1))
     }
     private var currentWidth: CGFloat { expandedH ? expandedWidth : collapsedSide }
@@ -12040,6 +12041,7 @@ struct LeaderboardHUDButton: View {
             }
         }
         .padding(.top, headerBottom + separatorHeight + rowsVerticalMargin)
+        .padding(.bottom, rowsBottomPadding)
         .transaction { $0.animation = nil }
     }
 
@@ -12671,7 +12673,7 @@ struct MainMenu: View {
     @State private var selectedSkinsTab: Int = 0
     @State private var activeInfoTab: String? = nil
     @State private var requestedShopSection: ShopTab? = nil
-    @State private var matchStatsExpanded: Bool = true
+    @State private var matchStatsExpanded: Bool = false
     @State private var matchStatsSeqID: Int = 0
     @State private var mainMenuEnterID: Int = 0
     /// Injected by ContentView; opens the PLAY ONLINE server browser.
@@ -13628,54 +13630,28 @@ struct MainMenu: View {
     func settingsModalOverlay(scale s: CGFloat, sideInset: CGFloat, containerSize: CGSize) -> some View {
         let settingsTableSlot = AnyView(
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 6 * s) {
-                    lightSettingToggle("Sound Effects", isOn: $soundEnabled, scale: s)
-                    lightSettingToggle("Dark Mode", isOn: $darkModeGrid, scale: s)
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    lightSettingHeader("Game Options", scale: s)
                     lightSettingToggle("Show Mass", isOn: $showMassText, scale: s)
-                    lightSettingToggle("Show Skins", isOn: $showSkins, scale: s)
-                    lightSettingToggle("Show Level Badge", isOn: $showPlayerLevel, scale: s)
                     lightSettingToggle("Show Arrow", isOn: $showArrow, scale: s)
-                    lightSettingToggle("Show Emoji Widget", isOn: $showEmojiWidget, scale: s)
-                    lightSettingToggle("Show Minimap", isOn: $showMinimap, scale: s)
-                    lightSettingToggle("Stop Movement on Release", isOn: $stopOnRelease, scale: s)
+                    lightSettingToggle("Show Skins", isOn: $showSkins, scale: s)
+                    lightSettingToggle("Show Level", isOn: $showPlayerLevel, scale: s)
+                    lightSettingToggle("Show Emojis Button", isOn: $showEmojiWidget, scale: s)
+                    lightSettingToggle("Dark Background", isOn: $darkModeGrid, scale: s)
+                    lightSettingToggle("Stop on Release", isOn: $stopOnRelease, scale: s)
+
+                    lightSettingHeader("Sounds", scale: s)
+                    lightSettingToggle("Menu Sounds", isOn: $soundEnabled, scale: s)
+                    lightSettingToggle("Game Sounds", isOn: $soundEnabled, scale: s)
+
+                    lightSettingHeader("Buttons", scale: s)
                     lightSettingControlLayout(scale: s)
 
-                    Text("Offline Match")
-                        .font(.custom("OpenSans-Bold", size: 14 * s))
-                        .foregroundColor(Color(hex: 0x5A5F66))
-                        .padding(.top, 8 * s)
-
-                    VStack(alignment: .leading, spacing: 8 * s) {
-                        Text("Player Start Mass: \(Int(playerStartMass))").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
-                        Slider(value: $playerStartMass, in: 10...5000, step: 10).accentColor(Color(hex: 0x00C8F8))
-
-                        Text("Bot Start Mass: \(Int(botStartMass))").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
-                        Slider(value: $botStartMass, in: 10...5000, step: 10).accentColor(Color(hex: 0x54C826))
-                            .opacity(randomizeBotStartMass ? 0.4 : 1.0)
-                            .disabled(randomizeBotStartMass)
-
-                        lightSettingRowSwitch("Randomize Bot Start Mass", isOn: $randomizeBotStartMass, scale: s)
-
-                        Text("Bot Count: \(targetBotCount)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
-                        Slider(value: Binding(get: { Double(targetBotCount) }, set: { targetBotCount = Int($0) }), in: 0...100, step: 1).accentColor(Color(hex: 0xF26522))
-
-                        Text("Feed Bot Count: \(feedBotCount)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
-                        Slider(value: Binding(get: { Double(feedBotCount) }, set: { feedBotCount = Int($0) }), in: 0...50, step: 1).accentColor(.pink)
-
-                        Text("Bot Skill: \(menuBotSkillLabel)").font(.custom("Lato-Regular", size: 13 * s)).foregroundColor(Color(hex: 0x555555))
-                        Slider(value: $botSkill, in: 0.4...1.6, step: 0.1).accentColor(.red)
-                    }
-                    .padding(12 * s)
-                    .background(MCFSFrame(name: "mcfs-light-grey"))
-
-                    Text(buildStamp)
-                        .font(.custom("Lato-Regular", size: 10 * s))
-                        .foregroundColor(Color(hex: 0x9A9A9A))
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.top, 4 * s)
+                    lightSettingHeader("Info", scale: s)
+                    lightSettingButton("Version", value: originalVersionString, scale: s) {}
                 }
-                .padding(.horizontal, 10 * s)
-                .padding(.vertical, 8 * s)
+                .padding(.horizontal, 5 * s)
+                .padding(.vertical, 4 * s)
             }
         )
 
@@ -13708,6 +13684,81 @@ struct MainMenu: View {
         let sha = Bundle.main.object(forInfoDictionaryKey: "AgarBuildSHA") as? String ?? "dev"
         let date = Bundle.main.object(forInfoDictionaryKey: "AgarBuildDate") as? String ?? ""
         return date.isEmpty ? "Build \(sha)" : "Build \(sha) · \(date)"
+    }
+
+    private var originalVersionString: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "26.2.0"
+    }
+
+    private func lightSettingHeader(_ title: String, scale s: CGFloat) -> some View {
+        CCBISceneView(
+            ccbFile: "MenuSettingsNode_26.2.0.ccbi",
+            centerRoot: true,
+            context: CCBIBindingContext(
+                labelOverrides: ["_titleLabel": title],
+                visibilityOverrides: [
+                    "_whiteNode": false,
+                    "_leftLabel": false,
+                    "_leftSmallLabel": false,
+                    "_rightLabel": false,
+                    "_toggleSwipe": false,
+                    "_toggleLeftHint": false,
+                    "_toggleRightHint": false,
+                    "_hint": false,
+                    "_leftToggle": false,
+                    "_centerToggle": false,
+                    "_rightToggle": false,
+                    "_greenButton": false,
+                    "_facebookLoginButton": false,
+                    "_googleButton": false,
+                    "_appleButton": false,
+                    "_orangeButton": false,
+                    "_instagramButton": false,
+                    "_facebookButton": false,
+                    "_youtubeButton": false,
+                    "_blueButton": false
+                ],
+                designScaleModifier: { _ in s }
+            )
+        )
+        .frame(height: 50.5 * s)
+    }
+
+    private func lightSettingButton(_ title: String, value: String, scale s: CGFloat, action: @escaping () -> Void) -> some View {
+        CCBISceneView(
+            ccbFile: "MenuSettingsNode_26.2.0.ccbi",
+            centerRoot: true,
+            context: CCBIBindingContext(
+                actions: ["hintButtonCallback": action, "hintButtonCallback:": action],
+                labelOverrides: [
+                    "_leftLabel": title,
+                    "_rightLabel": value
+                ],
+                visibilityOverrides: [
+                    "_titleLabel": false,
+                    "_firstTitleLabel": false,
+                    "_leftSmallLabel": false,
+                    "_toggleSwipe": false,
+                    "_hint": false,
+                    "_leftToggle": false,
+                    "_centerToggle": false,
+                    "_rightToggle": false,
+                    "_greenButton": false,
+                    "_facebookLoginButton": false,
+                    "_googleButton": false,
+                    "_appleButton": false,
+                    "_orangeButton": false,
+                    "_instagramButton": false,
+                    "_facebookButton": false,
+                    "_youtubeButton": false,
+                    "_blueButton": false
+                ],
+                designScaleModifier: { _ in s }
+            )
+        )
+        .frame(height: 50.5 * s)
+        .contentShape(Rectangle())
+        .onTapGesture { action() }
     }
 
     private func lightSettingRowSwitch(_ title: String, isOn: Binding<Bool>, scale s: CGFloat) -> some View {
@@ -13773,7 +13824,7 @@ struct MainMenu: View {
                 designScaleModifier: { _ in s }
             )
         )
-        .frame(height: 46 * s)
+        .frame(height: 50.5 * s)
         .contentShape(Rectangle())
         .onTapGesture { toggleAction() }
     }
@@ -13789,7 +13840,7 @@ struct MainMenu: View {
                     "rightButtonCallback:": { controlLayout = 2 }
                 ],
                 labelOverrides: [
-                    "_leftLabel": "Button Position"
+                    "_leftLabel": "Button Positions"
                 ],
                 visibilityOverrides: [
                     "_leftSmallLabel": false,
@@ -13816,7 +13867,7 @@ struct MainMenu: View {
                 designScaleModifier: { _ in s }
             )
         )
-        .frame(height: 46 * s)
+        .frame(height: 50.5 * s)
     }
 }
 

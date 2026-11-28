@@ -678,7 +678,7 @@ struct PotionsModalView: View {
 
     @ObservedObject private var potionStore = PotionStore.shared
     @State private var nowTimestamp: TimeInterval = Date().timeIntervalSince1970
-    @State private var statusBanner: String = "Brew Mystery Potions to unlock Coins, DNA & Skin Pieces!"
+    @State private var statusBanner: String = "To win a Potion: stay in Top 40 on the leaderboard (or Top 30 in Rush)"
     @State private var activeReward: PotionReward? = nil
     @State private var showHelpModal: Bool = false
 
