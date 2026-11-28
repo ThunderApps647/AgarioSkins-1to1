@@ -12834,7 +12834,6 @@ struct MainMenu: View {
     @State private var matchStatsSeqID: Int = 0
     private var statsDrawerExpanded: Bool { matchStatsExpanded || forceMatchStatsExpanded }
     @State private var mainMenuEnterID: Int = 0
-    @State private var showMoreGameModes = false
     /// Injected by ContentView; opens the PLAY ONLINE server browser.
     var onPlayOnline: () -> Void = {}
 
@@ -13646,7 +13645,9 @@ struct MainMenu: View {
 
                                         Button(action: {
                                             SoundManager.shared.play(.menuClick)
-                                            showMoreGameModes = true
+                                            // One secondary mode is implemented in this build; the
+                                            // authentic entry point opens the live server browser.
+                                            onPlayOnline()
                                         }) {
                                             CCBISceneView(
                                                 ccbFile: "MoreGameModesButton.ccbi",
@@ -13659,7 +13660,7 @@ struct MainMenu: View {
                                             .allowsHitTesting(false)
                                         }
                                         .buttonStyle(CCBIMenuItemButtonStyle())
-                                        .accessibilityIdentifier("menu.moreGameModes")
+                                        .accessibilityIdentifier("menu.playOnline")
                                     }
                                     .frame(width: 250 * s, height: 80 * s)
                                 )
