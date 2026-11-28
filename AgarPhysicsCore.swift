@@ -537,7 +537,9 @@ private enum SoftBodyTrigCache {
         cache[count] = out
         return out
     }
+}
 
+extension AgarPhysicsCore {
     // MARK: - Exact SoftBodyCellView collision deformation
 
     /// One nearby cell or virus the soft-body vertex solver can squash against.

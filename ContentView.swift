@@ -4810,6 +4810,7 @@ struct ContentView: View {
                         activeEmoteExpiresAt: activeEmoteExpiresAt
                     )
                     .onAppear(perform: spawnInitialObjects)
+                    .transition(.opacity)
                     .zIndex(0)
                 } else {
                     MainMenu(
@@ -4828,6 +4829,7 @@ struct ContentView: View {
                         lastMatchStats: lastMatchStats,
                         onPlayOnline: { showOnlinePlay = true }
                     )
+                    .transition(.opacity)
                 }
                 
                 if isPlaying && !isLeavePopupPresented {
@@ -10532,7 +10534,19 @@ struct ContentView: View {
                     }
                 }
                 
-                let spawnOffset = CGFloat(OriginalGameplay.mitosisPositionFactor)
+                // AgarCell::split draws each child direction with +/-0.2 rad of
+                // variation. Without it multiple pieces leave on one rail and the
+                // collision solver has to untangle them at the wall.
+                if launchDirection != .zero {
+                    let baseAngle = atan2(launchDirection.height, launchDirection.width)
+                    let jitter = CGFloat.random(in: -CGFloat(OriginalGameplay.directionAngleVariation)...CGFloat(OriginalGameplay.directionAngleVariation))
+                    let a = baseAngle + jitter
+                    launchDirection = CGSize(width: cos(a), height: sin(a))
+                }
+                // `mitosisPositionFactor` is a percentage of the cell radius, not a
+                // constant world-space gap. Using a flat 20 units buried a small
+                // split piece inside its parent and made large pieces launch late.
+                let spawnOffset = visualRadius * CGFloat(OriginalGameplay.mitosisPositionFactor) / 100.0
                 let split = AgarPhysicsCore.splitPositions(
                     parent: cells[index].position,
                     direction: launchDirection,
@@ -10796,9 +10810,7 @@ struct ContentView: View {
                 continue
             }
             let worldSize = OriginalGameplay.offlineArenaSideLength
-            let spawnOffset = CGFloat(OriginalGameplay.mitosisPositionFactor)
             let impulse = CGFloat(OriginalGameplay.splitImpulsePerSecond)
-            let pieceRadius = OriginalGameplay.radius(forMass: pieceMass)
 
             if action.isBot {
                 guard action.cellIndex < botCells.count else { continue }
@@ -10816,10 +10828,20 @@ struct ContentView: View {
                     let direction = CGSize(width: CGFloat(cos(angle)), height: CGFloat(sin(angle)))
                     let childMass = massList[k]
                     let childRadius = OriginalGameplay.radius(forMass: childMass)
-                    var spawn = botCells[action.cellIndex].position
-                    spawn.x += direction.width * spawnOffset
-                    spawn.y += direction.height * spawnOffset
-                    spawn = AgarPhysicsCore.clampSquashPosition(spawn, radius: childRadius, worldSize: worldSize)
+                    // Push the parent inland when the border clips the child; otherwise
+                    // the two pieces lose their separation and spawn on top of each other
+                    // at the wall (and at every angle where the child would cross it).
+                    let split = AgarPhysicsCore.splitPositions(
+                        parent: botCells[action.cellIndex].position,
+                        direction: direction,
+                        offset: childRadius * CGFloat(OriginalGameplay.mitosisPositionFactor) / 100.0,
+                        radius: childRadius,
+                        worldSize: worldSize
+                    )
+                    botCells[action.cellIndex].position = split.parent
+                    let spawn = split.child
+                    let actual = CGSize(width: spawn.x - split.parent.x, height: spawn.y - split.parent.y)
+                    let launch = hypot(actual.width, actual.height) > 0.01 ? actual.normalized() : direction
                     var newCell = PlayerCell(
                         ownerID: botCells[action.cellIndex].ownerID,
                         position: spawn,
@@ -10842,8 +10864,8 @@ struct ContentView: View {
                     newCell.massFontScale = poppedHalvesFont ? 0.5 : 1.0
                     newCell.aiAggression = botCells[action.cellIndex].aiAggression
                     newCell.aiCaution = botCells[action.cellIndex].aiCaution
-                    newCell.velocity.width += direction.width * impulse
-                    newCell.velocity.height += direction.height * impulse
+                    newCell.velocity.width += launch.width * impulse
+                    newCell.velocity.height += launch.height * impulse
                     botCells.append(newCell)
                 }
             } else {
@@ -10863,10 +10885,17 @@ struct ContentView: View {
                     let direction = CGSize(width: CGFloat(cos(angle)), height: CGFloat(sin(angle)))
                     let childMass = massList[k]
                     let childRadius = OriginalGameplay.radius(forMass: childMass)
-                    var spawn = playerCells[action.cellIndex].position
-                    spawn.x += direction.width * spawnOffset
-                    spawn.y += direction.height * spawnOffset
-                    spawn = AgarPhysicsCore.clampSquashPosition(spawn, radius: childRadius, worldSize: worldSize)
+                    let split = AgarPhysicsCore.splitPositions(
+                        parent: playerCells[action.cellIndex].position,
+                        direction: direction,
+                        offset: childRadius * CGFloat(OriginalGameplay.mitosisPositionFactor) / 100.0,
+                        radius: childRadius,
+                        worldSize: worldSize
+                    )
+                    playerCells[action.cellIndex].position = split.parent
+                    let spawn = split.child
+                    let actual = CGSize(width: spawn.x - split.parent.x, height: spawn.y - split.parent.y)
+                    let launch = hypot(actual.width, actual.height) > 0.01 ? actual.normalized() : direction
                     var newCell = PlayerCell(
                         ownerID: playerCells[action.cellIndex].ownerID,
                         position: spawn,
@@ -10884,8 +10913,8 @@ struct ContentView: View {
                     newCell.immuneToCellID = playerCells[action.cellIndex].id
                     newCell.massFontHalved = poppedHalvesFont
                     newCell.massFontScale = poppedHalvesFont ? 0.5 : 1.0
-                    newCell.velocity.width += direction.width * impulse
-                    newCell.velocity.height += direction.height * impulse
+                    newCell.velocity.width += launch.width * impulse
+                    newCell.velocity.height += launch.height * impulse
                     playerCells.append(newCell)
                 }
             }
@@ -11285,12 +11314,16 @@ struct ContentView: View {
         self.smoothedTotalMass = startMass
         self.cameraJumpOffset = .zero
         let customZoomMultiplier = 1.0 - ((CGFloat(zoomSliderValue) - 1.0) / 49.0) * 0.9
-        self.zoomLevel = OriginalGameplay.calculateZoom(
+        let targetZoom = OriginalGameplay.calculateZoom(
             totalRadius: playerRadius,
             cellCount: 1,
             viewportSize: UIScreen.main.bounds.size,
             customZoomMultiplier: customZoomMultiplier
         )
+        // Enter with the camera pulled back; `updateCameraZoom` eases it in
+        // over the first few frames instead of snapping to the mass-derived
+        // zoom on the same frame the arena appears.
+        self.zoomLevel = targetZoom * 0.72
         self.lastCameraTargetPos = nil
         self.lastCameraCellCount = playerCells.count
     }
@@ -11456,7 +11489,7 @@ struct ContentView: View {
         resetRecruitmentMotion()
         resetForcedFeedMotion()
         lastFrameTimestamp = 0
-        isPlaying = false
+        withAnimation(.easeInOut(duration: 0.22)) { isPlaying = false }
         displayLink.stop()
     }
 }
@@ -12319,14 +12352,21 @@ struct EmojiWidgetHUD: View, Equatable {
             let sceneH = max(1, geometry.size.height - topInset)
             let seqName: String? = isOpen ? "enter" : (toggleSeqID > 0 ? "leave" : "Default Timeline")
 
+            // EmojiWidget.ccbi's selector is a 49.21pt-wide floating list under the
+            // speech-bubble button. The CCBI sequence only translates the bare list, so
+            // draw its frosted panel here; otherwise the emote faces float on the arena
+            // with no frame and read as clipped at the screen edge.
+            let selectorSide = btnSide * 0.62
+            let panelWidth = btnSide * 1.256
+            let panelHeight = selectorSide * CGFloat(emotes.count) + 12 * s
             let selectorList = AnyView(
-                VStack(spacing: 4 * s) {
+                VStack(spacing: 2 * s) {
                     ForEach(emotes, id: \.self) { asset in
                         Button(action: { onSelect(asset) }) {
                             Image(asset)
                                 .resizable()
                                 .scaledToFill()
-                                .frame(width: btnSide * 0.72, height: btnSide * 0.72)
+                                .frame(width: selectorSide, height: selectorSide)
                                 .clipShape(Circle())
                                 .opacity(isOnCooldown ? 0.45 : 1.0)
                         }
@@ -12335,7 +12375,16 @@ struct EmojiWidgetHUD: View, Equatable {
                         .accessibilityIdentifier("hud.emote.\(asset)")
                     }
                 }
-                .padding(.vertical, 4 * s)
+                .frame(width: panelWidth, height: panelHeight)
+                .background(
+                    MCFSFrame(name: "MCFS_leaderboard_content_float")
+                        .clipShape(RoundedRectangle(cornerRadius: 9 * s))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 9 * s)
+                        .stroke(Color.black.opacity(0.10), lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.16), radius: 3 * s, y: 1.5 * s)
             )
 
             CCBISceneView(
@@ -13475,8 +13524,7 @@ struct MainMenu: View {
                                             context: CCBIBindingContext(
                                                 actions: [
                                                     "playButtonCallback": {
-                                                        withAnimation(.easeOut(duration: 0.4)) { zoomLevel = 0.8; isPlaying = true }
-                                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { withAnimation(.spring(duration: 1)) { zoomLevel = 1.0 } }
+                                                        withAnimation(.easeInOut(duration: 0.22)) { isPlaying = true }
                                                     }
                                                 ],
                                                 designScaleModifier: { _ in s }
@@ -13822,7 +13870,7 @@ struct MainMenu: View {
                     "_leftToggle": false,
                     "_centerToggle": false,
                     "_rightToggle": false,
-                    "_greenButton": false,
+                    "_greenButton": frameName == "mcfs-green",
                     "_facebookLoginButton": false,
                     "_googleButton": false,
                     "_appleButton": false,
@@ -13833,7 +13881,7 @@ struct MainMenu: View {
                     "_blueButton": frameName == "mcfs-blue"
                 ],
                 replacingSlotViews: [
-                    (frameName == "mcfs-orange" ? "_orangeButton" : "_blueButton"): AnyView(
+                    (frameName == "mcfs-orange" ? "_orangeButton" : (frameName == "mcfs-green" ? "_greenButton" : "_blueButton")): AnyView(
                         ZStack {
                             MCFSFrame(name: frameName)
                             Text(buttonText)
