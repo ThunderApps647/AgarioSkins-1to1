@@ -1167,5 +1167,7 @@ final class AgarParityTests: XCTestCase {
         let first = try XCTUnwrap(SkinSelectorPreview.bundledImage("skin_1"))
         XCTAssertEqual(first.size.width, 256, accuracy: 1.0)
         XCTAssertEqual(SkinSelectorPreview.resolvedAssetName(for: "1"), "skin_1")
+        XCTAssertEqual(SkinColorCatalog.colors.count, 387)
+        XCTAssertNotNil(SkinColorCatalog.color(for: "1"))
     }
 }

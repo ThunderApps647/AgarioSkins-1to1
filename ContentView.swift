@@ -1171,6 +1171,31 @@ enum SkinEffectsRenderer {
 /// Dual-width skins render their BASE (left) half with the live shine pass sweeping
 /// across every `DualSkin.effectInterval` seconds - the same renderer the in-game cell
 /// uses, so the button doubles as a check that the "SkinEffects" page is bundled.
+/// Cell colour shipped with each official gameplay skin
+/// (Slice_Gameplay - Equippable Skins.plist -> cellColor, 0xRRGGBB00).
+/// The downloaded artwork has a transparent background, so this is the colour
+/// that must sit behind the icon both in the selector and in the arena.
+enum SkinColorCatalog {
+    static let colors: [String: UInt] = {
+        guard let url = Bundle.main.url(forResource: "skin_colors", withExtension: "json",
+                                        subdirectory: "AgarAssets"),
+              let data = try? Data(contentsOf: url),
+              let raw = try? JSONSerialization.jsonObject(with: data) as? [String: String]
+        else { return [:] }
+        var out: [String: UInt] = [:]
+        out.reserveCapacity(raw.count)
+        for (key, hex) in raw {
+            if let value = UInt(hex, radix: 16) { out[key] = value }
+        }
+        return out
+    }()
+
+    static func color(for skinName: String?) -> Color? {
+        guard let skinName, let value = colors[skinName] else { return nil }
+        return Color(hex: value)
+    }
+}
+
 struct SkinSelectorPreview: View {
     let skinName: String
 
@@ -1197,6 +1222,7 @@ struct SkinSelectorPreview: View {
     var body: some View {
         let resolvedName = Self.resolvedAssetName(for: skinName)
         let resolvedImage = Self.bundledImage(resolvedName)
+        let cellColor = SkinColorCatalog.color(for: skinName)
         if DualSkinCatalog.shared.isDual(skinName), let resolvedImage {
             TimelineView(.animation) { timeline in
                 // Reading the timeline date keeps SwiftUI invalidating the canvas every frame.
@@ -1207,6 +1233,9 @@ struct SkinSelectorPreview: View {
                     let circleRect = CGRect(x: center.x - radius, y: center.y - radius,
                                             width: radius * 2, height: radius * 2)
                     let circle = Path(ellipseIn: circleRect)
+                    if let cellColor {
+                        context.fill(circle, with: .color(cellColor))
+                    }
                     var skinContext = context
                     skinContext.clip(to: circle)
                     // Left half only: draw the double-width sheet at 2x the destination
@@ -1224,9 +1253,15 @@ struct SkinSelectorPreview: View {
                 }
             }
         } else if let resolvedImage {
-            Image(uiImage: resolvedImage).resizable().scaledToFill().clipShape(Circle())
+            ZStack {
+                if let cellColor {
+                    Circle().fill(cellColor)
+                }
+                Image(uiImage: resolvedImage).resizable().scaledToFill()
+            }
+            .clipShape(Circle())
         } else {
-            Circle().fill(Color(white: 0.42))
+            Circle().fill(cellColor ?? Color(white: 0.42))
         }
     }
 }
@@ -5882,7 +5917,7 @@ struct ContentView: View {
             position: safePos,
             mass: spawnMass,
             targetMass: spawnMass,
-            color: colors.randomElement() ?? .red,
+            color: SkinColorCatalog.color(for: botSkin) ?? colors.randomElement() ?? .red,
             name: botName,
             skinName: botSkin,
             isBot: true,
@@ -5932,7 +5967,7 @@ struct ContentView: View {
             position: safePos,
             mass: botMass,
             targetMass: botMass,
-            color: Color(hex: 0x01FFBD),
+            color: SkinColorCatalog.color(for: skinName) ?? Color(hex: 0x01FFBD),
             name: feedBotName,
             skinName: skinName,
             isBot: true,
@@ -11282,7 +11317,10 @@ struct ContentView: View {
             Color(hex: 0x67DD00), Color(hex: 0xFFCC00), Color(hex: 0xFF7E00), Color(hex: 0xFF3C3C),
             Color(hex: 0xB608FF), Color(hex: 0xFF3ED3), Color(hex: 0x0078FE), Color(hex: 0x01DDFE)
         ]
-        let chosenColor = availableColors.randomElement() ?? .red
+        // The official skin definition owns the cell colour; only an unskinned
+        // cell rolls one of the eight arena colours.
+        let chosenColor = SkinColorCatalog.color(for: selectedSkinName)
+            ?? availableColors.randomElement() ?? .red
         
         while !foundSafeSpot && attempts < 50 {
             let randomX = CGFloat.random(in: (playerRadius + 50)...(worldSize - playerRadius - 50))
