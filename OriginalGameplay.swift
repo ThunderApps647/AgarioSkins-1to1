@@ -199,6 +199,24 @@ enum OriginalGameplay {
 
     /// Screen-point scale matching `AppDelegate` (`0x1002a714c`) + `CCGLView initWithPointBound:`:
     /// iPhone uses FixedHeight `320` (clamped by `480` width); iPad uses FixedWidth `768` (`w / 768.0`).
+    /// `-[BaseArenaView zoom]` (0x100376f2c) returns `_windowHeight`, a fixed
+    /// normalised window height, not the camera zoom.  `calcCellVertexCount`
+    /// multiplies the cell radius by this value, so ring resolution must not
+    /// shrink when the camera zooms out.  iPhone divides the unit window height
+    /// by `(w/h) / zoomMultiplier`; iPad leaves it at 1.
+    static func softBodyZoom(for size: CGSize, isPhoneOverride: Bool? = nil) -> CGFloat {
+        #if canImport(UIKit)
+        let isPhone = isPhoneOverride ?? (UIDevice.current.userInterfaceIdiom != .pad)
+        #else
+        let isPhone = isPhoneOverride ?? true
+        #endif
+        guard isPhone else { return 1.0 }
+        let w = max(size.width, 1)
+        let h = max(size.height, 1)
+        let phoneRatio = (max(w, h) / min(w, h)) / zoomMultiplier
+        return 1.0 / max(phoneRatio, 0.001)
+    }
+
     static func uiScale(for size: CGSize, isPhoneOverride: Bool? = nil) -> CGFloat {
         let w = max(size.width, 1)
         let h = max(size.height, 1)

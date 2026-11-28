@@ -51,6 +51,8 @@ final class ArenaRenderBox {
     var worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
     var cameraPos: CGPoint = .zero
     var zoom: CGFloat = 1.0
+    /// `[BaseArenaView zoom]`: fixed soft-body ring resolution factor.
+    var softBodyZoom: Float = 0.7
     var darkMode: Bool = false
     var showGrid: Bool = true
     var showSkins: Bool = true
@@ -297,6 +299,12 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
 
     private var solidBuf: [SolidVertex] = []
     private var trigCache: [Int: [(cos: Float, sin: Float)]] = [:]
+    /// `-[BaseArenaView createCell:updateRate:]` (0x1003736c4): a new cell is
+    /// invisible for two update ticks, snaps to 0.1 scale, then CCEaseBackOut
+    /// scales it to 1.0 over 0.5 s.  Keyed by cell UUID so splits replay it.
+    private var cellSpawnTimes: [UUID: CFTimeInterval] = [:]
+    /// Current cell spawn scale applied by the deformed-fan helpers.
+    private var fanScale: Float = 1.0
 
     // Triple-buffered per-frame vertex rings to prevent CPU/GPU races and per-frame allocation flicker
     private let maxFramesInFlight = 3
@@ -419,8 +427,8 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
             let len = max(0.0001, hypotf(vx, vy))
             let spike = (isVirus && (i & 1) == 0) ? virusSpikeDeltaWorld : 0.0
             let totalOffset = (radiusOffsetWorld + spike) * zoomPx
-            pts[i] = SIMD2<Float>(cx + vx * zoomPx + (vx / len) * totalOffset,
-                                  cy + vy * zoomPx + (vy / len) * totalOffset)
+            pts[i] = SIMD2<Float>(cx + vx * zoomPx * fanScale + (vx / len) * totalOffset * fanScale,
+                                  cy + vy * zoomPx * fanScale + (vy / len) * totalOffset * fanScale)
         }
         for i in 0..<n {
             let next = (i + 1) % n
@@ -436,8 +444,8 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         let center = SolidVertex(pixelPos: SIMD2<Float>(cx, cy), color: color)
         var pts = [SIMD2<Float>](repeating: .zero, count: n)
         for i in 0..<n {
-            pts[i] = SIMD2<Float>(cx + Float(verts[i].x) * scale * zoomPx,
-                                  cy + Float(verts[i].y) * scale * zoomPx)
+            pts[i] = SIMD2<Float>(cx + Float(verts[i].x) * scale * zoomPx * fanScale,
+                                  cy + Float(verts[i].y) * scale * zoomPx * fanScale)
         }
         for i in 0..<n {
             let next = (i + 1) % n
@@ -460,7 +468,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
             let vy = Float(v.y)
             let len = max(0.0001, hypotf(vx, vy))
             let spike = (i & 1) == 0 ? spikeDeltaWorld : 0.0
-            let rr = (len + spike) * scale * zoomPx
+            let rr = (len + spike) * scale * zoomPx * fanScale
             pts[i] = SIMD2<Float>(cx + (vx / len) * rr, cy + (vy / len) * rr)
         }
         for i in 0..<n {
@@ -478,7 +486,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         var pts = [SIMD2<Float>](repeating: .zero, count: count)
         for i in 0..<count {
             let spike = (i & 1) == 0 ? spikeDeltaWorld : 0.0
-            let rPx = max(1.0, (radiusWorld + radiusOffsetWorld + spike) * zoomPx)
+            let rPx = max(1.0, (radiusWorld + radiusOffsetWorld + spike) * zoomPx * fanScale)
             pts[i] = SIMD2<Float>(cx + ring[i].cos * rPx, cy + ring[i].sin * rPx)
         }
         for i in 0..<count {
@@ -603,6 +611,24 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         }
         enc.setFragmentTexture(texture, index: 0)
         enc.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: verts.count)
+    }
+
+    /// CCEaseBackOut with the Cocos2d-x default 1.70158 overshoot.
+    @inline(__always)
+    private func backOut(_ t: Float) -> Float {
+        let s: Float = 1.70158
+        let u = t - 1.0
+        return 1.0 + (s + 1.0) * u * u * u + s * u * u
+    }
+
+    private func spawnScale(id: UUID, now: CFTimeInterval) -> Float {
+        guard let start = cellSpawnTimes[id] else { return 1.0 }
+        let age = now - start
+        // CCDelayTime(2 * updateRate) at the 60 Hz arena tick.
+        let delay = 2.0 / 60.0
+        guard age >= delay else { return 0.0 }
+        let t = Float(min(1.0, max(0.0, (age - delay) / 0.5)))
+        return 0.1 + 0.9 * backOut(t)
     }
 
     func draw(in view: MTKView) {
@@ -793,7 +819,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 if let st = box.massManager?.renderStyle(for: sid) {
                     let ro = (shotR + 5.0) * sc * zoomPx
                     let ri = max(1.0, (shotR * (shotR - 5.0) / (shotR + 5.0)) * sc * zoomPx)
-                    let segs = min(64, max(10, Int(floor(shotR * cocosZoom))))
+                    let segs = max(7, min(1000, Int(floor(max(1, shotR * box.softBodyZoom)))))
                     appendDiskFan(cx: sx, cy: sy, radius: ro, count: segs, color: rgba(st.borderColor, alphaMultiplier: a))
                     appendDiskFan(cx: sx, cy: sy, radius: ri, count: segs, color: rgba(st.color, alphaMultiplier: a))
                 }
@@ -828,11 +854,17 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         }
 
         let nowTS = CACurrentMediaTime()
+        // Register first-seen cells for the original create-cell pop animation.
+        var liveCellIDs = Set<UUID>()
+        for c in box.playerCells { liveCellIDs.insert(c.id) }
+        for c in box.botCells { liveCellIDs.insert(c.id) }
+        cellSpawnTimes = cellSpawnTimes.filter { liveCellIDs.contains($0.key) || nowTS - $0.value < 2.0 }
+        for id in liveCellIDs where cellSpawnTimes[id] == nil { cellSpawnTimes[id] = nowTS }
         let tokTex = texCache.texture(named: "token-snowflake") ?? texCache.texture(named: "token")
         let tokSide = Float(52.0) * zoomPx
         let rOutShot = (shotR + 5.0) * zoomPx
         let rInShot = max(1.0, (shotR * (shotR - 5.0) / (shotR + 5.0)) * zoomPx)
-        let segsShot = min(64, max(10, Int(floor(shotR * cocosZoom))))
+        let segsShot = max(7, min(1000, Int(floor(max(1, shotR * box.softBodyZoom)))))
 
         var drawables: [RenderEntity] = []
         drawables.reserveCapacity(box.tokens.count + box.playerCells.count + box.botCells.count + box.animatingEatenCells.count + box.viruses.count + 64)
@@ -886,6 +918,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         let partyInnerCol = SIMD4<Float>(0xF9 / 255.0, 0xF9 / 255.0, 0x2F / 255.0, 1.0)
 
         for item in drawables {
+            fanScale = 1.0
             switch item {
             case .token(let tok):
                 if let tokTex {
@@ -923,7 +956,10 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                     appendScaledVirusFan(cx: sx, cy: sy, verts: v.deformedVertices, zoomPx: zoomPx,
                                          scale: innerScale, spikeDeltaWorld: spikeDelta, color: fillColVirus)
                 } else {
-                    let vCount = min(120, max(30, (2 * Int(floor(max(1, rW * cocosZoom)))) & ~1))
+                    // calcCellVertexCount: floor(radius * zoom), rounded even for viruses.
+                    var rawCount = Int(floor(max(1, rW * box.softBodyZoom)))
+                    rawCount += rawCount & 1
+                    let vCount = max(30, min(1000, rawCount))
                     appendVirusFan(cx: sx, cy: sy, radiusWorld: rW, zoomPx: zoomPx, pointCount: vCount,
                                    radiusOffsetWorld: borderOff, spikeDeltaWorld: spikeDelta, color: borderColVirus)
                     appendVirusFan(cx: sx, cy: sy, radiusWorld: rW, zoomPx: zoomPx, pointCount: vCount,
@@ -934,18 +970,24 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 flushSolid(enc: enc, viewportSize: vpPx)
 
             case .cell(let c, let isLocal):
+                let spawn = spawnScale(id: c.id, now: nowTS)
+                if spawn <= 0.001 { continue }
+                fanScale = spawn
                 let sx = Float(c.position.x) * zoomPx + screenOffX
                 let sy = Float(c.position.y) * zoomPx + screenOffY
-                let rW = Float(c.cachedVisualRadius)
-                let segCount = max(20, min(64, Int(rW * ptZoom * 0.85)))
+                let baseRadius = Float(c.cachedVisualRadius)
+                let rW = baseRadius * spawn
+                // calcCellVertexCount fallback before the soft-body arrays exist.
+                let minPoints = baseRadius <= 20.0 ? 7 : 10
+                let segCount = max(minPoints, min(1000, Int(floor(max(1, baseRadius * box.softBodyZoom)))))
                 // SoftBodyCellView::drawOutlineWithVertices (0x1003a5064):
                 //   outline at (r + 10) / r, body fill at (r + 5) / r.
                 // drawFillingWithVertices (0x1003a528c) then paints an inner disc at (r - 10) / r.
-                let isSmall = rW <= 18.0
+                let isSmall = baseRadius <= 18.0
                 // (r*zoom + 10)/(r*zoom): 10 and 5 are fixed screen points.
                 let borderOff = 10.0 / max(0.01, ptZoom)
                 let bodyOff = 5.0 / max(0.01, ptZoom)
-                let innerScale = max(0.0, 1.0 - 10.0 / max(0.001, rW * ptZoom))
+                let innerScale = max(0.0, 1.0 - 10.0 / max(0.001, baseRadius * ptZoom))
                 let isTeammate = box.teammateOwnerID == c.ownerID || box.teammateOwnerIDs.contains(c.ownerID)
                 let showPartyBorder = isTeammate || (isLocal && box.localPlayerInParty)
                 let fillSIMD = rgba(c.color)
@@ -960,7 +1002,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 if showPartyBorder {
                     let outerCol = SIMD4<Float>(partyRingCol.x, partyRingCol.y, partyRingCol.z, fillSIMD.w)
                     let innerCol = SIMD4<Float>(partyInnerCol.x, partyInnerCol.y, partyInnerCol.z, fillSIMD.w)
-                    let innerPartyScale = max(0.0, 1.0 - 5.0 / max(0.001, rW * ptZoom))
+                    let innerPartyScale = max(0.0, 1.0 - 5.0 / max(0.001, baseRadius * ptZoom))
                     if c.deformedVertices.count >= 8 {
                         appendDeformedFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
                                           radiusOffsetWorld: 0, isVirus: false, virusSpikeDeltaWorld: 0, color: outerCol)
@@ -968,7 +1010,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                                         scale: innerPartyScale, color: innerCol)
                     } else {
                         appendDiskFan(cx: sx, cy: sy, radius: max(1.5, rW * zoomPx), count: segCount, color: outerCol)
-                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW - 5.0 / max(0.01, ptZoom)) * zoomPx),
+                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW - 5.0 / max(0.01, ptZoom) * spawn) * zoomPx),
                                       count: segCount, color: innerCol)
                     }
                     flushSolid(enc: enc, viewportSize: vpPx)
@@ -990,9 +1032,9 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                             appendDeformedFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
                                               radiusOffsetWorld: bodyOff, isVirus: false, virusSpikeDeltaWorld: 0, color: bodyBandSIMD)
                         } else {
-                            appendDiskFan(cx: sx, cy: sy, radius: (rW + borderOff) * zoomPx, count: segCount,
+                            appendDiskFan(cx: sx, cy: sy, radius: (rW + borderOff * spawn) * zoomPx, count: segCount,
                                           color: showPartyBorder ? partyRingCol : borderSIMD)
-                            appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW + bodyOff) * zoomPx), count: segCount, color: bodyBandSIMD)
+                            appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW + bodyOff * spawn) * zoomPx), count: segCount, color: bodyBandSIMD)
                         }
                     }
                     flushSolid(enc: enc, viewportSize: vpPx)
@@ -1001,7 +1043,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 // drawBackgroundForTextureTransparency: (0x1003a56d0) runs before
                 // the skin and paints an opaque white polygon only when the cell's
                 // alpha is not fully opaque.
-                if let skinTex, fillSIMD.w < 1.0 {
+                if let skinTex, fillSIMD.x < 0.999 { // initialColor3b.r != 255
                     if c.deformedVertices.count >= 8 {
                         appendScaledFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
                                         scale: 1.0, color: SIMD4<Float>(1, 1, 1, 1))
@@ -1016,14 +1058,14 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 // (0x1003a56f0) scales the party skin geometry by 1 - 6/(r*zoom),
                 // but calcTexCoordsInto still uses the unscaled vertices.
                 if let skinTex {
-                    let vertexScale = showPartyBorder
-                        ? max(0.5, 1.0 - 6.0 / max(0.001, rW * ptZoom))
-                        : 1.0
-                    let rFallback = max(1.5, rW * zoomPx)
+                    let vertexScale = (showPartyBorder
+                        ? max(0.5, 1.0 - 6.0 / max(0.001, baseRadius * ptZoom))
+                        : 1.0) * spawn
+                    let rFallback = max(1.5, baseRadius * zoomPx)
                     drawTexturedFan(enc: enc, texture: skinTex, cx: sx, cy: sy,
                                     verts: c.deformedVertices, zoomPx: zoomPx,
                                     radiusOffsetWorld: 0, fallbackRadiusPx: rFallback,
-                                    baseRadiusWorld: rW, vertexScale: vertexScale,
+                                    baseRadiusWorld: baseRadius, vertexScale: vertexScale,
                                     alpha: fillSIMD.w, viewportSize: vpPx)
 
                     let altSince: TimeInterval? = isLocal
@@ -1036,7 +1078,7 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                         drawTexturedFan(enc: enc, texture: altTex, cx: sx, cy: sy,
                                         verts: c.deformedVertices, zoomPx: zoomPx,
                                         radiusOffsetWorld: 0, fallbackRadiusPx: rFallback,
-                                        baseRadiusWorld: rW, vertexScale: vertexScale,
+                                        baseRadiusWorld: baseRadius, vertexScale: vertexScale,
                                         alpha: min(fillSIMD.w, max(0.0, fade)), viewportSize: vpPx)
                     }
                 }
@@ -1078,20 +1120,21 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                     let elapsed = nowTS - box.activeEmoteStartedAt
                     let remaining = box.activeEmoteExpiresAt - nowTS
                     let alpha = Float(min(1.0, min(elapsed / 0.12, remaining / 0.2)))
-                    let rFallback = max(1.5, rW * zoomPx)
+                    let rFallback = max(1.5, baseRadius * zoomPx)
                     if alpha > 0.01 && rFallback > 4 {
                         drawTexturedFan(enc: enc, texture: emoteTex, cx: sx, cy: sy,
                                         verts: c.deformedVertices, zoomPx: zoomPx,
                                         radiusOffsetWorld: 0, fallbackRadiusPx: rFallback,
-                                        baseRadiusWorld: rW, alpha: alpha, viewportSize: vpPx)
+                                        baseRadiusWorld: baseRadius, vertexScale: spawn,
+                                        alpha: alpha, viewportSize: vpPx)
                     }
                 }
 
                 // Cell labels + League Badges + friend-pfp (SoftBodyCellView: OpenSans-Bold white w/ outline, z:2)
-                let screenSolidR = Float(c.cachedSolidRadius) * zoomPx
+                let screenSolidR = Float(c.cachedSolidRadius) * spawn * zoomPx
                 if screenSolidR > 12.0 * scale {
                     let level = box.ownerLevels[c.ownerID]
-                    let rWFloat = Float(c.cachedSolidRadius)
+                    let rWFloat = Float(c.cachedSolidRadius) * spawn
                     let w30 = c.name.isEmpty ? Float(0) : texCache.widthAt30pt(for: c.name)
                     let nameScale = max(Float(0.8), (3.24 * rWFloat) / (w30 + 161.0))
                     let fontPx = max(8.0 * scale, 30.0 * nameScale * zoomPx)

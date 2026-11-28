@@ -2909,6 +2909,7 @@ struct GameWorldView: View {
         renderBox.worldSize = worldSize
         renderBox.cameraPos = smoothedPlayerPosition
         renderBox.zoom = zoomLevel
+        renderBox.softBodyZoom = Float(OriginalGameplay.softBodyZoom(for: UIScreen.main.bounds.size))
         renderBox.darkMode = darkModeGrid
         renderBox.showGrid = showGrid
         renderBox.showSkins = showSkins
@@ -10639,7 +10640,7 @@ struct ContentView: View {
     
     private func updateCellDeformation(dt: CGFloat) {
         let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
-        let cocosZoom = zoomLevel / OriginalGameplay.arenaScreenScale(for: UIScreen.main.bounds.size)
+        let softBodyZoom = OriginalGameplay.softBodyZoom(for: UIScreen.main.bounds.size)
         AgarPhysicsCore.deformArena(
             playerCells: &playerCells,
             botCells: &botCells,
@@ -10647,7 +10648,7 @@ struct ContentView: View {
             visibleWorldRect: visibleWorldRect,
             worldSize: worldSize,
             dt: dt,
-            cocosZoom: cocosZoom
+            cocosZoom: softBodyZoom
         )
     }
     

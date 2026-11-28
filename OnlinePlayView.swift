@@ -1206,7 +1206,7 @@ struct OnlineGameView: View {
     private func updateCellDeformation(dt: CGFloat) {
         let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
         let visRect = visibleWorldRect
-        let cocosZoom = zoomLevel / OriginalGameplay.uiScale(for: UIScreen.main.bounds.size)
+        let softBodyZoom = OriginalGameplay.softBodyZoom(for: UIScreen.main.bounds.size)
         AgarPhysicsCore.deformArena(
             playerCells: &playerCells,
             botCells: &botCells,
@@ -1214,7 +1214,7 @@ struct OnlineGameView: View {
             visibleWorldRect: visRect,
             worldSize: worldSize,
             dt: dt,
-            cocosZoom: cocosZoom
+            cocosZoom: softBodyZoom
         )
     }
 }

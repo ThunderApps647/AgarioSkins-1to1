@@ -273,7 +273,7 @@ enum AgarPhysicsCore {
                 continue
             }
 
-            let cellVertexCount = max(24, min(72, (Int(floor(max(1.0, visualRadius * cocosZoom))) & ~1)))
+            let cellVertexCount = softBodyVertexCount(radius: visualRadius, zoom: cocosZoom, isVirus: false)
             let trig = SoftBodyTrigCache.get(count: cellVertexCount)
 
             if cells[i].deformedVertices.count != cellVertexCount ||
@@ -616,6 +616,16 @@ extension AgarPhysicsCore {
         return out
     }
 
+    /// `-[SoftBodyCellView calcCellVertexCount]` (0x1003a590c):
+    /// `max(minimumNumberOfPoints, min(1000, floor(radius * zoom)))` with virus
+    /// rings rounded up to an even vertex count.
+    private static func softBodyVertexCount(radius: CGFloat, zoom: CGFloat, isVirus: Bool) -> Int {
+        let minimum = radius <= 20.0 ? 7 : (isVirus ? 30 : 10)
+        var raw = Int(floor(max(1.0, radius * zoom)))
+        if isVirus { raw += raw & 1 }
+        return max(minimum, min(1000, raw))
+    }
+
     private static func deformCellsExact(
         cells: inout [PlayerCell],
         viruses: [Virus],
@@ -647,7 +657,7 @@ extension AgarPhysicsCore {
                 continue
             }
 
-            let vertexCount = max(24, min(72, (Int(floor(max(1.0, visualRadius * cocosZoom))) & ~1)))
+            let vertexCount = softBodyVertexCount(radius: visualRadius, zoom: cocosZoom, isVirus: false)
             let trig = SoftBodyTrigCache.get(count: vertexCount)
 
             if cells[i].deformedVertices.count != vertexCount ||
@@ -784,7 +794,7 @@ extension AgarPhysicsCore {
                 continue
             }
 
-            let vertexCount = min(120, max(30, (2 * Int(floor(max(1.0, visualRadius * cocosZoom)))) & ~1))
+            let vertexCount = softBodyVertexCount(radius: visualRadius, zoom: cocosZoom, isVirus: true)
             let trig = SoftBodyTrigCache.get(count: vertexCount)
             if viruses[i].deformedVertices.count != vertexCount ||
                viruses[i].vertexDisplacements.count != vertexCount ||
