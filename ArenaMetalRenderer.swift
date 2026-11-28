@@ -125,7 +125,7 @@ private final class ArenaTextureCache {
         let resolvedName = SkinSelectorPreview.resolvedAssetName(for: name)
         let key = "skin:\(resolvedName):\(isAlternate ? 1 : 0)"
         if let hit = imageTextures[key] { return hit }
-        guard let img = UIImage(named: resolvedName) ?? UIImage(named: "Skins/\(resolvedName)") else {
+        guard let img = SkinSelectorPreview.bundledImage(resolvedName) else {
             return nil
         }
         let sourceImg: UIImage = {
@@ -1103,12 +1103,14 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                     }
                     flushSolid(enc: enc, viewportSize: vpPx)
                 } else {
+                    // Unskinned cell: drawFillingWithVertices paints the opaque
+                    // (r - 10pt)/r core in the cell's own colour.  Without this
+                    // the banded body read as a see-through ring.
                     if c.deformedVertices.count >= 8 {
                         appendScaledFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
                                         scale: innerScale, color: fillSIMD)
                     } else {
-                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW - 10.0 / max(0.01, ptZoom)) * zoomPx),
-                                      count: segCount, color: fillSIMD)
+                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, rW * innerScale * zoomPx), count: segCount, color: fillSIMD)
                     }
                     flushSolid(enc: enc, viewportSize: vpPx)
                 }

@@ -509,9 +509,9 @@ final class TextSpriteCache {
     /// so they stay crisp when a big cell blows the label up on screen.
     let referenceFontSize: CGFloat = 96
     private let renderScale: CGFloat = 2.0
-    /// The old code stamped the black text 32x around a 7%-of-font-size circle.
-    /// A centred stroke of 14% extends 7% outward, so the outline weight matches.
-    private let strokePercent: CGFloat = 14.0
+    /// `MCLabelTTF` mass label uses a 2 px outline at fontSize 30 (6.7% of the
+    /// font).  CoreText's stroke is centred, so a 6.7% stroke extends 3.3% out.
+    private let strokePercent: CGFloat = 6.7
     
     struct Sprite {
         let image: Image
@@ -1174,18 +1174,30 @@ enum SkinEffectsRenderer {
 struct SkinSelectorPreview: View {
     let skinName: String
 
+    static func bundledImage(_ name: String) -> UIImage? {
+        if let img = UIImage(named: name) { return img }
+        for subdirectory in ["AgarAssets/Skins", "Skins"] {
+            if let url = Bundle.main.url(forResource: name, withExtension: "png", subdirectory: subdirectory),
+               let img = UIImage(contentsOfFile: url.path) {
+                return img
+            }
+        }
+        return nil
+    }
+
     static func resolvedAssetName(for name: String) -> String {
         if name == "Dragon" { return "skin1" }
         if Int(name) != nil {
-            if UIImage(named: "skin_\(name)") != nil { return "skin_\(name)" }
-            if UIImage(named: name) != nil { return name }
+            if bundledImage("skin_\(name)") != nil { return "skin_\(name)" }
+            if bundledImage(name) != nil { return name }
         }
         return name
     }
 
     var body: some View {
         let resolvedName = Self.resolvedAssetName(for: skinName)
-        if DualSkinCatalog.shared.isDual(skinName) {
+        let resolvedImage = Self.bundledImage(resolvedName)
+        if DualSkinCatalog.shared.isDual(skinName), let resolvedImage {
             TimelineView(.animation) { timeline in
                 // Reading the timeline date keeps SwiftUI invalidating the canvas every frame.
                 let wallClock = timeline.date.timeIntervalSinceReferenceDate
@@ -1200,7 +1212,7 @@ struct SkinSelectorPreview: View {
                     // Left half only: draw the double-width sheet at 2x the destination
                     // width so the base half fills the circle and the alt half falls
                     // outside the clip.
-                    skinContext.draw(Image(resolvedName).resizable(),
+                    skinContext.draw(Image(uiImage: resolvedImage).resizable(),
                                      in: CGRect(x: circleRect.minX, y: circleRect.minY,
                                                 width: circleRect.width * 2,
                                                 height: circleRect.height))
@@ -1211,8 +1223,10 @@ struct SkinSelectorPreview: View {
                     }
                 }
             }
+        } else if let resolvedImage {
+            Image(uiImage: resolvedImage).resizable().scaledToFill().clipShape(Circle())
         } else {
-            Image(resolvedName).resizable().scaledToFill().clipShape(Circle())
+            Circle().fill(Color(white: 0.42))
         }
     }
 }
@@ -11315,16 +11329,15 @@ struct ContentView: View {
         self.smoothedTotalMass = startMass
         self.cameraJumpOffset = .zero
         let customZoomMultiplier = 1.0 - ((CGFloat(zoomSliderValue) - 1.0) / 49.0) * 0.9
-        let targetZoom = OriginalGameplay.calculateZoom(
-            totalRadius: playerRadius,
+        // `-[BaseArenaView resetToInitialZoom]`: start at calculateZoom(baseRadius + level, 1).
+        // The account level is 0 for a fresh arena; the camera then eases to the
+        // mass-derived target at cameraScaleSnapRate instead of snapping.
+        self.zoomLevel = OriginalGameplay.calculateZoom(
+            totalRadius: CGFloat(OriginalGameplay.baseRadius),
             cellCount: 1,
             viewportSize: UIScreen.main.bounds.size,
             customZoomMultiplier: customZoomMultiplier
         )
-        // Enter with the camera pulled back; `updateCameraZoom` eases it in
-        // over the first few frames instead of snapping to the mass-derived
-        // zoom on the same frame the arena appears.
-        self.zoomLevel = targetZoom * 0.72
         self.lastCameraTargetPos = nil
         self.lastCameraCellCount = playerCells.count
     }
