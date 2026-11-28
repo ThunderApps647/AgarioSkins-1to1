@@ -1118,6 +1118,24 @@ final class AgarParityTests: XCTestCase {
         XCTAssertLessThan(rightSquashed.min() ?? baseR, baseR - 0.5,
                           "Virus contact must indent the player's near-side vertices")
 
+        // 3c. Rival cells must indent too, using the same vertex-vs-vertex path.
+        var rivalArr = [PlayerCell(ownerID: ownerA, position: CGPoint(x: 4000, y: 4000),
+                                   mass: 100, targetMass: 100, color: .green, name: "P")]
+        var rivalBots = [PlayerCell(ownerID: ownerB, position: CGPoint(x: 4190, y: 4000),
+                                    mass: 100, targetMass: 100, color: .red, name: "E", isBot: true)]
+        var noViruses: [Virus] = []
+        for _ in 0..<3 {
+            AgarPhysicsCore.deformArena(playerCells: &rivalArr, botCells: &rivalBots, viruses: &noViruses,
+                                        visibleWorldRect: vis, worldSize: ws,
+                                        dt: 1.0/60.0, cocosZoom: 0.5)
+        }
+        let rivalR = rivalArr[0].cachedVisualRadius
+        let rivalNear = rivalArr[0].deformedVertices.filter { $0.x > 0 && abs($0.y) < abs($0.x) }
+            .map { hypot($0.x, $0.y) }
+        XCTAssertFalse(rivalNear.isEmpty)
+        XCTAssertLessThan(rivalNear.min() ?? rivalR, rivalR - 0.5,
+                          "Rival cell contact must indent the player's near-side vertices")
+
         // 4. Consecutive Metal offscreen frames: zero flicker and shrinking skin clampToEdge
         if MTLCreateSystemDefaultDevice() != nil {
             let box = ArenaRenderBox()
