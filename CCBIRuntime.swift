@@ -771,22 +771,52 @@ final class CCBIAtlasStore: @unchecked Sendable {
         }
 
         // Fallback: standalone sprite in AgarAssets/sprites/
-        let shortFile = URL(fileURLWithPath: rawPath).lastPathComponent
-        let stem = (shortFile as NSString).deletingPathExtension
-        let ext = (shortFile as NSString).pathExtension.isEmpty ? "png" : (shortFile as NSString).pathExtension
-        if let spURL = Bundle.main.url(forResource: stem, withExtension: ext, subdirectory: "AgarAssets/sprites"),
-           let rawUI = UIImage(contentsOfFile: spURL.path),
-           let rawCG = rawUI.cgImage {
-            let pxScale: CGFloat = (32.0 / 9.0)
-            let designSize = CGSize(width: CGFloat(rawCG.width) / pxScale, height: CGFloat(rawCG.height) / pxScale)
-            let finalUI = UIImage(cgImage: rawCG, scale: pxScale, orientation: .up)
-            let entry = CCBISpriteEntry(image: finalUI, designSize: designSize, pixelScale: pxScale)
+        if let entry = rawSprite(for: rawPath) {
             lock.lock()
             spriteCache[cacheKey] = entry
             lock.unlock()
             return entry
         }
         return nil
+    }
+
+    /// Loads a standalone iOS resource (backgrounds, logos, shop art) without
+    /// going through an atlas.  Menu background variants are .png files whose
+    /// bytes are WebP; UIImage decodes them natively, but the atlas search above
+    /// never finds them, so the menu previously fell back to the 4:3
+    /// background.png on every device.  Loading by exact resource name picks
+    /// backgroundSuperWide.png for 2.17:1 phones, as the original does.
+    func rawSprite(for rawPath: String) -> CCBISpriteEntry? {
+        guard !rawPath.isEmpty else { return nil }
+        let cacheKey = "raw|\(rawPath)"
+        lock.lock()
+        if let hit = spriteCache[cacheKey] {
+            lock.unlock()
+            return hit
+        }
+        lock.unlock()
+        let shortFile = URL(fileURLWithPath: rawPath).lastPathComponent
+        let stem = (shortFile as NSString).deletingPathExtension
+        let ext = (shortFile as NSString).pathExtension.isEmpty ? "png" : (shortFile as NSString).pathExtension
+        let subdirectories = ["AgarAssets/sprites", "AgarAssets/images", "AgarAssets"]
+        var foundURL: URL?
+        for sub in subdirectories {
+            if let u = Bundle.main.url(forResource: stem, withExtension: ext, subdirectory: sub) {
+                foundURL = u
+                break
+            }
+        }
+        guard let spURL = foundURL,
+              let rawUI = UIImage(contentsOfFile: spURL.path),
+              let rawCG = rawUI.cgImage else { return nil }
+        let pxScale: CGFloat = (32.0 / 9.0)
+        let designSize = CGSize(width: CGFloat(rawCG.width) / pxScale, height: CGFloat(rawCG.height) / pxScale)
+        let finalUI = UIImage(cgImage: rawCG, scale: pxScale, orientation: .up)
+        let entry = CCBISpriteEntry(image: finalUI, designSize: designSize, pixelScale: pxScale)
+        lock.lock()
+        spriteCache[cacheKey] = entry
+        lock.unlock()
+        return entry
     }
 
     func mcfs(for descriptionName: String) -> CCBIMCFSEntry? {

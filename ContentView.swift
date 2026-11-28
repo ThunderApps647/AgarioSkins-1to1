@@ -13422,7 +13422,7 @@ struct MainMenu: View {
             let hasModalOverlay = showPartyMenu || showSkinsModal || activeInfoTab != nil || showSettings
 
             ZStack {
-                if let bg = CCBIAtlasStore.shared.sprite(for: OriginalGameplay.menuBackgroundSpritePath(for: geometry.size))
+                if let bg = CCBIAtlasStore.shared.rawSprite(for: OriginalGameplay.menuBackgroundSpritePath(for: geometry.size))
                     ?? CCBIAtlasStore.shared.sprite(for: "GeneratedAssets/images/Bundle/Background/background.png") {
                     Image(uiImage: bg.image)
                         .resizable()
