@@ -244,7 +244,7 @@ final class AgarParityTests: XCTestCase {
         let menuView = MainMenu(
             isPlaying: .constant(false),
             zoomLevel: .constant(1.0),
-            selectedSkinName: .constant("Dragon"),
+            selectedSkinName: .constant("1"),
             playerName: .constant("Captain Idris"),
             showPlayerLevel: .constant(true),
             playerLevel: .constant(28),
@@ -1096,6 +1096,24 @@ final class AgarParityTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(group[0].deformedVertices.count, 24)
         XCTAssertGreaterThanOrEqual(group[2].deformedVertices.count, 24)
 
+        // 3b. A player cell must indent against a virus (not just against cells).
+        let virusCell = PlayerCell(ownerID: ownerA, position: CGPoint(x: 4000, y: 4000),
+                                   mass: 100, targetMass: 100, color: .green, name: "V")
+        var pArr = [virusCell]
+        var bArr: [PlayerCell] = []
+        var virArr = [Virus(position: CGPoint(x: 4090, y: 4000))]
+        for _ in 0..<3 {
+            AgarPhysicsCore.deformArena(playerCells: &pArr, botCells: &bArr, viruses: &virArr,
+                                        visibleWorldRect: vis, worldSize: ws,
+                                        dt: 1.0/60.0, cocosZoom: 0.5)
+        }
+        let baseR = pArr[0].cachedVisualRadius
+        let rightSquashed = pArr[0].deformedVertices.filter { $0.x > 0 && abs($0.y) < abs($0.x) }
+            .map { hypot($0.x, $0.y) }
+        XCTAssertFalse(rightSquashed.isEmpty)
+        XCTAssertLessThan(rightSquashed.min() ?? baseR, baseR - 0.5,
+                          "Virus contact must indent the player's near-side vertices")
+
         // 4. Consecutive Metal offscreen frames: zero flicker and shrinking skin clampToEdge
         if MTLCreateSystemDefaultDevice() != nil {
             let box = ArenaRenderBox()
@@ -1104,7 +1122,7 @@ final class AgarParityTests: XCTestCase {
             box.zoom = 0.5
             box.showSkins = true
             box.showMassText = true
-            var skinCell = PlayerCell(ownerID: ownerA, position: CGPoint(x: 3000, y: 3000), mass: 100, targetMass: 100, color: .green, name: "A", skinName: "Dragon")
+            var skinCell = PlayerCell(ownerID: ownerA, position: CGPoint(x: 3000, y: 3000), mass: 100, targetMass: 100, color: .green, name: "A", skinName: "1")
             skinCell.deformedVertices = group[0].deformedVertices
             skinCell.vertexDisplacements = group[0].vertexDisplacements
             skinCell.vertexRadii = group[0].vertexRadii

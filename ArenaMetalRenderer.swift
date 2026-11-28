@@ -995,6 +995,23 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                     guard box.showSkins, let sName = c.skinName else { return nil }
                     return texCache.skinTexture(name: sName)
                 }()
+                // drawBackgroundForTextureTransparency: (0x1003a56d0) runs BEFORE
+                // the outline/body band and paints an opaque disc at the full cell
+                // radius in the cell colour.  The translucent body band and any
+                // transparent texels of the skin then blend against the cell body
+                // instead of the arena grid.  Doing this after the band (or only at
+                // the (r-10) core) left a see-through ring around every skin.
+                if skinTex != nil {
+                    if c.deformedVertices.count >= 8 {
+                        appendScaledFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
+                                        scale: spawn, color: fillSIMD)
+                    } else {
+                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, rW * zoomPx), count: segCount,
+                                      color: fillSIMD)
+                    }
+                    flushSolid(enc: enc, viewportSize: vpPx)
+                }
+
                 // Party cells use the dedicated branch in drawOutlineWithVertices:
                 // an opaque partySkinOuterOutlineColor disc at r, then
                 // partySkinInnerOutlineColor at r-5pt.  The skin is then shrunk by
@@ -1036,21 +1053,6 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                                           color: showPartyBorder ? partyRingCol : borderSIMD)
                             appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW + bodyOff * spawn) * zoomPx), count: segCount, color: bodyBandSIMD)
                         }
-                    }
-                    flushSolid(enc: enc, viewportSize: vpPx)
-                }
-
-                // drawBackgroundForTextureTransparency: (0x1003a56d0) runs before
-                // the skin and paints the cell body at the full radius, so the
-                // transparent pixels of the skin reveal the cell's own colour
-                // instead of the arena grid.
-                if skinTex != nil {
-                    if c.deformedVertices.count >= 8 {
-                        appendScaledFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
-                                        scale: innerScale, color: fillSIMD)
-                    } else {
-                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, rW * innerScale * zoomPx), count: segCount,
-                                      color: fillSIMD)
                     }
                     flushSolid(enc: enc, viewportSize: vpPx)
                 }

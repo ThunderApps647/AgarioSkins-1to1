@@ -748,7 +748,7 @@ final class SkinEdgeClampCache {
         if failedNames.contains(key) { return nil }
         
         let resolved = SkinSelectorPreview.resolvedAssetName(for: skinName)
-        guard let source = UIImage(named: resolved),
+        guard let source = SkinSelectorPreview.bundledImage(resolved),
               let image = uprightCGImage(source),
               image.width > 0,
               image.height > 0 else {
@@ -912,7 +912,7 @@ final class DualSkinCatalog {
         if let cached = isDualByName[skinName] { return cached }
         var dual = false
         let resolved = SkinSelectorPreview.resolvedAssetName(for: skinName)
-        if let image = UIImage(named: resolved), image.size.height > 0 {
+        if let image = SkinSelectorPreview.bundledImage(resolved), image.size.height > 0 {
             // UIImage.size is in points; width/height share the same scale factor,
             // so the point ratio equals the pixel ratio.
             dual = image.size.width >= image.size.height * DualSkin.aspectThreshold
@@ -1211,7 +1211,6 @@ struct SkinSelectorPreview: View {
     }
 
     static func resolvedAssetName(for name: String) -> String {
-        if name == "Dragon" { return "skin1" }
         if Int(name) != nil {
             if bundledImage("skin_\(name)") != nil { return "skin_\(name)" }
             if bundledImage(name) != nil { return name }
@@ -1630,7 +1629,7 @@ final class SkinGameplayPaletteCache {
         if let cached = cache[skinName] { return cached }
         if failedNames.contains(skinName) { return nil }
         let resolved = SkinSelectorPreview.resolvedAssetName(for: skinName)
-        guard let source = UIImage(named: resolved),
+        guard let source = SkinSelectorPreview.bundledImage(resolved),
               let fullImage = drawableCGImage(source) else {
             failedNames.insert(skinName)
             return nil
@@ -13196,7 +13195,7 @@ struct MainMenu: View {
     /// MenuShopSkins.ccbi full-screen 1:1 Skin Picker (GenericHeader + CoinsBar/DNABar + tabs + horizontal MCScrollList)
     func skinsModalOverlay(scale s: CGFloat, containerSize: CGSize) -> some View {
         let filteredSkins: [String] = {
-            let full = ["Dragon"] + availableSkins
+            let full = availableSkins
             switch selectedSkinsTab {
             case 2:
                 return full.filter { DualSkinCatalog.shared.isDual($0) }
@@ -13271,7 +13270,7 @@ struct MainMenu: View {
                         ForEach(filteredSkins, id: \.self) { skin in
                             let isSelected = selectedSkinName == skin
                             let isDual = DualSkinCatalog.shared.isDual(skin)
-                            let cardTitle = skin == "Dragon" ? "Dragon" : "Skin #\(skin)"
+                            let cardTitle = "Skin #\(skin)"
                             let skinPreview = AnyView(
                                 ZStack(alignment: .topTrailing) {
                                     SkinSelectorPreview(skinName: skin)
