@@ -4584,6 +4584,9 @@ struct ContentView: View {
     /// while every bot that dies and respawns afterwards re-enters at a fresh-spawn
     /// 40-140. Off = every bot uses the Bot Start Mass slider, exactly as before.
     @State private var randomizeBotStartMass: Bool = false
+    /// Retail parity default is off; when off, start mass controls are ignored and the
+    /// match uses retail start masses (player 10, bot 31, no randomize).
+    @AppStorage("macro.customStartMassEnabled") private var customStartMassEnabled: Bool = false
     /// True while the match's opening bot wave is still filling to targetBotCount; flips
     /// false the moment the lobby is full so later spawns count as respawns.
     @State private var initialBotFillActive: Bool = true
@@ -5884,8 +5887,11 @@ struct ContentView: View {
     
     private func spawnSingleBot() {
         let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
+        let useCustomStartMass = customStartMassEnabled
+        let effectiveRandomizeBotStartMass = useCustomStartMass ? randomizeBotStartMass : false
+        let effectiveBotStartMass = useCustomStartMass ? botStartMass : 31
         let spawnMass: CGFloat
-        if randomizeBotStartMass {
+        if effectiveRandomizeBotStartMass {
             if initialBotFillActive {
                 // Opening wave: 40-10000, skewed low/mid (pow 2.3 puts the median near
                 // ~2000 with a believable handful of giants) so the lobby looks like a
@@ -5897,7 +5903,7 @@ struct ContentView: View {
                 spawnMass = CGFloat.random(in: 40...140)
             }
         } else {
-            spawnMass = botStartMass
+            spawnMass = effectiveBotStartMass
         }
         let botRadius = OriginalGameplay.radius(forMass: spawnMass)
         var safePos: CGPoint = .zero
@@ -11362,7 +11368,8 @@ struct ContentView: View {
         let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
         let boost = CGFloat(UserDefaults.standard.integer(forKey: "macro.activeStartBoost"))
         if boost > 0 { UserDefaults.standard.set(0, forKey: "macro.activeStartBoost") }
-        let startMass: CGFloat = playerStartMass + boost
+        let effectivePlayerStartMass = customStartMassEnabled ? playerStartMass : 10
+        let startMass: CGFloat = effectivePlayerStartMass + boost
         let playerRadius = OriginalGameplay.radius(forMass: startMass)
         let safetyBuffer: CGFloat = 400
         var safePosition: CGPoint = .zero
@@ -11558,7 +11565,7 @@ struct ContentView: View {
         let elapsedSec = matchStartTime > 0 ? max(matchSurvivalSeconds, Int(CACurrentMediaTime() - matchStartTime)) : matchSurvivalSeconds
         if highScore > 0 || elapsedSec >= 2 {
             lastMatchStats = MatchSummaryStats(
-                highestMass: max(Int(playerStartMass), highScore),
+                highestMass: max(Int(customStartMassEnabled ? playerStartMass : 10), highScore),
                 foodEaten: matchFoodEaten,
                 cellsEaten: matchCellsEaten,
                 timeAliveSec: elapsedSec,
@@ -12747,6 +12754,8 @@ struct MainMenu: View {
     /// Show Mass: shows/hides the mass counter on cells (shared with the renderer).
     @AppStorage("macro.showMassText") private var showMassText: Bool = true
     @AppStorage("macro.showMinimap") private var showMinimap: Bool = false
+    /// Retail parity default is off; gates the offline start-mass sandbox controls.
+    @AppStorage("macro.customStartMassEnabled") private var customStartMassEnabled: Bool = false
     @AppStorage("macro.showArrow") private var showArrow: Bool = true
     @AppStorage("macro.showSkins") private var showSkins: Bool = true
     @AppStorage("macro.showEmojiWidget") private var showEmojiWidget: Bool = true
@@ -13568,57 +13577,10 @@ struct MainMenu: View {
                                         .scaledToFit()
                                         .frame(width: 18 * s, height: 18 * s)
                                 ),
+                                // Rule 3: do not nest CCBISceneView inside another scene's slotViews.
+                                // The static play buttons are rendered as a ZStack overlay below.
                                 "_staticPlayButtonsContainer": AnyView(
-                                    // `StaticPlayButtonContainer addButton:withOwner:` adds the
-                                    // Classic entry plus MoreGameModesButton (120x80, spacing 10).
-                                    // The second button is the authentic blue framed star button;
-                                    // it is NOT a green "Play Online" panel.
-                                    HStack(spacing: 10 * s) {
-                                        CCBISceneView(
-                                            ccbFile: "ClassicButton.ccbi",
-                                            centerRoot: true,
-                                            context: CCBIBindingContext(
-                                                actions: [
-                                                    "playButtonCallback": {
-                                                        // Retail `StateMachine goToApplicationState:` swaps
-                                                        // scenes directly; no cross-fade is applied.
-                                                        isPlaying = true
-                                                    }
-                                                ],
-                                                designScaleModifier: { _ in s }
-                                            )
-                                        )
-                                        .frame(width: 120 * s, height: 80 * s)
-
-                                        ZStack {
-                                            CCBISceneView(
-                                                ccbFile: "MoreGameModesButton.ccbi",
-                                                centerRoot: true,
-                                                context: CCBIBindingContext(
-                                                    designScaleModifier: { _ in s }
-                                                )
-                                            )
-                                            .frame(width: 120 * s, height: 80 * s)
-                                            .allowsHitTesting(false)
-
-                                            // The CCBI menu item owns a UIKit touch handler;
-                                            // disable that view and put a transparent SwiftUI
-                                            // button above it so the entry point is reliably
-                                            // hittable from both touch and UI tests.
-                                            Button(action: {
-                                                SoundManager.shared.play(.menuClick)
-                                                onPlayOnline()
-                                            }) {
-                                                Color.clear
-                                                    .contentShape(Rectangle())
-                                            }
-                                            .buttonStyle(.plain)
-                                            .frame(width: 120 * s, height: 80 * s)
-                                            .accessibilityIdentifier("menu.playOnline")
-                                            .accessibilityLabel("More")
-                                        }
-                                    }
-                                    .frame(width: 250 * s, height: 80 * s)
+                                    Color.clear.frame(width: 250 * s, height: 80 * s)
                                 )
                             ]
                             if let skin = selectedSkinName {
@@ -13645,6 +13607,51 @@ struct MainMenu: View {
                     }
                 }
 
+                // Rule 3: render static play buttons outside MenuMain slotViews
+                // to avoid nesting CCBISceneView inside another scene's slotViews.
+                HStack(spacing: 10 * s) {
+                    CCBISceneView(
+                        ccbFile: "ClassicButton.ccbi",
+                        centerRoot: true,
+                        context: CCBIBindingContext(
+                            actions: [
+                                "playButtonCallback": {
+                                    isPlaying = true
+                                }
+                            ],
+                            designScaleModifier: { _ in s }
+                        )
+                    )
+                    .frame(width: 120 * s, height: 80 * s)
+
+                    ZStack {
+                        CCBISceneView(
+                            ccbFile: "MoreGameModesButton.ccbi",
+                            centerRoot: true,
+                            context: CCBIBindingContext(
+                                designScaleModifier: { _ in s }
+                            )
+                        )
+                        .frame(width: 120 * s, height: 80 * s)
+                        .allowsHitTesting(false)
+
+                        Button(action: {
+                            SoundManager.shared.play(.menuClick)
+                            onPlayOnline()
+                        }) {
+                            Color.clear
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .frame(width: 120 * s, height: 80 * s)
+                        .accessibilityIdentifier("menu.playOnline")
+                        .accessibilityLabel("More")
+                    }
+                }
+                .frame(width: 250 * s, height: 80 * s)
+                .allowsHitTesting(!hasModalOverlay)
+                .accessibilityHidden(hasModalOverlay)
+                .zIndex(1)
                 if showPartyMenu { partyOverlay(scale: s, containerSize: geometry.size).zIndex(2) }
                 if showSkinsModal { skinsModalOverlay(scale: s, containerSize: geometry.size).zIndex(2) }
                 if let tab = activeInfoTab {
@@ -13761,6 +13768,26 @@ struct MainMenu: View {
                     lightSettingToggle("Show Quest", isOn: $showQuestProgress, scale: s)
                     lightSettingToggle("Show Notifications", isOn: $showNotifications, scale: s)
                     lightSettingToggle("Show Online Status", isOn: $showOnlineStatus, scale: s)
+                    lightSettingToggle("Custom Start Mass", isOn: $customStartMassEnabled, scale: s)
+                    if customStartMassEnabled {
+                        VStack(alignment: .leading, spacing: 8 * s) {
+                            Text("Player Start Mass: \(Int(playerStartMass))")
+                                .font(.custom("Lato-Regular", size: 13 * s))
+                                .foregroundColor(Color(hex: 0x555555))
+                            Slider(value: $playerStartMass, in: 10...5000, step: 10)
+                                .accentColor(Color(hex: 0x00C8F8))
+                            Text("Bot Start Mass: \(Int(botStartMass))")
+                                .font(.custom("Lato-Regular", size: 13 * s))
+                                .foregroundColor(Color(hex: 0x555555))
+                            Slider(value: $botStartMass, in: 10...5000, step: 10)
+                                .accentColor(Color(hex: 0x54C826))
+                                .opacity(randomizeBotStartMass ? 0.4 : 1.0)
+                                .disabled(randomizeBotStartMass)
+                            lightSettingRowSwitch("Randomize Bot Start Mass", isOn: $randomizeBotStartMass, scale: s)
+                        }
+                        .padding(12 * s)
+                        .background(MCFSFrame(name: "mcfs-light-grey"))
+                    }
                     lightSettingBlueButton("Restore Purchases", buttonText: "Restore", scale: s) {}
 
                     lightSettingHeader("Privacy", scale: s)

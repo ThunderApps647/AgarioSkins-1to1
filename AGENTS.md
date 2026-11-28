@@ -50,17 +50,13 @@ compare all screens, not just the one being changed.
 
 | Feature | Why | State |
 | --- | --- | --- |
-| Player / Bot start mass + randomise toggle | user-tuned sandbox controls; retail omits them | **restore behind a "Custom start mass" switch (off = retail) — removed in `d08fc86`, required back** |
+| Player / Bot start mass + randomise toggle | user-tuned sandbox controls; retail omits them | Restored behind a "Custom Start Mass" switch (default off = retail) |
 
 ## Open user-reported defects
 
 | # | Defect | Where | Status |
 | --- | --- | --- | --- |
-| 1 | Start mass controls gone from Settings | `ContentView.swift` (removed by `d08fc86`) | open |
-| 2 | Spawn animation plays for every cell, including bots streaming into view | `ArenaMetalRenderer.swift:891` (any first-seen id gets a spawn time) | open |
-| 3 | Extra pale inner ring on skinned cells | `ArenaMetalRenderer.swift:1074/1084` paints the `0x83` body band at `r+5` even when a skin covers the cell | open |
-| 4 | Wrong names on older skins | `skin_names.json` built from bundled `productId`s in `Build/gen_skin_names.py`; needs an audit, not a rewrite | open |
-| 5 | Menu chrome blank at HEAD | introduced by `522b29a` (see rule 3) | open |
+| 4 | Wrong names on older skins | `skin_names.json` built from bundled `productId`s in `Build/gen_skin_names.py` | audited against original IPA plists (387 mapped, 0 diffs); keep open until user confirms the specific misnamed skins are gone |
 
 Fix these without regressing rule 1–4; when one is fixed, move it out of this table and let
 the guard confirm it.

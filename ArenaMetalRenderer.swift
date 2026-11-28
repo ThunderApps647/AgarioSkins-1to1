@@ -884,9 +884,17 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
 
         let nowTS = CACurrentMediaTime()
         // Register first-seen cells for the original create-cell pop animation.
+        // Seed the first observed population as already-spawned so pre-existing /
+        // streaming-in cells don't all pop; only cells that appear after this
+        // renderer has seen a live population get the spawn animation.
         var liveCellIDs = Set<UUID>()
         for c in box.playerCells { liveCellIDs.insert(c.id) }
         for c in box.botCells { liveCellIDs.insert(c.id) }
+        if cellSpawnTimes.isEmpty && !liveCellIDs.isEmpty {
+            let seedTime = nowTS - 10.0
+            for c in box.botCells { cellSpawnTimes[c.id] = seedTime }
+            for c in box.playerCells { cellSpawnTimes[c.id] = nowTS }
+        }
         cellSpawnTimes = cellSpawnTimes.filter { liveCellIDs.contains($0.key) || nowTS - $0.value < 2.0 }
         for id in liveCellIDs where cellSpawnTimes[id] == nil { cellSpawnTimes[id] = nowTS }
         let rOutShot = (shotR + 5.0) * zoomPx
@@ -1072,16 +1080,21 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                     } else {
                         let borderSIMD = SIMD4<Float>(rgba(c.borderColor).x, rgba(c.borderColor).y, rgba(c.borderColor).z, fillSIMD.w)
                         let bodyBandSIMD = SIMD4<Float>(fillSIMD.x, fillSIMD.y, fillSIMD.z, 0x83 / 255.0)
+                        let drawBodyBand = skinTex == nil
                         if c.deformedVertices.count >= 8 {
                             appendDeformedFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
                                               radiusOffsetWorld: borderOff, isVirus: false, virusSpikeDeltaWorld: 0,
                                               color: borderSIMD)
-                            appendDeformedFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
-                                              radiusOffsetWorld: bodyOff, isVirus: false, virusSpikeDeltaWorld: 0, color: bodyBandSIMD)
+                            if drawBodyBand {
+                                appendDeformedFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
+                                                  radiusOffsetWorld: bodyOff, isVirus: false, virusSpikeDeltaWorld: 0, color: bodyBandSIMD)
+                            }
                         } else {
                             appendDiskFan(cx: sx, cy: sy, radius: (rW + borderOff * spawn) * zoomPx, count: segCount,
                                           color: borderSIMD)
-                            appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW + bodyOff * spawn) * zoomPx), count: segCount, color: bodyBandSIMD)
+                            if drawBodyBand {
+                                appendDiskFan(cx: sx, cy: sy, radius: max(1.5, (rW + bodyOff * spawn) * zoomPx), count: segCount, color: bodyBandSIMD)
+                            }
                         }
                     }
                     flushSolid(enc: enc, viewportSize: vpPx)
