@@ -1041,15 +1041,16 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 }
 
                 // drawBackgroundForTextureTransparency: (0x1003a56d0) runs before
-                // the skin and paints an opaque white polygon only when the cell's
-                // alpha is not fully opaque.
-                if let skinTex, fillSIMD.x < 0.999 { // initialColor3b.r != 255
+                // the skin and paints the cell body at the full radius, so the
+                // transparent pixels of the skin reveal the cell's own colour
+                // instead of the arena grid.
+                if skinTex != nil {
                     if c.deformedVertices.count >= 8 {
                         appendScaledFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
-                                        scale: 1.0, color: SIMD4<Float>(1, 1, 1, 1))
+                                        scale: innerScale, color: fillSIMD)
                     } else {
-                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, rW * zoomPx), count: segCount,
-                                      color: SIMD4<Float>(1, 1, 1, 1))
+                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, rW * innerScale * zoomPx), count: segCount,
+                                      color: fillSIMD)
                     }
                     flushSolid(enc: enc, viewportSize: vpPx)
                 }
@@ -1089,23 +1090,12 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 //   * other unskinned cells draw the opaque (r-10)/r disc in their
                 //     own colour.
                 // Skinned non-player cells return before this pass in the client.
-                if skinTex != nil {
-                    // The skin already carries the cell artwork.  The client's 0xC0C0C0
-                    // player-owned fill is a dimming wash only for the untextured body;
-                    // painting it over a skin produced the grey veil seen in game.
-                } else if isLocal {
-                    let wash = SIMD4<Float>(0xC0 / 255.0, 0xC0 / 255.0, 0xC0 / 255.0, fillSIMD.w * 0.75)
-                    if c.deformedVertices.count >= 8 {
-                        appendScaledFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
-                                        scale: 1.0, color: wash)
-                    } else {
-                        appendDiskFan(cx: sx, cy: sy, radius: max(1.5, rW * zoomPx), count: segCount, color: wash)
-                    }
-                    flushSolid(enc: enc, viewportSize: vpPx)
-                } else {
-                    // Unskinned cell: drawFillingWithVertices paints the opaque
-                    // (r - 10pt)/r core in the cell's own colour.  Without this
-                    // the banded body read as a see-through ring.
+                if skinTex == nil {
+                    // drawFillingWithVertices paints the opaque (r - 10pt)/r core
+                    // in the cell's own colour for an untextured body.  The
+                    // 0xC0C0C0 "player-owned" fill belongs to MenuCellView's
+                    // veteran-lock preview only; arena cells never set that flag,
+                    // so it must not veil the local player's skin.
                     if c.deformedVertices.count >= 8 {
                         appendScaledFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
                                         scale: innerScale, color: fillSIMD)

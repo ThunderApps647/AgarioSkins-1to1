@@ -5102,25 +5102,6 @@ struct ContentView: View {
                     }
                 }
                 
-                if isPlaying && isGameOverPresented {
-                    ContinueGameModalView(
-                        highScore: highScore,
-                        tokensCollected: tokenCount,
-                        survivalSeconds: matchSurvivalSeconds,
-                        onContinue: {
-                            isGameOverPresented = false
-                            isDeathSequencePending = false
-                            spawnInitialObjects()
-                        },
-                        onCloseToMenu: {
-                            isGameOverPresented = false
-                            isDeathSequencePending = false
-                            exitMatchToMainMenu()
-                        }
-                    )
-                    .zIndex(1000)
-                }
-                
                 if isPlaying && leavePopupMounted {
                     LeavePopupModal(
                         onNo: { resumeFromLeavePopup() },
@@ -9962,16 +9943,16 @@ struct ContentView: View {
                 joystickBasePosition = nil
                 isFeedingHeld = false
                 isMacroHeld = false
-                withAnimation(.easeOut(duration: 0.5)) {
-                    zoomLevel = max(0.35, zoomLevel * 0.72)
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                // -[OfflineModeArenaState onGameOver:] hides the HUD and moves the
+                // application straight back to the menu (with slideOutMatchStats);
+                // there is no death zoom and no revive/continue panel.
+                DispatchQueue.main.async {
                     guard isPlaying, playerCells.isEmpty else {
                         isDeathSequencePending = false
                         return
                     }
                     isDeathSequencePending = false
-                    isGameOverPresented = true
+                    exitMatchToMainMenu()
                 }
             }
         }

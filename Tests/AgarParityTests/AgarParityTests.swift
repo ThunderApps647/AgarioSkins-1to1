@@ -1155,4 +1155,17 @@ final class AgarParityTests: XCTestCase {
         XCTAssertEqual(OriginalGameplay.directionAngleVariation, 0.2, accuracy: 1e-6)
         XCTAssertEqual(OriginalGameplay.spawnFoodVelocityVariation, 0.2, accuracy: 1e-6)
     }
+
+    func testOfficialSkinArtworkIsBundled() throws {
+        // Gameplay IDs 1...387 come straight from Slice_Gameplay - Equippable Skins.plist.
+        // The artworks are folder resources, so this asserts the runtime path lookup
+        // (AgarAssets/Skins) and that the numeric selector resolves them.
+        let loaded = (1...387).compactMap { id in
+            SkinSelectorPreview.bundledImage("skin_\(id)")
+        }
+        XCTAssertGreaterThan(loaded.count, 180, "official skin folder resources missing")
+        let first = try XCTUnwrap(SkinSelectorPreview.bundledImage("skin_1"))
+        XCTAssertEqual(first.size.width, 256, accuracy: 1.0)
+        XCTAssertEqual(SkinSelectorPreview.resolvedAssetName(for: "1"), "skin_1")
+    }
 }
