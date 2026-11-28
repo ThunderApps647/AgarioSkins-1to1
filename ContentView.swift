@@ -9835,11 +9835,14 @@ struct ContentView: View {
             let visualRadius = cells[i].cachedVisualRadius
             let hardPhysicsRadius = visualRadius * OriginalGameplay.percentageOfCellToSquash
             
-            if cells[i].position.x < hardPhysicsRadius { cells[i].position.x = hardPhysicsRadius; cells[i].velocity.width = 0 }
-            else if cells[i].position.x > worldSize - hardPhysicsRadius { cells[i].position.x = worldSize - hardPhysicsRadius; cells[i].velocity.width = 0 }
+            // `sub_10004C888` clamps the position only; the impulse keeps
+            // decaying on its own. Zeroing the axis made a border split lose
+            // all outward momentum the instant it touched the wall.
+            if cells[i].position.x < hardPhysicsRadius { cells[i].position.x = hardPhysicsRadius }
+            else if cells[i].position.x > worldSize - hardPhysicsRadius { cells[i].position.x = worldSize - hardPhysicsRadius }
             
-            if cells[i].position.y < hardPhysicsRadius { cells[i].position.y = hardPhysicsRadius; cells[i].velocity.height = 0 }
-            else if cells[i].position.y > worldSize - hardPhysicsRadius { cells[i].position.y = worldSize - hardPhysicsRadius; cells[i].velocity.height = 0 }
+            if cells[i].position.y < hardPhysicsRadius { cells[i].position.y = hardPhysicsRadius }
+            else if cells[i].position.y > worldSize - hardPhysicsRadius { cells[i].position.y = worldSize - hardPhysicsRadius }
         }
         botCells = cells
     }
@@ -10539,20 +10542,17 @@ struct ContentView: View {
             }
 
             let hardPhysicsRadius = solidRadius * OriginalGameplay.percentageOfCellToSquash
+            // Wall clamp is position-only, same as `sub_10004C888`.
             if playerCells[i].position.x < hardPhysicsRadius {
                 playerCells[i].position.x = hardPhysicsRadius
-                playerCells[i].velocity.width = 0
             } else if playerCells[i].position.x > worldSize - hardPhysicsRadius {
                 playerCells[i].position.x = worldSize - hardPhysicsRadius
-                playerCells[i].velocity.width = 0
             }
 
             if playerCells[i].position.y < hardPhysicsRadius {
                 playerCells[i].position.y = hardPhysicsRadius
-                playerCells[i].velocity.height = 0
             } else if playerCells[i].position.y > worldSize - hardPhysicsRadius {
                 playerCells[i].position.y = worldSize - hardPhysicsRadius
-                playerCells[i].velocity.height = 0
             }
         }
     }
@@ -12834,6 +12834,7 @@ struct MainMenu: View {
     @State private var matchStatsSeqID: Int = 0
     private var statsDrawerExpanded: Bool { matchStatsExpanded || forceMatchStatsExpanded }
     @State private var mainMenuEnterID: Int = 0
+    @State private var showMoreGameModes = false
     /// Injected by ContentView; opens the PLAY ONLINE server browser.
     var onPlayOnline: () -> Void = {}
 
@@ -13622,7 +13623,11 @@ struct MainMenu: View {
                                         .frame(width: 18 * s, height: 18 * s)
                                 ),
                                 "_staticPlayButtonsContainer": AnyView(
-                                    HStack(spacing: 12 * s) {
+                                    // `StaticPlayButtonContainer addButton:withOwner:` adds the
+                                    // Classic entry plus MoreGameModesButton (120x80, spacing 10).
+                                    // The second button is the authentic blue framed star button;
+                                    // it is NOT a green "Play Online" panel.
+                                    HStack(spacing: 10 * s) {
                                         CCBISceneView(
                                             ccbFile: "ClassicButton.ccbi",
                                             centerRoot: true,
@@ -13641,39 +13646,22 @@ struct MainMenu: View {
 
                                         Button(action: {
                                             SoundManager.shared.play(.menuClick)
-                                            onPlayOnline()
+                                            showMoreGameModes = true
                                         }) {
-                                            ZStack {
-                                                if let shMcfs = CCBIAtlasStore.shared.mcfs(for: "FramedSprites/Bundle/MCFS_shadow.plist") {
-                                                    let pair = shMcfs.uiImageAndInsets(forUIScale: s)
-                                                    Image(uiImage: pair.0)
-                                                        .resizable(capInsets: pair.1, resizingMode: .stretch)
-                                                        .frame(width: 117 * s, height: 26 * s)
-                                                        .offset(y: 28 * s)
-                                                }
-                                                if let grMcfs = CCBIAtlasStore.shared.mcfs(for: "FramedSprites/Bundle/MCFS_green.plist") {
-                                                    let pair = grMcfs.uiImageAndInsets(forUIScale: s)
-                                                    Image(uiImage: pair.0)
-                                                        .resizable(capInsets: pair.1, resizingMode: .stretch)
-                                                        .frame(width: 120 * s, height: 80 * s)
-                                                }
-                                                Image("menu-party-icon")
-                                                    .resizable()
-                                                    .scaledToFit()
-                                                    .frame(width: 30 * s, height: 26 * s)
-                                                    .offset(y: -8 * s)
-                                                Text("Play Online")
-                                                    .font(.custom("OpenSans-Bold", size: 13 * s))
-                                                    .foregroundColor(.white)
-                                                    .offset(y: 16 * s)
-                                            }
+                                            CCBISceneView(
+                                                ccbFile: "MoreGameModesButton.ccbi",
+                                                centerRoot: true,
+                                                context: CCBIBindingContext(
+                                                    designScaleModifier: { _ in s }
+                                                )
+                                            )
                                             .frame(width: 120 * s, height: 80 * s)
-                                            .contentShape(Rectangle())
+                                            .allowsHitTesting(false)
                                         }
                                         .buttonStyle(CCBIMenuItemButtonStyle())
-                                        .accessibilityIdentifier("menu.playOnline")
+                                        .accessibilityIdentifier("menu.moreGameModes")
                                     }
-                                    .frame(width: 252 * s, height: 80 * s)
+                                    .frame(width: 250 * s, height: 80 * s)
                                 )
                             ]
                             if let skin = selectedSkinName {
