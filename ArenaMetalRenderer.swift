@@ -121,6 +121,20 @@ private final class ArenaTextureCache {
         return tex
     }
 
+    /// Loads a sprite straight from the bundled AgarAssets folder so its alpha
+    /// channel survives. Asset-catalog copies of a few event sprites are flattened
+    /// onto white, which turned arena tokens into opaque white squares.
+    func bundledSpriteTexture(named name: String) -> MTLTexture? {
+        let key = "file:\(name)"
+        if let hit = imageTextures[key] { return hit }
+        guard let url = Bundle.main.url(forResource: name, withExtension: "png",
+                                        subdirectory: "AgarAssets/sprites"),
+              let img = UIImage(contentsOfFile: url.path),
+              let tex = uploadImage(img) else { return nil }
+        imageTextures[key] = tex
+        return tex
+    }
+
     func skinTexture(name: String, isAlternate: Bool = false) -> MTLTexture? {
         let resolvedName = SkinSelectorPreview.resolvedAssetName(for: name)
         let key = "skin:\(resolvedName):\(isAlternate ? 1 : 0)"
@@ -860,7 +874,8 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
         for c in box.botCells { liveCellIDs.insert(c.id) }
         cellSpawnTimes = cellSpawnTimes.filter { liveCellIDs.contains($0.key) || nowTS - $0.value < 2.0 }
         for id in liveCellIDs where cellSpawnTimes[id] == nil { cellSpawnTimes[id] = nowTS }
-        let tokTex = texCache.texture(named: "token-snowflake") ?? texCache.texture(named: "token")
+        let tokTex = texCache.bundledSpriteTexture(named: "token-snowflake")
+            ?? texCache.texture(named: "token-snowflake") ?? texCache.texture(named: "token")
         let tokSide = Float(52.0) * zoomPx
         let rOutShot = (shotR + 5.0) * zoomPx
         let rInShot = max(1.0, (shotR * (shotR - 5.0) / (shotR + 5.0)) * zoomPx)

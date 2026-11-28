@@ -1196,6 +1196,19 @@ enum SkinColorCatalog {
     }
 }
 
+enum ArenaSpriteArt {
+    /// The folder reference keeps the original PNG bytes, including alpha.
+    /// Asset-catalog thinning flattened some event art onto white.
+    static func image(named name: String) -> UIImage? {
+        if let url = Bundle.main.url(forResource: name, withExtension: "png",
+                                     subdirectory: "AgarAssets/sprites"),
+           let img = UIImage(contentsOfFile: url.path) {
+            return img
+        }
+        return UIImage(named: name)
+    }
+}
+
 struct SkinSelectorPreview: View {
     let skinName: String
 
@@ -2446,19 +2459,14 @@ struct PlayerCell: Identifiable {
         self.canMerge = canMerge
         self.splitTimer = splitTimer
         
-        if let skinName = skinName,
-           let palette = SkinGameplayPaletteCache.shared.palette(for: skinName) {
-            // For a skinned owner, `color` is also the ejected-mass colour and the fallback
-            // behind transparent skin pixels. Every split reconstructs the same cached pair.
-            self.color = palette.ejectedMassColor
-            self.borderColor = palette.borderColor
-            self.ejectedMassBorderColor = palette.ejectedMassBorderColor
-        } else {
-            let fallbackBorder = color.darker(ratio: 0.9)
-            self.color = color
-            self.borderColor = fallbackBorder
-            self.ejectedMassBorderColor = fallbackBorder
-        }
+        // The plist `cellColor` is the authoritative body and ejected-mass colour.
+        // drawOutlineWithVertices (0x1003a5064) multiplies every channel by 0.9 for the
+        // contour, so derive that here instead of inventing a per-skin swatch.
+        let bodyColor = SkinColorCatalog.color(for: skinName) ?? color
+        let outlineColor = bodyColor.darker(ratio: 0.9)
+        self.color = bodyColor
+        self.borderColor = outlineColor
+        self.ejectedMassBorderColor = outlineColor
         self.name = name
         self.skinName = skinName
         self.isBot = isBot
@@ -11809,10 +11817,18 @@ struct TopBarHUD: View, Equatable {
                             labelOverrides: ["_countLabel": "\(tokenCount)"],
                             replacingSlotViews: [
                                 "_tokenNode": AnyView(
-                                    Image("token-snowflake")
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                        .frame(width: 20 * s, height: 20 * s)
+                                    Group {
+                                        if let art = ArenaSpriteArt.image(named: "token-snowflake") {
+                                            Image(uiImage: art)
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fit)
+                                        } else {
+                                            Image("token-snowflake")
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fit)
+                                        }
+                                    }
+                                    .frame(width: 20 * s, height: 20 * s)
                                 )
                             ],
                             designScaleModifier: { _ in s }
