@@ -2984,7 +2984,7 @@ struct GameWorldView: View {
         renderBox.worldSize = worldSize
         renderBox.cameraPos = smoothedPlayerPosition
         renderBox.zoom = zoomLevel
-        renderBox.softBodyZoom = Float(OriginalGameplay.softBodyZoom(for: UIScreen.main.bounds.size))
+        renderBox.softBodyZoom = Float(OriginalGameplay.softBodyZoom(for: screenSize))
         renderBox.darkMode = darkModeGrid
         renderBox.showGrid = showGrid
         renderBox.showSkins = showSkins
@@ -4714,6 +4714,10 @@ struct ContentView: View {
     }
     
     @State private var zoomLevel: CGFloat = 1.0
+    /// Actual landscape viewport in points. `UIScreen.main.bounds` can still report the
+    /// portrait size during the first layout pass, which made the camera zoom and the
+    /// cursor reach use the wrong aspect ratio (roughly 2x too close and 3x too far).
+    @State private var viewportSize: CGSize = .zero
     @State private var joystickOffset = CGSize.zero
     @State private var joystickBasePosition: CGPoint? = nil
     @State private var joystickIsDragging = false
@@ -5252,9 +5256,10 @@ struct ContentView: View {
                 }
                 pendingBotSplits.removeAll(keepingCapacity: true)
                 
+                if viewportSize != geometry.size { viewportSize = geometry.size }
                 updateVisibleObjects(screenSize: geometry.size)
                 
-                movePlayer(dt: deltaTime)
+                movePlayer(dt: deltaTime, viewportSize: geometry.size)
                 moveBots(dt: deltaTime)
                 let virusesMoved = moveViruses(dt: deltaTime)
                 
@@ -5369,7 +5374,7 @@ struct ContentView: View {
                 
                 handleCellSelfCollisions(cells: &playerCells)
                 handleCellSelfCollisions(cells: &botCells)
-                updateCellDeformation(dt: deltaTime)
+                updateCellDeformation(dt: deltaTime, viewportSize: geometry.size)
 
                 if !playerCells.isEmpty {
                     let myMass = totalPlayerMass
@@ -5392,7 +5397,7 @@ struct ContentView: View {
                 smoothedPlayerPosition.x += (targetPos.x - smoothedPlayerPosition.x) * camSmooth
                 smoothedPlayerPosition.y += (targetPos.y - smoothedPlayerPosition.y) * camSmooth
                 
-                updateCameraZoom(dt: deltaTime)
+                updateCameraZoom(dt: deltaTime, viewportSize: geometry.size)
                 
                 if !canFeed() {
                     if isFeedingHeld { isFeedingHeld = false }
@@ -10396,14 +10401,14 @@ struct ContentView: View {
         return 1.0 - pow(1.0 - base, dt * 60.0)
     }
     
-    private func updateCameraZoom(dt: CGFloat) {
+    private func updateCameraZoom(dt: CGFloat, viewportSize: CGSize) {
         smoothedTotalMass = totalPlayerMass
         let totalRadius = playerCells.reduce(CGFloat(0)) { $0 + $1.cachedSolidRadius }
         let customZoomMultiplier = 1.0 - ((CGFloat(zoomSliderValue) - 1.0) / 49.0) * 0.9
         let targetZoom = OriginalGameplay.calculateZoom(
             totalRadius: max(totalRadius, CGFloat(OriginalGameplay.baseRadius)),
             cellCount: max(playerCells.count, 1),
-            viewportSize: UIScreen.main.bounds.size,
+            viewportSize: viewportSize,
             customZoomMultiplier: customZoomMultiplier
         )
 
@@ -10424,7 +10429,7 @@ struct ContentView: View {
         visibleWorldRect = visibleRect
     }
     
-    private func movePlayer(dt: CGFloat) {
+    private func movePlayer(dt: CGFloat, viewportSize: CGSize) {
         let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
         agarJoystick.step(dt: dt, isDragging: joystickIsDragging, stopOnRelease: stopOnRelease)
 
@@ -10437,7 +10442,7 @@ struct ContentView: View {
         let isStopped = centerAimUntilCursorMoves || rawMag < 0.0005
 
         let flockCenter = playerCenter
-        let reach = AgarPhysicsCore.worldCursorReach(cells: playerCells, viewportSize: UIScreen.main.bounds.size)
+        let reach = AgarPhysicsCore.worldCursorReach(cells: playerCells, viewportSize: viewportSize)
         let worldCursor = isStopped
             ? flockCenter
             : CGPoint(x: flockCenter.x + rawAxis.width * reach.worldReach,
@@ -10556,6 +10561,7 @@ struct ContentView: View {
     private func executeSplit(on cells: inout [PlayerCell],
                               for ownerID: UUID,
                               direction: CGSize,
+                              facing: CGSize? = nil,
                               toward targetPoint: CGPoint? = nil) {
         let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
         var splitDirection = direction.normalized()
@@ -10603,13 +10609,21 @@ struct ContentView: View {
                     let a = baseAngle + jitter
                     launchDirection = CGSize(width: cos(a), height: sin(a))
                 }
-                // `OfflineModeManager` split handler (0x100046fe8): the new piece is
-                // placed at parent + direction * mitosisPositionFactor. The value (20)
-                // is a flat world-space gap, not a percentage of the radius.
+                // `sub_100046FE8`: the child is placed at parent + parentFacing *
+                // mitosisPositionFactor (20 world units). The jittered split direction
+                // only becomes the child's heading/impulse, never its spawn offset.
+                // Previously the offset used the split aim, so border splits at some
+                // angles put the child behind or on top of the parent.
+                var parentFacing = facing ?? cells[index].aiMovementDirection
+                if parentFacing.width.magnitude < 0.0001 && parentFacing.height.magnitude < 0.0001 {
+                    parentFacing = splitDirection
+                } else {
+                    parentFacing = parentFacing.normalized()
+                }
                 let spawnOffset = CGFloat(OriginalGameplay.mitosisPositionFactor)
                 let split = AgarPhysicsCore.splitPositions(
                     parent: cells[index].position,
-                    direction: launchDirection,
+                    direction: parentFacing,
                     offset: spawnOffset,
                     radius: visualRadius,
                     worldSize: worldSize
@@ -10671,6 +10685,7 @@ struct ContentView: View {
                 on: &playerCells,
                 for: pCell.ownerID,
                 direction: .zero,
+                facing: lastJoystickDirection,
                 toward: currentCenter
             )
             return
@@ -10690,12 +10705,13 @@ struct ContentView: View {
         }
         SoundManager.shared.playBinary(.split)
         recordPlayerSplitIntent(direction: splitDirection, now: CACurrentMediaTime())
-        executeSplit(on: &playerCells, for: pCell.ownerID, direction: splitDirection)
+        executeSplit(on: &playerCells, for: pCell.ownerID, direction: splitDirection,
+                     facing: lastJoystickDirection)
     }
     
-    private func updateCellDeformation(dt: CGFloat) {
+    private func updateCellDeformation(dt: CGFloat, viewportSize: CGSize) {
         let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
-        let softBodyZoom = OriginalGameplay.softBodyZoom(for: UIScreen.main.bounds.size)
+        let softBodyZoom = OriginalGameplay.softBodyZoom(for: viewportSize)
         AgarPhysicsCore.deformArena(
             playerCells: &playerCells,
             botCells: &botCells,
@@ -11327,6 +11343,14 @@ struct ContentView: View {
         spawnPlayerSafely()
     }
     
+    /// Landscape viewport, resolving the stale portrait `UIScreen` size seen on the
+    /// first frame. The arena is landscape-only, so the long edge is always width.
+    private var resolvedViewportSize: CGSize {
+        if viewportSize.width > 0, viewportSize.height > 0 { return viewportSize }
+        let b = UIScreen.main.bounds.size
+        return CGSize(width: max(b.width, b.height), height: min(b.width, b.height))
+    }
+
     private func spawnPlayerSafely() {
         let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
         let boost = CGFloat(UserDefaults.standard.integer(forKey: "macro.activeStartBoost"))
@@ -11379,7 +11403,7 @@ struct ContentView: View {
         self.zoomLevel = OriginalGameplay.calculateZoom(
             totalRadius: CGFloat(OriginalGameplay.baseRadius),
             cellCount: 1,
-            viewportSize: UIScreen.main.bounds.size,
+            viewportSize: resolvedViewportSize,
             customZoomMultiplier: customZoomMultiplier
         )
         self.lastCameraTargetPos = nil
