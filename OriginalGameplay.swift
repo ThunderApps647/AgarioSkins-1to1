@@ -14,6 +14,8 @@ enum OriginalGameplay {
     /// `Offline Mode - Settings`: `arenaSizeRatio = 0.5` -> `round(arenaSideLength * sqrt(0.5))` = `7905` (`0x10003f48c`).
     static let offlineArenaSizeRatio: Double = 0.5
     static let offlineArenaSideLength: CGFloat = CGFloat(Int((arenaSideLength * sqrt(offlineArenaSizeRatio)).rounded()))
+    static let offlineFoodCount: Int = 625
+    static let offlineVirusCount: Int = 16
 
     static let baseRadius: Double = 31.6227766016837
     static let minRadiusToShoot: Double = 56.56854249

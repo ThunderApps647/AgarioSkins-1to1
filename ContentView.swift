@@ -10802,7 +10802,7 @@ struct ContentView: View {
             for i in collected.sorted(by: >) where i < tokens.count {
                 tokens.remove(at: i)
             }
-            let missingTokens = 200 - tokens.count
+            let missingTokens = OriginalGameplay.offlineFoodCount - tokens.count
             if missingTokens > 0 {
                 for _ in 0..<missingTokens { tokens.append(spawnSingleToken(existing: tokens)) }
             }
@@ -11476,11 +11476,10 @@ struct ContentView: View {
     }
     
     private func spawnInitialViruses() {
-        for _ in 0..<16 { viruses.append(spawnSingleVirusSafely()) }
+        for _ in 0..<OriginalGameplay.offlineVirusCount { viruses.append(spawnSingleVirusSafely()) }
     }
     private func spawnInitialTokens() {
-        // Offline `foodPerArenaAreaUnit` 1.0005e-05 x 7905^2 = 625 pellets.
-        for _ in 0..<625 { tokens.append(spawnSingleToken(existing: tokens)) }
+        for _ in 0..<OriginalGameplay.offlineFoodCount { tokens.append(spawnSingleToken(existing: tokens)) }
     }
     
     /// Exact Agar.io virus shatter distribution (`AgarCell::eatVirus`): the cell
