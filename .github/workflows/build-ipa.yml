@@ -80,8 +80,9 @@ jobs:
             echo "visual_guard: no baselines committed yet, skipping"
             exit 0
           fi
-          python3 -m pip install --quiet pillow
-          python3 tools/visual_guard.py build/snapshots Tests/Baselines
+          python3 -m venv .venv_vg
+          .venv_vg/bin/pip install --quiet pillow
+          .venv_vg/bin/python tools/visual_guard.py build/snapshots Tests/Baselines
       - if: always()
         uses: actions/upload-artifact@v4
         with:
