@@ -163,6 +163,18 @@ final class AgarUITests: XCTestCase {
         RunLoop.current.run(until: Date().addingTimeInterval(0.8))
         capture(app, name: "Live_04_Arena_Center.png")
 
+        // MenuPause must open while the arena HUD is untouched, before optional
+        // overlays (emote picker, leaderboard) can cover its hit area.
+        waitAndTap(pauseBtn)
+        let resumeNo = firstExisting(app, ids: ["ccbi.quitCancelButtonCallback", "ccbi._noButton"], timeout: 3.0)
+        XCTAssertNotNil(resumeNo, "MenuPause modal should open when Pause is tapped")
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        capture(app, name: "Live_06_Arena_HUD_and_Pause.png")
+        if let resumeNo {
+            waitAndTap(resumeNo)
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+        }
+
         // Drag virtual joystick on left-bottom quadrant toward top-left edge/corner
         let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.16, dy: 0.72))
         let dragTopLeft = app.coordinate(withNormalizedOffset: CGVector(dx: 0.06, dy: 0.56))
@@ -188,16 +200,6 @@ final class AgarUITests: XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.35))
             capture(app, name: "Live_05b_Arena_Emote_and_Leaderboard.png")
         }
-        waitAndTap(pauseBtn)
-        let resumeNo = firstExisting(app, ids: ["ccbi.quitCancelButtonCallback", "ccbi._noButton"], timeout: 3.0)
-        XCTAssertNotNil(resumeNo, "MenuPause modal should open when Pause is tapped")
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        capture(app, name: "Live_06_Arena_HUD_and_Pause.png")
-        if let resumeNo {
-            waitAndTap(resumeNo)
-            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
-        }
-
         if let splitBtn = firstExisting(app, ids: ["hud.split"], timeout: 2.0) {
             waitAndTap(splitBtn)
             RunLoop.current.run(until: Date().addingTimeInterval(0.15))

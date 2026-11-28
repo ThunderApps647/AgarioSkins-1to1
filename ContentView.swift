@@ -5902,7 +5902,7 @@ struct ContentView: View {
         var safePos: CGPoint = .zero
         var found = false
         let pCenter = playerCenter
-        let safeDistance = sqrt(totalPlayerMass) * 10
+        let safeDistance = max(800, (OriginalGameplay.radius(forMass: totalPlayerMass) + botRadius) * 4)
         
         for _ in 0..<10 {
             let x = CGFloat.random(in: botRadius...worldSize-botRadius)
