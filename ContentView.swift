@@ -1232,13 +1232,16 @@ struct SkinSelectorPreview: View {
     let skinName: String
 
     static func bundledImage(_ name: String) -> UIImage? {
-        if let img = UIImage(named: name) { return img }
+        // Prefer the bundled PNG over the asset catalog: catalog copies of some
+        // skins are flattened onto opaque white, which showed up as a translucent
+        // white plate on top of arena cells.  The original reads the raw texture.
         for subdirectory in ["AgarAssets/Skins", "Skins"] {
             if let url = Bundle.main.url(forResource: name, withExtension: "png", subdirectory: subdirectory),
                let img = UIImage(contentsOfFile: url.path) {
                 return img
             }
         }
+        if let img = UIImage(named: name) { return img }
         return nil
     }
 
@@ -4971,14 +4974,15 @@ struct ContentView: View {
                     if showArrow && lastJoystickDirection != .zero {
                         PlayerArrow(geometry: geometry, joystickIsDragging: joystickIsDragging, joystickOffset: joystickOffset, lastJoystickDirection: lastJoystickDirection, playerCells: playerCells, playerCenter: playerCenter, cameraCenter: smoothedPlayerPosition, zoomLevel: $zoomLevel)
                     }
-                    if joystickIsDragging {
-                        JoystickView(
-                            joystickOffset: $joystickOffset,
-                            joystickBasePosition: $joystickBasePosition,
-                            uiScale: OriginalGameplay.uiScale(for: geometry.size),
-                            viewportSize: geometry.size
-                        )
-                    }
+                    // Retail `ControlsWidget createJoystick` adds the JoystickView
+                    // as a permanent child; it rests at the default lower-left spot
+                    // and only follows the finger once a touch begins.
+                    JoystickView(
+                        joystickOffset: $joystickOffset,
+                        joystickBasePosition: $joystickBasePosition,
+                        uiScale: OriginalGameplay.uiScale(for: geometry.size),
+                        viewportSize: geometry.size
+                    )
                 }
                 
                 // MARK: - UI OVERLAY (Score, Pause, FPS)
@@ -14254,8 +14258,17 @@ struct JoystickView: View {
         }
         .compositingGroup()
         .opacity(50.0 / 255.0)
-        .position(joystickBasePosition ?? .zero)
+        .position(joystickBasePosition ?? restPosition(metrics: metrics))
         .allowsHitTesting(false)
+    }
+
+    /// Lower-left resting spot for the permanent joystick. Retail keeps the
+    /// joystick on screen before the first touch, unlike a touch-only overlay.
+    private func restPosition(metrics: (bgSide: CGFloat, knobSide: CGFloat, maxRadius: CGFloat)) -> CGPoint {
+        let margin = max(8, metrics.bgSide * 0.12)
+        return CGPoint(x: margin + metrics.bgSide * 0.5,
+                       y: max(margin + metrics.bgSide * 0.5,
+                              viewportSize.height - margin - metrics.bgSide * 0.5))
     }
 }
 
