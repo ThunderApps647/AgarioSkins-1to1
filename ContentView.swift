@@ -4884,7 +4884,7 @@ struct ContentView: View {
                         )
                     
                     if showArrow && lastJoystickDirection != .zero {
-                        PlayerArrow(geometry: geometry, joystickIsDragging: joystickIsDragging, joystickOffset: joystickOffset, lastJoystickDirection: lastJoystickDirection, playerCells: playerCells, playerCenter: playerCenter, zoomLevel: $zoomLevel)
+                        PlayerArrow(geometry: geometry, joystickIsDragging: joystickIsDragging, joystickOffset: joystickOffset, lastJoystickDirection: lastJoystickDirection, playerCells: playerCells, playerCenter: playerCenter, cameraCenter: smoothedPlayerPosition, zoomLevel: $zoomLevel)
                     }
                     if joystickIsDragging {
                         JoystickView(
@@ -14007,6 +14007,7 @@ struct PlayerArrow: View {
     let lastJoystickDirection: CGSize
     let playerCells: [PlayerCell]
     let playerCenter: CGPoint
+    let cameraCenter: CGPoint
     @Binding var zoomLevel: CGFloat
     
     var body: some View {
@@ -14022,9 +14023,13 @@ struct PlayerArrow: View {
             extent = max(extent, sqrt(dx * dx + dy * dy) + cell.cachedSolidRadius)
         }
         
+        let playerScreenCenter = CGPoint(
+            x: screenCenter.x + (playerCenter.x - cameraCenter.x) * zoomLevel,
+            y: screenCenter.y + (playerCenter.y - cameraCenter.y) * zoomLevel
+        )
         let rawOffset = extent * zoomLevel + 18 * s
-        let rawX = screenCenter.x + (rawOffset * CGFloat(cos(angle)))
-        let rawY = screenCenter.y + (rawOffset * CGFloat(sin(angle)))
+        let rawX = playerScreenCenter.x + (rawOffset * CGFloat(cos(angle)))
+        let rawY = playerScreenCenter.y + (rawOffset * CGFloat(sin(angle)))
         
         let padding: CGFloat = 32 * s
         let minX = padding + geometry.safeAreaInsets.leading
