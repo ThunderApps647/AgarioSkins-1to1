@@ -5136,9 +5136,32 @@ struct ContentView: View {
                 }
                 
                 if isPlaying && !isLeavePopupPresented {
-                    // The original client has no floating mod-menu launcher; the
-                    // draggable gear was an extra overlay and is intentionally not
-                    // drawn.  Mod state remains available to the simulation.
+                    let modScale = OriginalGameplay.uiScale(for: geometry.size)
+                    Image("mod-menu-btn")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 40 * modScale, height: 40 * modScale)
+                        .contentShape(Rectangle())
+                        .offset(modMenuIconOffset)
+                        .position(x: geometry.size.width - 44 * modScale, y: 128 * modScale)
+                        .gesture(
+                            DragGesture(coordinateSpace: .global)
+                                .onChanged { val in
+                                    modMenuIconOffset = CGSize(
+                                        width: lastModMenuIconOffset.width + val.translation.width,
+                                        height: lastModMenuIconOffset.height + val.translation.height
+                                    )
+                                }
+                                .onEnded { _ in
+                                    lastModMenuIconOffset = modMenuIconOffset
+                                }
+                        )
+                        .onTapGesture {
+                            withAnimation(.easeInOut(duration: 0.5)) { showModMenu.toggle() }
+                        }
+                        .accessibilityIdentifier("hud.modMenu")
+                        .zIndex(99)
+
                     if showModMenu {
                         XelahotModMenuPanel(
                             title: "Mod Menu",
@@ -12240,6 +12263,7 @@ struct ActionButtonsHUD: View, Equatable {
     let onFeedDown: () -> Void
     let onFeedUp: () -> Void
 
+    @State private var macroPressed = false
     @State private var feedPressed = false
     @State private var feedSequencePlayID = 0
 
@@ -12257,10 +12281,21 @@ struct ActionButtonsHUD: View, Equatable {
         GeometryReader { geometry in
             let s = OriginalGameplay.uiScale(for: geometry.size)
             let buttonSide = 65.0 * s
+            let macroSide = buttonSide
             let leadInset = max(0, geometry.safeAreaInsets.leading - 6)
             let trailInset = max(0, geometry.safeAreaInsets.trailing - 6)
             let sceneW = max(1, geometry.size.width - leadInset - trailInset)
             let ccbName: String = controlLayout == 0 ? "Controls-Left.ccbi" : (controlLayout == 1 ? "Controls-Sides.ccbi" : "Controls-Right.ccbi")
+            let macroX: CGFloat = {
+                if controlLayout == 0 {
+                    return leadInset + sceneW * 0.137 + buttonSide * 1.18
+                } else if controlLayout == 1 {
+                    return leadInset + sceneW * 0.92 - buttonSide * 1.18
+                } else {
+                    return leadInset + sceneW * 0.863 - buttonSide * 1.18
+                }
+            }()
+            let shootCenterY = geometry.size.height - 40.0 * s
             let splitHitOverlay = AnyView(
                 ImmediatePressSurface(onDown: { if canSplit { onSplit() } }, onUp: {})
                     .frame(width: buttonSide, height: buttonSide)
@@ -12316,9 +12351,21 @@ struct ActionButtonsHUD: View, Equatable {
                 .frame(width: sceneW, height: geometry.size.height)
                 .padding(.leading, leadInset)
 
-                // Original Controls-*.ccbi only contains the split and shoot
-                // buttons.  The extra macro button was a custom overlay and is
-                // intentionally absent here.
+                Image("macro")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: macroSide, height: macroSide)
+                    .scaleEffect(macroButtonScale)
+                    .overlay(
+                        ImmediatePressSurface(onDown: { macroPressed = true; onMacroDown() },
+                                              onUp: { macroPressed = false; onMacroUp() })
+                    )
+                    .opacity(canFeed ? (macroPressed ? 0.55 : 1.0) : 0.45)
+                    .allowsHitTesting(canFeed)
+                    .position(x: macroX, y: shootCenterY)
+                    .accessibilityLabel("Fast eject")
+                    .accessibilityIdentifier("hud.macro")
+                    .accessibilityAddTraits(.isButton)
             }
         }
     }

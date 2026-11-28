@@ -397,8 +397,6 @@ class AssetLibrary:
 
 
 def ui_scale_for(w: float, h: float, is_ipad: bool) -> float:
-    if is_ipad:
-        return max(0.5, w / 768.0)
     return max(0.5, min(h / 320.0, w / 480.0))
 
 
@@ -434,8 +432,6 @@ VISIBILITY_OVERRIDES = {
         "_playButtonsScrollNode": False,
         # Bound slot views replace these CCBI placeholders at runtime.
         "_inputBox": False, "_rewardSprite": False, "_buttonIcon": False,
-        "_playerAvatar": False, "_leagueBadgeRootNode": False,
-        "_staticPlayButtonsContainer": False, "_skinsButtonSprite": False,
     },
     "MenuSettings": {"_menuHelp": False, "_scrollbarNode": False},
     "MenuShopSkins": {"_scrollbarNode": False, "_tabsNode": False, "_tableNode": False},

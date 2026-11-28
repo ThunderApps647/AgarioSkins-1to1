@@ -838,8 +838,8 @@ final class AgarParityTests: XCTestCase {
         let actualMass = Double(AgarPhysicsCore.applyOfflineMassDecay(mass: 10000, isPlayer: true, dt: 0.02))
         XCTAssertEqual(actualMass, expectedMass, accuracy: 1e-4)
 
-        // Verify AppDelegate iPad FixedWidth 768 vs iPhone FixedHeight 320 UI scale & resourceScaleFactor
-        XCTAssertEqual(Double(OriginalGameplay.uiScale(for: CGSize(width: 1024, height: 768), isPhoneOverride: false)), 1024.0 / 768.0, accuracy: tol)
+        // Verify .ccbi 480x320 UI scale on iPad & iPhone, plus resourceScaleFactor
+        XCTAssertEqual(Double(OriginalGameplay.uiScale(for: CGSize(width: 1024, height: 768), isPhoneOverride: false)), 1024.0 / 480.0, accuracy: tol)
         XCTAssertEqual(Double(OriginalGameplay.uiScale(for: CGSize(width: 852, height: 393), isPhoneOverride: true)), 393.0 / 320.0, accuracy: tol)
         XCTAssertEqual(Double(OriginalGameplay.resourceScaleFactor(isPhoneOverride: true)), 0.46875, accuracy: tol)
         XCTAssertEqual(Double(OriginalGameplay.resourceScaleFactor(isPhoneOverride: false)), 1.0, accuracy: tol)

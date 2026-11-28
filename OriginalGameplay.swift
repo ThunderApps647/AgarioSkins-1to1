@@ -226,14 +226,6 @@ enum OriginalGameplay {
     static func uiScale(for size: CGSize, isPhoneOverride: Bool? = nil) -> CGFloat {
         let w = max(size.width, 1)
         let h = max(size.height, 1)
-        #if canImport(UIKit)
-        let isPhone = isPhoneOverride ?? (UIDevice.current.userInterfaceIdiom != .pad)
-        #else
-        let isPhone = isPhoneOverride ?? true
-        #endif
-        if !isPhone {
-            return max(0.5, w / 768.0)
-        }
         let s = min(h / 320.0, w / 480.0)
         return max(0.5, s)
     }

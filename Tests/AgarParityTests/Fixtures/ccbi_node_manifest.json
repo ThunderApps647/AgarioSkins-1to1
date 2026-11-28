@@ -418,6 +418,22 @@
         "h": 48.88
       },
       {
+        "cls": "CCSprite",
+        "varName": "_skinsButtonSprite",
+        "x": 223.96,
+        "y": 131.56,
+        "w": 41.52,
+        "h": 42.4
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "",
+        "x": 223.96,
+        "y": 131.56,
+        "w": 41.52,
+        "h": 42.4
+      },
+      {
         "cls": "CCNodeRGBA",
         "varName": "_plusSprite",
         "x": 211.12,
@@ -666,6 +682,14 @@
         "h": 175.88
       },
       {
+        "cls": "StaticPlayButtonContainer",
+        "varName": "_staticPlayButtonsContainer",
+        "x": 0.0,
+        "y": 153.26,
+        "w": 874.0,
+        "h": 175.88
+      },
+      {
         "cls": "CCHybridMenu",
         "varName": "",
         "x": 0.0,
@@ -904,6 +928,30 @@
         "y": 351.75,
         "w": 37.69,
         "h": 37.69
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_playerAvatar",
+        "x": 823.75,
+        "y": 351.75,
+        "w": 37.69,
+        "h": 37.69
+      },
+      {
+        "cls": "PlayerAvatarInitialized",
+        "varName": "",
+        "x": 823.75,
+        "y": 351.75,
+        "w": 37.69,
+        "h": 37.69
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "_defaultImage",
+        "x": 796.96,
+        "y": 324.81,
+        "w": 91.27,
+        "h": 91.57
       },
       {
         "cls": "MCFramedSprite",
@@ -3304,10 +3352,10 @@
       {
         "cls": "CCSprite",
         "varName": "_logo",
-        "x": 429.1,
-        "y": 164.8,
-        "w": 517.79,
-        "h": 145.12
+        "x": 273.77,
+        "y": 121.26,
+        "w": 828.47,
+        "h": 232.2
       },
       {
         "cls": "CCHybridMenu",
@@ -3320,903 +3368,951 @@
       {
         "cls": "CCNodeRGBA",
         "varName": "_leaguesButtonNode",
-        "x": 89.58,
+        "x": 143.33,
         "y": 0.0,
-        "w": 71.67,
-        "h": 89.58
+        "w": 114.67,
+        "h": 143.33
       },
       {
         "cls": "CCBFile",
         "varName": "_leaguesButton",
-        "x": 89.58,
-        "y": -89.58,
-        "w": 71.67,
-        "h": 89.58
+        "x": 143.33,
+        "y": -143.33,
+        "w": 114.67,
+        "h": 143.33
       },
       {
         "cls": "LeaguesButton",
         "varName": "_leaguesButton",
-        "x": 89.58,
+        "x": 143.33,
         "y": 0.0,
-        "w": 71.67,
-        "h": 89.58
+        "w": 114.67,
+        "h": 143.33
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 89.58,
-        "y": 8.96,
-        "w": 71.67,
-        "h": 71.67
+        "x": 143.33,
+        "y": 14.33,
+        "w": 114.67,
+        "h": 114.67
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 89.03,
-        "y": 46.58,
-        "w": 73.46,
-        "h": 46.58
+        "x": 142.46,
+        "y": 74.53,
+        "w": 117.53,
+        "h": 74.53
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 89.58,
-        "y": 8.96,
-        "w": 71.67,
-        "h": 71.67
+        "x": 143.33,
+        "y": 14.33,
+        "w": 114.67,
+        "h": 114.67
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_timerState",
-        "x": 89.58,
-        "y": 8.96,
-        "w": 71.67,
-        "h": 71.67
+        "x": 143.33,
+        "y": 14.33,
+        "w": 114.67,
+        "h": 114.67
       },
       {
         "cls": "CCSprite",
         "varName": "_icon",
-        "x": 88.24,
-        "y": 16.57,
-        "w": 74.35,
-        "h": 56.44
+        "x": 141.18,
+        "y": 26.52,
+        "w": 118.97,
+        "h": 90.3
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_badgeNode",
-        "x": 134.73,
-        "y": -1.08,
-        "w": 35.83,
-        "h": 35.83
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 120.4,
-        "y": -14.42,
-        "w": 64.5,
-        "h": 66.11
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 129.81,
-        "y": -6.76,
-        "w": 45.69,
-        "h": 47.21
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 148.17,
-        "y": 1.61,
-        "w": 8.96,
-        "h": 30.46
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "_mysteryPotionsButtonNode",
-        "x": 250.83,
-        "y": 0.0,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "CCBFile",
-        "varName": "_mysteryPotionsButton",
-        "x": 250.83,
-        "y": -89.58,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "MysteryPotionsButton",
-        "varName": "",
-        "x": 250.83,
-        "y": 0.0,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "",
-        "x": 250.83,
-        "y": 8.96,
-        "w": 71.67,
-        "h": 71.67
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 250.28,
-        "y": 46.58,
-        "w": 73.46,
-        "h": 46.58
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 250.83,
-        "y": 8.96,
-        "w": 71.67,
-        "h": 71.67
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "_normalState",
-        "x": 250.83,
-        "y": 8.96,
-        "w": 71.67,
-        "h": 71.67
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "_badgeNode",
-        "x": 295.98,
-        "y": -1.08,
-        "w": 35.83,
-        "h": 35.83
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 281.65,
-        "y": -14.42,
-        "w": 64.5,
-        "h": 66.11
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 291.06,
-        "y": -6.76,
-        "w": 45.69,
-        "h": 47.21
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 309.42,
-        "y": 1.61,
-        "w": 8.96,
-        "h": 30.46
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "_dailyQuestButtonNode",
-        "x": 170.21,
-        "y": 0.0,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "CCBFile",
-        "varName": "_dailyQuestButton",
-        "x": 170.21,
-        "y": -89.58,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "DailyQuestButton",
-        "varName": "",
-        "x": 170.21,
-        "y": 0.0,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "",
-        "x": 170.21,
-        "y": 8.96,
-        "w": 71.67,
-        "h": 71.67
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 169.66,
-        "y": 46.58,
-        "w": 73.46,
-        "h": 46.58
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 170.21,
-        "y": 8.96,
-        "w": 71.67,
-        "h": 71.67
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "_normalState",
-        "x": 186.33,
-        "y": 27.32,
-        "w": 39.42,
-        "h": 34.94
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 171.1,
-        "y": 13.89,
-        "w": 69.88,
-        "h": 61.81
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "_badgeNode",
-        "x": 215.36,
-        "y": -1.08,
-        "w": 35.83,
-        "h": 35.83
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 201.02,
-        "y": -14.42,
-        "w": 64.5,
-        "h": 66.11
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 210.43,
-        "y": -6.76,
-        "w": 45.69,
-        "h": 47.21
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 228.8,
-        "y": 1.61,
-        "w": 8.96,
-        "h": 30.46
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "_freeCoinsButtonNode",
-        "x": 8.96,
-        "y": 0.0,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "CCBFile",
-        "varName": "",
-        "x": 44.79,
-        "y": -44.79,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "FreeRewardsButton",
-        "varName": "",
-        "x": 44.79,
-        "y": -44.79,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "",
-        "x": 44.79,
-        "y": -44.79,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 43.9,
-        "y": 1.79,
-        "w": 73.46,
-        "h": 46.58
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 44.79,
-        "y": -35.83,
-        "w": 71.67,
-        "h": 71.67
-      },
-      {
-        "cls": "MCLabelTTF",
-        "varName": "_rewardText",
-        "x": 44.79,
-        "y": -14.33,
-        "w": 71.67,
-        "h": 71.67
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "_badgeNode",
-        "x": 89.94,
-        "y": -50.17,
-        "w": 35.83,
-        "h": 44.79
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 75.61,
-        "y": -58.59,
-        "w": 64.5,
-        "h": 66.11
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 85.01,
-        "y": -51.38,
-        "w": 45.69,
-        "h": 47.21
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 103.38,
-        "y": -43.0,
-        "w": 8.96,
-        "h": 30.46
-      },
-      {
-        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
-        "varName": "",
-        "x": 344.97,
-        "y": 351.85,
-        "w": 80.62,
-        "h": 80.62
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "_skinsBonusButton",
-        "x": 344.97,
-        "y": 351.85,
-        "w": 80.62,
-        "h": 80.62
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 312.27,
-        "y": 319.42,
-        "w": 146.02,
-        "h": 148.71
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "_plusSprite",
-        "x": 337.35,
-        "y": 399.77,
-        "w": 40.31,
-        "h": 40.31
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 321.68,
-        "y": 385.22,
-        "w": 71.67,
-        "h": 73.46
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 331.98,
-        "y": 393.95,
-        "w": 51.06,
-        "h": 51.96
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 342.73,
-        "y": 405.15,
-        "w": 29.56,
-        "h": 29.56
-      },
-      {
-        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
-        "varName": "",
-        "x": -26.88,
-        "y": 987.21,
-        "w": 71.67,
-        "h": 71.67
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": -25.08,
-        "y": 1025.73,
-        "w": 68.08,
-        "h": 46.58
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": -26.88,
-        "y": 987.21,
-        "w": 71.67,
-        "h": 71.67
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": -29.56,
-        "y": 984.52,
-        "w": 77.04,
-        "h": 77.04
-      },
-      {
-        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
-        "varName": "",
-        "x": 946.0,
-        "y": 951.38,
-        "w": 179.17,
-        "h": 71.67
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 947.79,
-        "y": 989.9,
-        "w": 175.58,
-        "h": 46.58
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "_shopButtonNode",
-        "x": 946.0,
-        "y": 951.38,
-        "w": 179.17,
-        "h": 71.67
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 946.0,
-        "y": 951.38,
-        "w": 179.17,
-        "h": 71.67
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 1039.17,
-        "y": 948.24,
-        "w": 82.42,
-        "h": 77.94
-      },
-      {
-        "cls": "MCLabelTTF",
-        "varName": "",
-        "x": 919.12,
-        "y": 951.38,
-        "w": 179.17,
-        "h": 71.67
-      },
-      {
-        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
-        "varName": "",
-        "x": 8.96,
-        "y": 107.5,
-        "w": 77.04,
-        "h": 73.46
-      },
-      {
-        "cls": "CCBFile",
-        "varName": "_boostXpButton",
-        "x": 8.96,
-        "y": 34.04,
-        "w": 77.04,
-        "h": 73.46
-      },
-      {
-        "cls": "BoostButton",
-        "varName": "",
-        "x": 8.96,
-        "y": 107.5,
-        "w": 77.04,
-        "h": 73.46
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": -17.47,
-        "y": 85.55,
-        "w": 129.9,
-        "h": 117.35
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "_badgeNode",
-        "x": -30.23,
-        "y": 65.17,
-        "w": 64.95,
-        "h": 58.68
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": -33.59,
-        "y": 60.72,
-        "w": 71.67,
-        "h": 73.46
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "_plusBackgroundSprite",
-        "x": -23.29,
-        "y": 68.53,
-        "w": 51.06,
-        "h": 51.96
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "_plusSprite",
-        "x": -12.54,
-        "y": 79.73,
-        "w": 29.56,
-        "h": 29.56
-      },
-      {
-        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
-        "varName": "",
-        "x": 8.96,
-        "y": 179.17,
-        "w": 75.25,
-        "h": 73.46
-      },
-      {
-        "cls": "CCBFile",
-        "varName": "_boostMassButton",
-        "x": 8.96,
-        "y": 105.71,
-        "w": 75.25,
-        "h": 73.46
-      },
-      {
-        "cls": "BoostButton",
-        "varName": "",
-        "x": 8.96,
-        "y": 179.17,
-        "w": 75.25,
-        "h": 73.46
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": -15.23,
-        "y": 156.32,
-        "w": 123.62,
-        "h": 119.15
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "_badgeNode",
-        "x": -26.43,
-        "y": 135.49,
-        "w": 61.81,
-        "h": 59.57
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": -31.35,
-        "y": 131.53,
-        "w": 71.67,
-        "h": 73.46
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "_plusBackgroundSprite",
-        "x": -21.05,
-        "y": 139.3,
-        "w": 51.06,
-        "h": 51.96
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "_plusSprite",
-        "x": -10.3,
-        "y": 150.5,
-        "w": 29.56,
-        "h": 29.56
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "",
-        "x": 0.0,
-        "y": 493.78,
-        "w": 1376.0,
-        "h": 250.83
-      },
-      {
-        "cls": "CCHybridMenu",
-        "varName": "",
-        "x": 0.0,
-        "y": 0.0,
-        "w": 1376.0,
-        "h": 1032.0
-      },
-      {
-        "cls": "CCMenuItem",
-        "varName": "",
-        "x": 8.96,
-        "y": 862.69,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "CCHybridMenu",
-        "varName": "_leftSlot",
-        "x": 8.96,
-        "y": 862.69,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
-        "varName": "_newsfeedButton",
-        "x": 8.96,
-        "y": 862.69,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 10.75,
-        "y": 909.27,
-        "w": 68.08,
-        "h": 46.58
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 8.96,
-        "y": 871.65,
-        "w": 71.67,
-        "h": 71.67
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 9.41,
-        "y": 881.95,
-        "w": 70.77,
-        "h": 51.06
-      },
-      {
-        "cls": "CCMenuItem",
-        "varName": "",
-        "x": 89.58,
-        "y": 942.42,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "CCHybridMenu",
-        "varName": "_bottomLeftSlot",
-        "x": 89.58,
-        "y": 942.42,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
-        "varName": "_giftCenterButton",
-        "x": 89.58,
-        "y": 951.38,
-        "w": 71.67,
-        "h": 71.67
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 91.38,
-        "y": 989.9,
-        "w": 68.08,
-        "h": 46.58
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 89.58,
-        "y": 951.38,
-        "w": 71.67,
-        "h": 71.67
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 90.48,
-        "y": 943.76,
-        "w": 69.88,
-        "h": 86.9
-      },
-      {
-        "cls": "CCMenuItem",
-        "varName": "",
-        "x": 170.21,
-        "y": 942.42,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "CCHybridMenu",
-        "varName": "_bottomRightSlot",
-        "x": 170.21,
-        "y": 942.42,
-        "w": 71.67,
-        "h": 89.58
-      },
-      {
-        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
-        "varName": "_partyModeButton",
-        "x": 170.21,
-        "y": 951.38,
-        "w": 71.67,
-        "h": 71.67
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 172.0,
-        "y": 989.9,
-        "w": 68.08,
-        "h": 46.58
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 170.21,
-        "y": 951.38,
-        "w": 71.67,
-        "h": 71.67
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 162.59,
-        "y": 950.03,
-        "w": 86.9,
-        "h": 74.35
-      },
-      {
-        "cls": "CCBFile",
-        "varName": "_partyModeBadge",
-        "x": 233.28,
-        "y": 887.59,
-        "w": 71.67,
-        "h": 71.67
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "",
-        "x": 287.03,
-        "y": 1013.01,
-        "w": 35.83,
-        "h": 35.83
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 269.11,
-        "y": 995.99,
-        "w": 71.67,
-        "h": 73.46
-      },
-      {
-        "cls": "CCSprite",
-        "varName": "",
-        "x": 279.41,
-        "y": 1004.95,
-        "w": 51.06,
-        "h": 51.96
-      },
-      {
-        "cls": "MCLabelTTF",
-        "varName": "_badgeLabel",
-        "x": 287.03,
-        "y": 1013.01,
-        "w": 35.83,
-        "h": 35.83
-      },
-      {
-        "cls": "CCHybridMenu",
-        "varName": "",
-        "x": 0.0,
-        "y": 0.0,
-        "w": 1376.0,
-        "h": 1032.0
-      },
-      {
-        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
-        "varName": "",
-        "x": 1134.12,
-        "y": 951.38,
-        "w": 232.92,
-        "h": 71.67
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 1135.47,
-        "y": 989.9,
-        "w": 230.23,
-        "h": 46.58
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 1134.13,
-        "y": 951.38,
-        "w": 232.92,
-        "h": 71.67
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "_xpBarFrame",
-        "x": 1173.54,
-        "y": 966.6,
-        "w": 125.42,
-        "h": 23.29
-      },
-      {
-        "cls": "CCNodeRGBA",
-        "varName": "",
-        "x": 1304.33,
-        "y": 960.33,
-        "w": 53.75,
-        "h": 53.75
-      },
-      {
-        "cls": "MCFramedSprite",
-        "varName": "",
-        "x": 1302.54,
-        "y": 958.54,
+        "x": 215.57,
+        "y": -1.72,
         "w": 57.33,
         "h": 57.33
       },
       {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 192.64,
+        "y": -23.08,
+        "w": 103.2,
+        "h": 105.78
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 207.69,
+        "y": -10.82,
+        "w": 73.1,
+        "h": 75.54
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 237.07,
+        "y": 2.58,
+        "w": 14.33,
+        "h": 48.73
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_mysteryPotionsButtonNode",
+        "x": 401.33,
+        "y": 0.0,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_mysteryPotionsButton",
+        "x": 401.33,
+        "y": -143.33,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "MysteryPotionsButton",
+        "varName": "",
+        "x": 401.33,
+        "y": 0.0,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": 401.33,
+        "y": 14.33,
+        "w": 114.67,
+        "h": 114.67
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 400.46,
+        "y": 74.53,
+        "w": 117.53,
+        "h": 74.53
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 401.33,
+        "y": 14.33,
+        "w": 114.67,
+        "h": 114.67
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_normalState",
+        "x": 401.33,
+        "y": 14.33,
+        "w": 114.67,
+        "h": 114.67
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_badgeNode",
+        "x": 473.57,
+        "y": -1.72,
+        "w": 57.33,
+        "h": 57.33
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 450.64,
+        "y": -23.08,
+        "w": 103.2,
+        "h": 105.78
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 465.69,
+        "y": -10.82,
+        "w": 73.1,
+        "h": 75.54
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 495.07,
+        "y": 2.58,
+        "w": 14.33,
+        "h": 48.73
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_dailyQuestButtonNode",
+        "x": 272.33,
+        "y": 0.0,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_dailyQuestButton",
+        "x": 272.33,
+        "y": -143.33,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "DailyQuestButton",
+        "varName": "",
+        "x": 272.33,
+        "y": 0.0,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": 272.33,
+        "y": 14.33,
+        "w": 114.67,
+        "h": 114.67
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 271.46,
+        "y": 74.53,
+        "w": 117.53,
+        "h": 74.53
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 272.33,
+        "y": 14.33,
+        "w": 114.67,
+        "h": 114.67
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_normalState",
+        "x": 298.13,
+        "y": 43.72,
+        "w": 63.07,
+        "h": 55.9
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 273.77,
+        "y": 22.22,
+        "w": 111.8,
+        "h": 98.9
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_badgeNode",
+        "x": 344.57,
+        "y": -1.72,
+        "w": 57.33,
+        "h": 57.33
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 321.64,
+        "y": -23.08,
+        "w": 103.2,
+        "h": 105.78
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 336.69,
+        "y": -10.82,
+        "w": 73.1,
+        "h": 75.54
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 366.07,
+        "y": 2.58,
+        "w": 14.33,
+        "h": 48.73
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_freeCoinsButtonNode",
+        "x": 14.33,
+        "y": 0.0,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "",
+        "x": 71.67,
+        "y": -71.67,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "FreeRewardsButton",
+        "varName": "",
+        "x": 71.67,
+        "y": -71.67,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": 71.67,
+        "y": -71.67,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 70.23,
+        "y": 2.87,
+        "w": 117.53,
+        "h": 74.53
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 71.67,
+        "y": -57.33,
+        "w": 114.67,
+        "h": 114.67
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_rewardText",
+        "x": 71.67,
+        "y": -22.93,
+        "w": 114.67,
+        "h": 114.67
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_badgeNode",
+        "x": 143.91,
+        "y": -80.27,
+        "w": 57.33,
+        "h": 71.67
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 120.97,
+        "y": -93.74,
+        "w": 103.2,
+        "h": 105.78
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 136.02,
+        "y": -82.2,
+        "w": 73.1,
+        "h": 75.54
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 165.41,
+        "y": -68.8,
+        "w": 14.33,
+        "h": 48.73
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": 320.78,
+        "y": 327.66,
+        "w": 129.0,
+        "h": 129.0
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_skinsBonusButton",
+        "x": 320.78,
+        "y": 327.66,
+        "w": 129.0,
+        "h": 129.0
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 268.46,
+        "y": 275.77,
+        "w": 233.63,
+        "h": 237.93
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "_skinsButtonSprite",
+        "x": 284.23,
+        "y": 288.96,
+        "w": 202.1,
+        "h": 206.4
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "",
+        "x": 284.23,
+        "y": 288.96,
+        "w": 202.1,
+        "h": 206.4
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_plusSprite",
+        "x": 308.6,
+        "y": 404.34,
+        "w": 64.5,
+        "h": 64.5
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 283.51,
+        "y": 381.05,
+        "w": 114.67,
+        "h": 117.53
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 300.0,
+        "y": 395.03,
+        "w": 81.7,
+        "h": 83.13
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 317.2,
+        "y": 412.94,
+        "w": 47.3,
+        "h": 47.3
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": -43.0,
+        "y": 960.33,
+        "w": 114.67,
+        "h": 114.67
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -40.13,
+        "y": 1021.97,
+        "w": 108.93,
+        "h": 74.53
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": -43.0,
+        "y": 960.33,
+        "w": 114.67,
+        "h": 114.67
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": -47.3,
+        "y": 956.03,
+        "w": 123.27,
+        "h": 123.27
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": 688.0,
+        "y": 903.0,
+        "w": 286.67,
+        "h": 114.67
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 690.87,
+        "y": 964.63,
+        "w": 280.93,
+        "h": 74.53
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_shopButtonNode",
+        "x": 688.0,
+        "y": 903.0,
+        "w": 286.67,
+        "h": 114.67
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 688.0,
+        "y": 903.0,
+        "w": 286.67,
+        "h": 114.67
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 837.07,
+        "y": 897.98,
+        "w": 131.87,
+        "h": 124.7
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "",
+        "x": 645.0,
+        "y": 903.0,
+        "w": 286.67,
+        "h": 114.67
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": 14.33,
+        "y": 172.0,
+        "w": 123.27,
+        "h": 117.53
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_boostXpButton",
+        "x": 14.33,
+        "y": 54.47,
+        "w": 123.27,
+        "h": 117.53
+      },
+      {
+        "cls": "BoostButton",
+        "varName": "",
+        "x": 14.33,
+        "y": 172.0,
+        "w": 123.27,
+        "h": 117.53
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": -27.95,
+        "y": 136.88,
+        "w": 207.83,
+        "h": 187.77
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_badgeNode",
+        "x": -48.38,
+        "y": 104.28,
+        "w": 103.92,
+        "h": 93.88
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": -53.75,
+        "y": 97.14,
+        "w": 114.67,
+        "h": 117.53
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "_plusBackgroundSprite",
+        "x": -37.27,
+        "y": 109.65,
+        "w": 81.7,
+        "h": 83.13
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "_plusSprite",
+        "x": -20.07,
+        "y": 127.57,
+        "w": 47.3,
+        "h": 47.3
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": 14.33,
+        "y": 286.67,
+        "w": 120.4,
+        "h": 117.53
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_boostMassButton",
+        "x": 14.33,
+        "y": 169.13,
+        "w": 120.4,
+        "h": 117.53
+      },
+      {
+        "cls": "BoostButton",
+        "varName": "",
+        "x": 14.33,
+        "y": 286.67,
+        "w": 120.4,
+        "h": 117.53
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": -24.37,
+        "y": 250.12,
+        "w": 197.8,
+        "h": 190.63
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "_badgeNode",
+        "x": -42.28,
+        "y": 216.79,
+        "w": 98.9,
+        "h": 95.32
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": -50.17,
+        "y": 210.45,
+        "w": 114.67,
+        "h": 117.53
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "_plusBackgroundSprite",
+        "x": -33.68,
+        "y": 222.88,
+        "w": 81.7,
+        "h": 83.13
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "_plusSprite",
+        "x": -16.48,
+        "y": 240.8,
+        "w": 47.3,
+        "h": 47.3
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": 0.0,
+        "y": 418.53,
+        "w": 1376.0,
+        "h": 401.33
+      },
+      {
+        "cls": "StaticPlayButtonContainer",
+        "varName": "_staticPlayButtonsContainer",
+        "x": 0.0,
+        "y": 418.53,
+        "w": 1376.0,
+        "h": 401.33
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "",
+        "x": 0.0,
+        "y": 0.0,
+        "w": 1376.0,
+        "h": 1032.0
+      },
+      {
+        "cls": "CCMenuItem",
+        "varName": "",
+        "x": 14.33,
+        "y": 761.1,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "_leftSlot",
+        "x": 14.33,
+        "y": 761.1,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "_newsfeedButton",
+        "x": 14.33,
+        "y": 761.1,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 17.2,
+        "y": 835.63,
+        "w": 108.93,
+        "h": 74.53
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 14.33,
+        "y": 775.43,
+        "w": 114.67,
+        "h": 114.67
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 15.05,
+        "y": 791.92,
+        "w": 113.23,
+        "h": 81.7
+      },
+      {
+        "cls": "CCMenuItem",
+        "varName": "",
+        "x": 143.33,
+        "y": 888.67,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "_bottomLeftSlot",
+        "x": 143.33,
+        "y": 888.67,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "_giftCenterButton",
+        "x": 143.33,
+        "y": 903.0,
+        "w": 114.67,
+        "h": 114.67
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 146.2,
+        "y": 964.63,
+        "w": 108.93,
+        "h": 74.53
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 143.33,
+        "y": 903.0,
+        "w": 114.67,
+        "h": 114.67
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 144.77,
+        "y": 890.82,
+        "w": 111.8,
+        "h": 139.03
+      },
+      {
+        "cls": "CCMenuItem",
+        "varName": "",
+        "x": 272.33,
+        "y": 888.67,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "_bottomRightSlot",
+        "x": 272.33,
+        "y": 888.67,
+        "w": 114.67,
+        "h": 143.33
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "_partyModeButton",
+        "x": 272.33,
+        "y": 903.0,
+        "w": 114.67,
+        "h": 114.67
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 275.2,
+        "y": 964.63,
+        "w": 108.93,
+        "h": 74.53
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 272.33,
+        "y": 903.0,
+        "w": 114.67,
+        "h": 114.67
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 260.15,
+        "y": 900.85,
+        "w": 139.03,
+        "h": 118.97
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_partyModeBadge",
+        "x": 373.24,
+        "y": 800.95,
+        "w": 114.67,
+        "h": 114.67
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": 459.24,
+        "y": 1001.61,
+        "w": 57.33,
+        "h": 57.33
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 430.57,
+        "y": 974.38,
+        "w": 114.67,
+        "h": 117.53
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "",
+        "x": 447.06,
+        "y": 988.71,
+        "w": 81.7,
+        "h": 83.13
+      },
+      {
+        "cls": "MCLabelTTF",
+        "varName": "_badgeLabel",
+        "x": 459.24,
+        "y": 1001.61,
+        "w": 57.33,
+        "h": 57.33
+      },
+      {
+        "cls": "CCHybridMenu",
+        "varName": "",
+        "x": 0.0,
+        "y": 0.0,
+        "w": 1376.0,
+        "h": 1032.0
+      },
+      {
+        "cls": "MCMenuItemNodeRGBAStaticWithSounds",
+        "varName": "",
+        "x": 989.0,
+        "y": 903.0,
+        "w": 372.67,
+        "h": 114.67
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 991.15,
+        "y": 964.63,
+        "w": 368.37,
+        "h": 74.53
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 989.0,
+        "y": 903.0,
+        "w": 372.67,
+        "h": 114.67
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "_xpBarFrame",
+        "x": 1052.07,
+        "y": 927.37,
+        "w": 200.67,
+        "h": 37.27
+      },
+      {
+        "cls": "CCNodeRGBA",
+        "varName": "",
+        "x": 1261.33,
+        "y": 917.33,
+        "w": 86.0,
+        "h": 86.0
+      },
+      {
+        "cls": "CCBFile",
+        "varName": "_playerAvatar",
+        "x": 1261.33,
+        "y": 917.33,
+        "w": 86.0,
+        "h": 86.0
+      },
+      {
+        "cls": "PlayerAvatarInitialized",
+        "varName": "",
+        "x": 1261.33,
+        "y": 917.33,
+        "w": 86.0,
+        "h": 86.0
+      },
+      {
+        "cls": "CCSprite",
+        "varName": "_defaultImage",
+        "x": 1082.17,
+        "y": 737.45,
+        "w": 444.33,
+        "h": 445.77
+      },
+      {
+        "cls": "MCFramedSprite",
+        "varName": "",
+        "x": 1258.47,
+        "y": 914.47,
+        "w": 91.73,
+        "h": 91.73
+      },
+      {
         "cls": "MCLabelTTF",
         "varName": "_profileNameLabel",
-        "x": 1144.88,
-        "y": 947.79,
-        "w": 232.92,
-        "h": 71.67
+        "x": 1006.2,
+        "y": 897.27,
+        "w": 372.67,
+        "h": 114.67
       },
       {
         "cls": "CCBFile",
         "varName": "_coinBar",
-        "x": 1367.04,
+        "x": 1361.67,
         "y": -1032.0,
         "w": 1376.0,
         "h": 1032.0
@@ -4224,71 +4320,71 @@
       {
         "cls": "CoinBar",
         "varName": "",
-        "x": 1187.88,
+        "x": 1075.0,
         "y": 0.0,
-        "w": 179.17,
-        "h": 62.71
+        "w": 286.67,
+        "h": 100.33
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 1187.88,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 1075.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 1187.88,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 1075.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "CCSprite",
         "varName": "_plusNode",
-        "x": 1323.59,
-        "y": 0.9,
-        "w": 51.06,
-        "h": 51.96
+        "x": 1292.15,
+        "y": 1.43,
+        "w": 81.7,
+        "h": 83.13
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 1334.34,
-        "y": 12.09,
-        "w": 29.56,
-        "h": 29.56
+        "x": 1309.35,
+        "y": 19.35,
+        "w": 47.3,
+        "h": 47.3
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 1187.88,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 1075.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "CCSprite",
         "varName": "_barCurrencySprite",
-        "x": 1191.39,
-        "y": 6.32,
-        "w": 43.13,
-        "h": 41.12
+        "x": 1080.63,
+        "y": 10.11,
+        "w": 69.01,
+        "h": 65.79
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_barCurrencyValue",
-        "x": 1148.46,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 1011.93,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "CCBFile",
         "varName": "_dnaBar",
-        "x": 1178.92,
+        "x": 1060.67,
         "y": -1032.0,
         "w": 1376.0,
         "h": 1032.0
@@ -4296,114 +4392,114 @@
       {
         "cls": "DNABar",
         "varName": "",
-        "x": 999.75,
+        "x": 774.0,
         "y": 0.0,
-        "w": 179.17,
-        "h": 62.71
+        "w": 286.67,
+        "h": 100.33
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 999.75,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 774.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 999.75,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 774.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "CCSprite",
         "varName": "_plusNode",
-        "x": 1135.47,
-        "y": 0.9,
-        "w": 51.06,
-        "h": 51.96
+        "x": 991.15,
+        "y": 1.43,
+        "w": 81.7,
+        "h": 83.13
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 1146.22,
-        "y": 12.09,
-        "w": 29.56,
-        "h": 29.56
+        "x": 1008.35,
+        "y": 19.35,
+        "w": 47.3,
+        "h": 47.3
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 999.75,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 774.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "CCSprite",
         "varName": "_barCurrencySprite",
-        "x": 997.82,
-        "y": 3.9,
-        "w": 54.02,
-        "h": 45.96
+        "x": 770.92,
+        "y": 6.23,
+        "w": 86.43,
+        "h": 73.53
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_barCurrencyValue",
-        "x": 960.33,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 710.93,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "LockablePlayButton",
         "varName": "",
-        "x": 354.75,
-        "y": 569.75,
-        "w": 215.0,
-        "h": 143.33
+        "x": 154.8,
+        "y": 602.0,
+        "w": 344.0,
+        "h": 229.33
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 356.9,
-        "y": 679.94,
-        "w": 210.7,
-        "h": 46.58
+        "x": 158.24,
+        "y": 778.3,
+        "w": 337.12,
+        "h": 74.53
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 354.75,
-        "y": 569.75,
-        "w": 215.0,
-        "h": 143.33
+        "x": 154.8,
+        "y": 602.0,
+        "w": 344.0,
+        "h": 229.33
       },
       {
         "cls": "MCFramedSprite",
         "varName": "_unlockedState",
-        "x": 354.75,
-        "y": 569.75,
-        "w": 215.0,
-        "h": 143.33
+        "x": 154.8,
+        "y": 602.0,
+        "w": 344.0,
+        "h": 229.33
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 428.66,
-        "y": 589.01,
-        "w": 67.19,
-        "h": 76.15
+        "x": 273.05,
+        "y": 632.82,
+        "w": 107.5,
+        "h": 121.83
       },
       {
         "cls": "MCLabelTTF",
         "varName": "",
-        "x": 354.75,
-        "y": 598.42,
-        "w": 215.0,
-        "h": 143.33
+        "x": 154.8,
+        "y": 647.87,
+        "w": 344.0,
+        "h": 229.33
       }
     ],
     "MenuSettings": [
@@ -4427,7 +4523,7 @@
         "cls": "CCNodeRGBA",
         "varName": "_tableNode",
         "x": 13.76,
-        "y": 125.2,
+        "y": 119.83,
         "w": 1348.48,
         "h": 897.84
       },
@@ -4437,7 +4533,7 @@
         "x": 0.0,
         "y": 0.0,
         "w": 1376.0,
-        "h": 71.67
+        "h": 114.67
       },
       {
         "cls": "CCBFile",
@@ -4453,15 +4549,15 @@
         "x": 0.0,
         "y": -1032.0,
         "w": 1376.0,
-        "h": 71.67
+        "h": 114.67
       },
       {
         "cls": "MCFramedSprite",
         "varName": "_horizontalFrame",
         "x": 13.76,
-        "y": -970.64,
+        "y": -933.82,
         "w": 1348.48,
-        "h": 2.69
+        "h": 4.3
       },
       {
         "cls": "CCHybridMenu",
@@ -4469,29 +4565,29 @@
         "x": 0.0,
         "y": -1032.0,
         "w": 1376.0,
-        "h": 71.67
+        "h": 114.67
       },
       {
         "cls": "MCMenuItemNodeRGBAStaticWithSounds",
         "varName": "_backButton",
-        "x": 32.97,
-        "y": -1035.58,
-        "w": 71.67,
-        "h": 71.67
+        "x": 11.47,
+        "y": -1037.73,
+        "w": 114.67,
+        "h": 114.67
       },
       {
         "cls": "CCSprite",
         "varName": "_backIcon",
-        "x": 27.14,
-        "y": -1041.41,
-        "w": 83.31,
-        "h": 83.31
+        "x": 2.15,
+        "y": -1047.05,
+        "w": 133.3,
+        "h": 133.3
       },
       {
         "cls": "MCLabelTTF",
         "varName": "",
         "x": 0.0,
-        "y": -483.75,
+        "y": -464.4,
         "w": 1376.0,
         "h": 1032.0
       }
@@ -4527,15 +4623,15 @@
         "x": 0.0,
         "y": -1032.0,
         "w": 1376.0,
-        "h": 71.67
+        "h": 114.67
       },
       {
         "cls": "MCFramedSprite",
         "varName": "_horizontalFrame",
         "x": 13.76,
-        "y": -970.64,
+        "y": -933.82,
         "w": 1348.48,
-        "h": 2.69
+        "h": 4.3
       },
       {
         "cls": "CCHybridMenu",
@@ -4543,29 +4639,29 @@
         "x": 0.0,
         "y": -1032.0,
         "w": 1376.0,
-        "h": 71.67
+        "h": 114.67
       },
       {
         "cls": "MCMenuItemNodeRGBAStaticWithSounds",
         "varName": "_backButton",
-        "x": 32.97,
-        "y": -1035.58,
-        "w": 71.67,
-        "h": 71.67
+        "x": 11.47,
+        "y": -1037.73,
+        "w": 114.67,
+        "h": 114.67
       },
       {
         "cls": "CCSprite",
         "varName": "_backIcon",
-        "x": 27.14,
-        "y": -1041.41,
-        "w": 83.31,
-        "h": 83.31
+        "x": 2.15,
+        "y": -1047.05,
+        "w": 133.3,
+        "h": 133.3
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_titleLabel",
         "x": -206.4,
-        "y": -483.75,
+        "y": -464.4,
         "w": 1376.0,
         "h": 1032.0
       },
@@ -4580,7 +4676,7 @@
       {
         "cls": "CCBFile",
         "varName": "_coinBar",
-        "x": 1367.04,
+        "x": 1361.67,
         "y": -1032.0,
         "w": 1376.0,
         "h": 1032.0
@@ -4588,71 +4684,71 @@
       {
         "cls": "CoinBar",
         "varName": "",
-        "x": 1187.88,
+        "x": 1075.0,
         "y": 0.0,
-        "w": 179.17,
-        "h": 62.71
+        "w": 286.67,
+        "h": 100.33
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 1187.88,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 1075.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 1187.88,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 1075.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "CCSprite",
         "varName": "_plusNode",
-        "x": 1323.59,
-        "y": 0.9,
-        "w": 51.06,
-        "h": 51.96
+        "x": 1292.15,
+        "y": 1.43,
+        "w": 81.7,
+        "h": 83.13
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 1334.34,
-        "y": 12.09,
-        "w": 29.56,
-        "h": 29.56
+        "x": 1309.35,
+        "y": 19.35,
+        "w": 47.3,
+        "h": 47.3
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 1187.88,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 1075.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "CCSprite",
         "varName": "_barCurrencySprite",
-        "x": 1191.39,
-        "y": 6.32,
-        "w": 43.13,
-        "h": 41.12
+        "x": 1080.63,
+        "y": 10.11,
+        "w": 69.01,
+        "h": 65.79
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_barCurrencyValue",
-        "x": 1148.46,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 1011.93,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "CCBFile",
         "varName": "_dnaBar",
-        "x": 1178.92,
+        "x": 1060.67,
         "y": -1032.0,
         "w": 1376.0,
         "h": 1032.0
@@ -4660,66 +4756,66 @@
       {
         "cls": "DNABar",
         "varName": "",
-        "x": 999.75,
+        "x": 774.0,
         "y": 0.0,
-        "w": 179.17,
-        "h": 62.71
+        "w": 286.67,
+        "h": 100.33
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 999.75,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 774.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 999.75,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 774.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "CCSprite",
         "varName": "_plusNode",
-        "x": 1135.47,
-        "y": 0.9,
-        "w": 51.06,
-        "h": 51.96
+        "x": 991.15,
+        "y": 1.43,
+        "w": 81.7,
+        "h": 83.13
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 1146.22,
-        "y": 12.09,
-        "w": 29.56,
-        "h": 29.56
+        "x": 1008.35,
+        "y": 19.35,
+        "w": 47.3,
+        "h": 47.3
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 999.75,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 774.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "CCSprite",
         "varName": "_barCurrencySprite",
-        "x": 997.82,
-        "y": 3.9,
-        "w": 54.02,
-        "h": 45.96
+        "x": 770.92,
+        "y": 6.23,
+        "w": 86.43,
+        "h": 73.53
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_barCurrencyValue",
-        "x": 960.33,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 710.93,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "CCNodeRGBA",
@@ -4769,15 +4865,15 @@
         "x": 0.0,
         "y": -1032.0,
         "w": 1376.0,
-        "h": 71.67
+        "h": 114.67
       },
       {
         "cls": "MCFramedSprite",
         "varName": "_horizontalFrame",
         "x": 13.76,
-        "y": -970.64,
+        "y": -933.82,
         "w": 1348.48,
-        "h": 2.69
+        "h": 4.3
       },
       {
         "cls": "CCHybridMenu",
@@ -4785,29 +4881,29 @@
         "x": 0.0,
         "y": -1032.0,
         "w": 1376.0,
-        "h": 71.67
+        "h": 114.67
       },
       {
         "cls": "MCMenuItemNodeRGBAStaticWithSounds",
         "varName": "_backButton",
-        "x": 32.97,
-        "y": -1035.58,
-        "w": 71.67,
-        "h": 71.67
+        "x": 11.47,
+        "y": -1037.73,
+        "w": 114.67,
+        "h": 114.67
       },
       {
         "cls": "CCSprite",
         "varName": "_backIcon",
-        "x": 27.14,
-        "y": -1041.41,
-        "w": 83.31,
-        "h": 83.31
+        "x": 2.15,
+        "y": -1047.05,
+        "w": 133.3,
+        "h": 133.3
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_titleLabel",
         "x": -206.4,
-        "y": -483.75,
+        "y": -464.4,
         "w": 1376.0,
         "h": 1032.0
       },
@@ -4822,7 +4918,7 @@
       {
         "cls": "CCBFile",
         "varName": "_coinBar",
-        "x": 1367.04,
+        "x": 1361.67,
         "y": -1032.0,
         "w": 1376.0,
         "h": 1032.0
@@ -4830,71 +4926,71 @@
       {
         "cls": "CoinBar",
         "varName": "",
-        "x": 1187.88,
+        "x": 1075.0,
         "y": 0.0,
-        "w": 179.17,
-        "h": 62.71
+        "w": 286.67,
+        "h": 100.33
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 1187.88,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 1075.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 1187.88,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 1075.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "CCSprite",
         "varName": "_plusNode",
-        "x": 1323.59,
-        "y": 0.9,
-        "w": 51.06,
-        "h": 51.96
+        "x": 1292.15,
+        "y": 1.43,
+        "w": 81.7,
+        "h": 83.13
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 1334.34,
-        "y": 12.09,
-        "w": 29.56,
-        "h": 29.56
+        "x": 1309.35,
+        "y": 19.35,
+        "w": 47.3,
+        "h": 47.3
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 1187.88,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 1075.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "CCSprite",
         "varName": "_barCurrencySprite",
-        "x": 1191.39,
-        "y": 6.32,
-        "w": 43.13,
-        "h": 41.12
+        "x": 1080.63,
+        "y": 10.11,
+        "w": 69.01,
+        "h": 65.79
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_barCurrencyValue",
-        "x": 1148.46,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 1011.93,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "CCBFile",
         "varName": "_dnaBar",
-        "x": 1178.92,
+        "x": 1060.67,
         "y": -1032.0,
         "w": 1376.0,
         "h": 1032.0
@@ -4902,88 +4998,88 @@
       {
         "cls": "DNABar",
         "varName": "",
-        "x": 999.75,
+        "x": 774.0,
         "y": 0.0,
-        "w": 179.17,
-        "h": 62.71
+        "w": 286.67,
+        "h": 100.33
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 999.75,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 774.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 999.75,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 774.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "CCSprite",
         "varName": "_plusNode",
-        "x": 1135.47,
-        "y": 0.9,
-        "w": 51.06,
-        "h": 51.96
+        "x": 991.15,
+        "y": 1.43,
+        "w": 81.7,
+        "h": 83.13
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 1146.22,
-        "y": 12.09,
-        "w": 29.56,
-        "h": 29.56
+        "x": 1008.35,
+        "y": 19.35,
+        "w": 47.3,
+        "h": 47.3
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 999.75,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 774.0,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "CCSprite",
         "varName": "_barCurrencySprite",
-        "x": 997.82,
-        "y": 3.9,
-        "w": 54.02,
-        "h": 45.96
+        "x": 770.92,
+        "y": 6.23,
+        "w": 86.43,
+        "h": 73.53
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_barCurrencyValue",
-        "x": 960.33,
-        "y": 8.96,
-        "w": 179.17,
-        "h": 35.83
+        "x": 710.93,
+        "y": 14.33,
+        "w": 286.67,
+        "h": 57.33
       },
       {
         "cls": "MCMenuItemNodeRGBAStaticWithSounds",
         "varName": "",
-        "x": 129.29,
-        "y": -3.58,
-        "w": 71.67,
-        "h": 71.67
+        "x": 107.79,
+        "y": -5.73,
+        "w": 114.67,
+        "h": 114.67
       },
       {
         "cls": "CCSprite",
         "varName": "_helpIcon",
-        "x": 123.46,
-        "y": -9.41,
-        "w": 83.31,
-        "h": 83.31
+        "x": 98.47,
+        "y": -15.05,
+        "w": 133.3,
+        "h": 133.3
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_footerLabel",
         "x": 0.0,
-        "y": 492.71,
+        "y": 478.73,
         "w": 1376.0,
         "h": 1032.0
       },
@@ -4991,393 +5087,393 @@
         "cls": "MCLabelTTF",
         "varName": "_subtitleLabel",
         "x": 0.0,
-        "y": -422.83,
+        "y": -366.93,
         "w": 1376.0,
         "h": 1032.0
       },
       {
         "cls": "PotionSlot",
         "varName": "",
-        "x": -195.89,
-        "y": 307.27,
-        "w": 434.78,
-        "h": 349.38
+        "x": -175.82,
+        "y": 491.63,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": -195.89,
-        "y": 307.27,
-        "w": 434.78,
-        "h": 349.37
+        "x": -175.82,
+        "y": 491.63,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_headerParent",
-        "x": -195.89,
-        "y": 307.27,
-        "w": 434.78,
-        "h": 349.37
+        "x": -175.82,
+        "y": 491.63,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_readyNode",
-        "x": -195.89,
-        "y": 307.27,
-        "w": 434.78,
-        "h": 349.37
+        "x": -175.82,
+        "y": 491.63,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "CCSprite",
         "varName": "_readyNodeHeader",
-        "x": -233.81,
-        "y": 307.27,
-        "w": 510.62,
-        "h": 112.88
+        "x": -374.1,
+        "y": 491.63,
+        "w": 817.0,
+        "h": 180.6
       },
       {
         "cls": "MCLabelTTF",
         "varName": "",
-        "x": -233.81,
-        "y": 301.63,
-        "w": 510.62,
-        "h": 112.88
+        "x": -374.1,
+        "y": 482.6,
+        "w": 817.0,
+        "h": 180.6
       },
       {
         "cls": "CCHybridMenu",
         "varName": "",
-        "x": -195.89,
-        "y": 307.27,
-        "w": 434.78,
-        "h": 349.37
+        "x": -175.82,
+        "y": 491.63,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "MCMenuItemNodeRGBAStaticWithSounds",
         "varName": "_openReadyButton",
-        "x": -59.12,
-        "y": 582.47,
-        "w": 161.25,
-        "h": 64.5
+        "x": -94.6,
+        "y": 931.95,
+        "w": 258.0,
+        "h": 103.2
       },
       {
         "cls": "MCFramedSprite",
         "varName": "_openReadyButtonFramedSprite",
-        "x": -59.12,
-        "y": 582.47,
-        "w": 161.25,
-        "h": 64.5
+        "x": -94.6,
+        "y": 931.95,
+        "w": 258.0,
+        "h": 103.2
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_openReadyButtonLabel",
-        "x": -59.12,
-        "y": 582.47,
-        "w": 161.25,
-        "h": 64.5
+        "x": -94.6,
+        "y": 931.95,
+        "w": 258.0,
+        "h": 103.2
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_particlesNode",
-        "x": -174.15,
-        "y": 420.82,
-        "w": 391.3,
-        "h": 122.28
+        "x": -154.8,
+        "y": 673.31,
+        "w": 378.4,
+        "h": 195.65
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_potionParentNode",
-        "x": -174.15,
-        "y": 420.82,
-        "w": 391.3,
-        "h": 122.28
+        "x": -154.8,
+        "y": 673.31,
+        "w": 378.4,
+        "h": 195.65
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_hoursNode",
-        "x": -195.89,
-        "y": 379.39,
-        "w": 434.78,
-        "h": 34.94
+        "x": -175.82,
+        "y": 607.02,
+        "w": 420.44,
+        "h": 55.9
       },
       {
         "cls": "CCSprite",
         "varName": "_brewClockSprite",
-        "x": -1.34,
-        "y": 372.67,
-        "w": 45.69,
-        "h": 48.38
+        "x": -2.15,
+        "y": 596.27,
+        "w": 73.1,
+        "h": 77.4
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_brewingTimer",
-        "x": 21.5,
-        "y": 379.39,
-        "w": 434.78,
-        "h": 34.94
+        "x": 34.4,
+        "y": 607.02,
+        "w": 420.44,
+        "h": 55.9
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_potionTypeLabel",
-        "x": -195.89,
-        "y": 389.37,
-        "w": 434.78,
-        "h": 349.37
+        "x": -175.82,
+        "y": 623.0,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "PotionSlot",
         "varName": "",
-        "x": 253.22,
-        "y": 307.27,
-        "w": 434.78,
-        "h": 349.38
+        "x": 267.56,
+        "y": 491.63,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 253.22,
-        "y": 307.27,
-        "w": 434.78,
-        "h": 349.37
+        "x": 267.56,
+        "y": 491.63,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_headerParent",
-        "x": 253.22,
-        "y": 307.27,
-        "w": 434.78,
-        "h": 349.37
+        "x": 267.56,
+        "y": 491.63,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_readyNode",
-        "x": 253.22,
-        "y": 307.27,
-        "w": 434.78,
-        "h": 349.37
+        "x": 267.56,
+        "y": 491.63,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "CCSprite",
         "varName": "_readyNodeHeader",
-        "x": 215.3,
-        "y": 307.27,
-        "w": 510.62,
-        "h": 112.88
+        "x": 69.28,
+        "y": 491.63,
+        "w": 817.0,
+        "h": 180.6
       },
       {
         "cls": "MCLabelTTF",
         "varName": "",
-        "x": 215.3,
-        "y": 301.63,
-        "w": 510.62,
-        "h": 112.88
+        "x": 69.28,
+        "y": 482.6,
+        "w": 817.0,
+        "h": 180.6
       },
       {
         "cls": "CCHybridMenu",
         "varName": "",
-        "x": 253.22,
-        "y": 307.27,
-        "w": 434.78,
-        "h": 349.37
+        "x": 267.56,
+        "y": 491.63,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "MCMenuItemNodeRGBAStaticWithSounds",
         "varName": "_openReadyButton",
-        "x": 389.99,
-        "y": 582.47,
-        "w": 161.25,
-        "h": 64.5
+        "x": 348.78,
+        "y": 931.95,
+        "w": 258.0,
+        "h": 103.2
       },
       {
         "cls": "MCFramedSprite",
         "varName": "_openReadyButtonFramedSprite",
-        "x": 389.99,
-        "y": 582.47,
-        "w": 161.25,
-        "h": 64.5
+        "x": 348.78,
+        "y": 931.95,
+        "w": 258.0,
+        "h": 103.2
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_openReadyButtonLabel",
-        "x": 389.99,
-        "y": 582.47,
-        "w": 161.25,
-        "h": 64.5
+        "x": 348.78,
+        "y": 931.95,
+        "w": 258.0,
+        "h": 103.2
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_particlesNode",
-        "x": 274.96,
-        "y": 420.82,
-        "w": 391.3,
-        "h": 122.28
+        "x": 288.58,
+        "y": 673.31,
+        "w": 378.4,
+        "h": 195.65
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_potionParentNode",
-        "x": 274.96,
-        "y": 420.82,
-        "w": 391.3,
-        "h": 122.28
+        "x": 288.58,
+        "y": 673.31,
+        "w": 378.4,
+        "h": 195.65
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_hoursNode",
-        "x": 253.22,
-        "y": 379.39,
-        "w": 434.78,
-        "h": 34.94
+        "x": 267.56,
+        "y": 607.02,
+        "w": 420.44,
+        "h": 55.9
       },
       {
         "cls": "CCSprite",
         "varName": "_brewClockSprite",
-        "x": 447.77,
-        "y": 372.67,
-        "w": 45.69,
-        "h": 48.38
+        "x": 441.23,
+        "y": 596.27,
+        "w": 73.1,
+        "h": 77.4
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_brewingTimer",
-        "x": 470.61,
-        "y": 379.39,
-        "w": 434.78,
-        "h": 34.94
+        "x": 477.78,
+        "y": 607.02,
+        "w": 420.44,
+        "h": 55.9
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_potionTypeLabel",
-        "x": 253.22,
-        "y": 389.37,
-        "w": 434.78,
-        "h": 349.37
+        "x": 267.56,
+        "y": 623.0,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "PotionSlot",
         "varName": "",
-        "x": 702.33,
-        "y": 307.27,
-        "w": 434.78,
-        "h": 349.38
+        "x": 710.93,
+        "y": 491.63,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 702.33,
-        "y": 307.27,
-        "w": 434.78,
-        "h": 349.37
+        "x": 710.93,
+        "y": 491.63,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_headerParent",
-        "x": 702.33,
-        "y": 307.27,
-        "w": 434.78,
-        "h": 349.37
+        "x": 710.93,
+        "y": 491.63,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_readyNode",
-        "x": 702.33,
-        "y": 307.27,
-        "w": 434.78,
-        "h": 349.37
+        "x": 710.93,
+        "y": 491.63,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "CCSprite",
         "varName": "_readyNodeHeader",
-        "x": 664.41,
-        "y": 307.27,
-        "w": 510.62,
-        "h": 112.88
+        "x": 512.66,
+        "y": 491.63,
+        "w": 817.0,
+        "h": 180.6
       },
       {
         "cls": "MCLabelTTF",
         "varName": "",
-        "x": 664.41,
-        "y": 301.63,
-        "w": 510.62,
-        "h": 112.88
+        "x": 512.66,
+        "y": 482.6,
+        "w": 817.0,
+        "h": 180.6
       },
       {
         "cls": "CCHybridMenu",
         "varName": "",
-        "x": 702.33,
-        "y": 307.27,
-        "w": 434.78,
-        "h": 349.37
+        "x": 710.93,
+        "y": 491.63,
+        "w": 420.44,
+        "h": 559.0
       },
       {
         "cls": "MCMenuItemNodeRGBAStaticWithSounds",
         "varName": "_openReadyButton",
-        "x": 839.1,
-        "y": 582.47,
-        "w": 161.25,
-        "h": 64.5
+        "x": 792.16,
+        "y": 931.95,
+        "w": 258.0,
+        "h": 103.2
       },
       {
         "cls": "MCFramedSprite",
         "varName": "_openReadyButtonFramedSprite",
-        "x": 839.1,
-        "y": 582.47,
-        "w": 161.25,
-        "h": 64.5
+        "x": 792.16,
+        "y": 931.95,
+        "w": 258.0,
+        "h": 103.2
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_openReadyButtonLabel",
-        "x": 839.1,
-        "y": 582.47,
-        "w": 161.25,
-        "h": 64.5
+        "x": 792.16,
+        "y": 931.95,
+        "w": 258.0,
+        "h": 103.2
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_particlesNode",
-        "x": 724.07,
-        "y": 420.82,
-        "w": 391.3,
-        "h": 122.28
+        "x": 731.96,
+        "y": 673.31,
+        "w": 378.4,
+        "h": 195.65
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_potionParentNode",
-        "x": 724.07,
-        "y": 420.82,
-        "w": 391.3,
-        "h": 122.28
+        "x": 731.96,
+        "y": 673.31,
+        "w": 378.4,
+        "h": 195.65
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_hoursNode",
-        "x": 702.33,
-        "y": 379.39,
-        "w": 434.78,
-        "h": 34.94
+        "x": 710.93,
+        "y": 607.02,
+        "w": 420.44,
+        "h": 55.9
       },
       {
         "cls": "CCSprite",
         "varName": "_brewClockSprite",
-        "x": 896.88,
-        "y": 372.67,
-        "w": 45.69,
-        "h": 48.38
+        "x": 884.61,
+        "y": 596.27,
+        "w": 73.1,
+        "h": 77.4
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_brewingTimer",
-        "x": 919.72,
-        "y": 379.39,
-        "w": 434.78,
-        "h": 34.94
+        "x": 921.16,
+        "y": 607.02,
+        "w": 420.44,
+        "h": 55.9
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_potionTypeLabel",
-        "x": 702.33,
-        "y": 389.37,
-        "w": 434.78,
-        "h": 349.37
+        "x": 710.93,
+        "y": 623.0,
+        "w": 420.44,
+        "h": 559.0
       }
     ],
     "PotionSlot": [
@@ -5416,18 +5512,18 @@
       {
         "cls": "CCSprite",
         "varName": "_readyNodeHeader",
-        "x": -255.31,
+        "x": -408.5,
         "y": 516.0,
-        "w": 510.62,
-        "h": 112.88
+        "w": 817.0,
+        "h": 180.6
       },
       {
         "cls": "MCLabelTTF",
         "varName": "",
-        "x": -255.31,
-        "y": 510.36,
-        "w": 510.62,
-        "h": 112.88
+        "x": -408.5,
+        "y": 506.97,
+        "w": 817.0,
+        "h": 180.6
       },
       {
         "cls": "CCHybridMenu",
@@ -5440,26 +5536,26 @@
       {
         "cls": "MCMenuItemNodeRGBAStaticWithSounds",
         "varName": "_openReadyButton",
-        "x": -80.62,
-        "y": 1391.91,
-        "w": 161.25,
-        "h": 64.5
+        "x": -129.0,
+        "y": 1372.56,
+        "w": 258.0,
+        "h": 103.2
       },
       {
         "cls": "MCFramedSprite",
         "varName": "_openReadyButtonFramedSprite",
-        "x": -80.62,
-        "y": 1391.91,
-        "w": 161.25,
-        "h": 64.5
+        "x": -129.0,
+        "y": 1372.56,
+        "w": 258.0,
+        "h": 103.2
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_openReadyButtonLabel",
-        "x": -80.62,
-        "y": 1391.91,
-        "w": 161.25,
-        "h": 64.5
+        "x": -129.0,
+        "y": 1372.56,
+        "w": 258.0,
+        "h": 103.2
       },
       {
         "cls": "CCNodeRGBA",
@@ -5481,23 +5577,23 @@
         "cls": "CCNodeRGBA",
         "varName": "_hoursNode",
         "x": -688.0,
-        "y": 553.98,
+        "y": 607.73,
         "w": 1376.0,
         "h": 103.2
       },
       {
         "cls": "CCSprite",
         "varName": "_brewClockSprite",
-        "x": -22.84,
-        "y": 581.4,
-        "w": 45.69,
-        "h": 48.38
+        "x": -36.55,
+        "y": 620.63,
+        "w": 73.1,
+        "h": 77.4
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_brewingTimer",
         "x": 0.0,
-        "y": 553.98,
+        "y": 607.73,
         "w": 1376.0,
         "h": 103.2
       },
@@ -5530,178 +5626,178 @@
       {
         "cls": "MCMenuItemNodeRGBAStatic",
         "varName": "_alternativeShootButton",
-        "x": 49.43,
-        "y": 844.77,
-        "w": 116.46,
-        "h": 116.46
+        "x": 14.49,
+        "y": 809.83,
+        "w": 186.33,
+        "h": 186.33
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 49.43,
-        "y": 844.77,
-        "w": 116.46,
-        "h": 116.46
+        "x": 14.49,
+        "y": 809.83,
+        "w": 186.33,
+        "h": 186.33
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 46.02,
-        "y": 841.37,
-        "w": 239.73,
-        "h": 239.73
+        "x": 9.04,
+        "y": 804.39,
+        "w": 383.56,
+        "h": 383.56
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 66.0,
-        "y": 861.34,
-        "w": 199.77,
-        "h": 199.77
+        "x": 41.01,
+        "y": 836.35,
+        "w": 319.63,
+        "h": 319.63
       },
       {
         "cls": "CCSprite",
         "varName": "_alternativeShootButtonIcon",
-        "x": 117.51,
-        "y": 912.85,
-        "w": 96.75,
-        "h": 96.75
+        "x": 123.42,
+        "y": 918.77,
+        "w": 154.8,
+        "h": 154.8
       },
       {
         "cls": "MCMenuItemNodeRGBAStatic",
         "varName": "_alternativeSplitButton",
-        "x": 49.43,
-        "y": 607.41,
-        "w": 116.46,
-        "h": 116.46
+        "x": 14.49,
+        "y": 572.47,
+        "w": 186.33,
+        "h": 186.33
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 49.43,
-        "y": 607.41,
-        "w": 116.46,
-        "h": 116.46
+        "x": 14.49,
+        "y": 572.47,
+        "w": 186.33,
+        "h": 186.33
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 7.77,
-        "y": 565.75,
-        "w": 199.77,
-        "h": 199.77
+        "x": -52.16,
+        "y": 505.82,
+        "w": 319.63,
+        "h": 319.63
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 52.12,
-        "y": 628.91,
-        "w": 111.08,
-        "h": 73.46
+        "x": 18.79,
+        "y": 606.87,
+        "w": 177.73,
+        "h": 117.53
       },
       {
         "cls": "MCMenuItemNodeRGBAStatic",
         "varName": "_shootButton",
-        "x": 1205.27,
-        "y": 844.77,
-        "w": 116.46,
-        "h": 116.46
+        "x": 1170.33,
+        "y": 809.83,
+        "w": 186.33,
+        "h": 186.33
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 1205.27,
-        "y": 844.77,
-        "w": 116.46,
-        "h": 116.46
+        "x": 1170.33,
+        "y": 809.83,
+        "w": 186.33,
+        "h": 186.33
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 1201.86,
-        "y": 841.37,
-        "w": 239.73,
-        "h": 239.73
+        "x": 1164.88,
+        "y": 804.39,
+        "w": 383.56,
+        "h": 383.56
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 1221.84,
-        "y": 861.34,
-        "w": 199.77,
-        "h": 199.77
+        "x": 1196.85,
+        "y": 836.35,
+        "w": 319.63,
+        "h": 319.63
       },
       {
         "cls": "CCSprite",
         "varName": "_shootButtonIcon",
-        "x": 1273.35,
-        "y": 912.85,
-        "w": 96.75,
-        "h": 96.75
+        "x": 1279.26,
+        "y": 918.77,
+        "w": 154.8,
+        "h": 154.8
       },
       {
         "cls": "MCMenuItemNodeRGBAStatic",
         "varName": "_splitButton",
-        "x": 1205.27,
-        "y": 607.41,
-        "w": 116.46,
-        "h": 116.46
+        "x": 1170.33,
+        "y": 572.47,
+        "w": 186.33,
+        "h": 186.33
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 1205.27,
-        "y": 607.41,
-        "w": 116.46,
-        "h": 116.46
+        "x": 1170.33,
+        "y": 572.47,
+        "w": 186.33,
+        "h": 186.33
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 1163.61,
-        "y": 565.75,
-        "w": 199.77,
-        "h": 199.77
+        "x": 1103.68,
+        "y": 505.82,
+        "w": 319.63,
+        "h": 319.63
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 1207.96,
-        "y": 628.91,
-        "w": 111.08,
-        "h": 73.46
+        "x": 1174.63,
+        "y": 606.87,
+        "w": 177.73,
+        "h": 117.53
       },
       {
         "cls": "MCMenuItemNodeRGBAStatic",
         "varName": "",
-        "x": 49.43,
-        "y": 844.77,
-        "w": 116.46,
-        "h": 116.46
+        "x": 14.49,
+        "y": 809.83,
+        "w": 186.33,
+        "h": 186.33
       },
       {
         "cls": "MCMenuItemNodeRGBAStatic",
         "varName": "",
-        "x": 49.43,
-        "y": 612.57,
-        "w": 116.46,
-        "h": 116.46
+        "x": 14.49,
+        "y": 577.63,
+        "w": 186.33,
+        "h": 186.33
       },
       {
         "cls": "MCMenuItemNodeRGBAStatic",
         "varName": "",
-        "x": 1205.27,
-        "y": 844.77,
-        "w": 116.46,
-        "h": 116.46
+        "x": 1170.33,
+        "y": 809.83,
+        "w": 186.33,
+        "h": 186.33
       },
       {
         "cls": "MCMenuItemNodeRGBAStatic",
         "varName": "",
-        "x": 1205.27,
-        "y": 612.57,
-        "w": 116.46,
-        "h": 116.46
+        "x": 1170.33,
+        "y": 577.63,
+        "w": 186.33,
+        "h": 186.33
       }
     ],
     "Score": [
@@ -5716,8 +5812,8 @@
       {
         "cls": "MCLabelTTF",
         "varName": "_scoreLabel",
-        "x": 89.58,
-        "y": -989.0,
+        "x": 143.33,
+        "y": -963.2,
         "w": 1376.0,
         "h": 1032.0
       }
@@ -5734,114 +5830,114 @@
       {
         "cls": "CCNodeRGBA",
         "varName": "_speechBubbleReferenceNode",
-        "x": 9.15,
-        "y": 88.49,
-        "w": 70.18,
-        "h": 70.18
+        "x": 14.65,
+        "y": 141.59,
+        "w": 112.29,
+        "h": 112.29
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 9.15,
-        "y": 88.49,
-        "w": 70.18,
-        "h": 447.92
+        "x": 14.65,
+        "y": 141.59,
+        "w": 112.29,
+        "h": 716.67
       },
       {
         "cls": "CCHybridMenu",
         "varName": "",
-        "x": 9.15,
-        "y": 88.49,
-        "w": 70.18,
-        "h": 70.18
+        "x": 14.65,
+        "y": 141.59,
+        "w": 112.29,
+        "h": 112.29
       },
       {
         "cls": "MCMenuItemNodeRGBAStatic",
         "varName": "",
-        "x": 9.15,
-        "y": 88.49,
-        "w": 70.18,
-        "h": 70.18
+        "x": 14.65,
+        "y": 141.59,
+        "w": 112.29,
+        "h": 112.29
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 9.15,
-        "y": 88.49,
-        "w": 70.18,
-        "h": 70.18
+        "x": 14.65,
+        "y": 141.59,
+        "w": 112.29,
+        "h": 112.29
       },
       {
         "cls": "MCClippingNode",
         "varName": "_normalClippingNode",
-        "x": 9.15,
-        "y": 88.49,
-        "w": 70.18,
-        "h": 60.71
+        "x": 14.65,
+        "y": 141.59,
+        "w": 112.29,
+        "h": 97.13
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 9.15,
-        "y": 88.49,
-        "w": 70.18,
-        "h": 70.18
+        "x": 14.65,
+        "y": 141.59,
+        "w": 112.29,
+        "h": 112.29
       },
       {
         "cls": "MCAutoScalableSprite",
         "varName": "",
-        "x": 9.15,
-        "y": 88.49,
-        "w": 70.18,
-        "h": 70.18
+        "x": 14.65,
+        "y": 141.59,
+        "w": 112.29,
+        "h": 112.29
       },
       {
         "cls": "MCClippingNode",
         "varName": "_normalClippingNode",
-        "x": 9.15,
-        "y": 149.2,
-        "w": 70.18,
-        "h": 9.47
+        "x": 14.65,
+        "y": 238.72,
+        "w": 112.29,
+        "h": 15.16
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 9.15,
-        "y": 88.49,
-        "w": 70.18,
-        "h": 70.18
+        "x": 14.65,
+        "y": 141.59,
+        "w": 112.29,
+        "h": 112.29
       },
       {
         "cls": "MCClippingNode",
         "varName": "",
-        "x": 9.15,
-        "y": 148.96,
-        "w": 70.18,
-        "h": 358.33
+        "x": 14.65,
+        "y": 238.34,
+        "w": 112.29,
+        "h": 573.33
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_selectorArea",
-        "x": 9.15,
-        "y": -388.54,
-        "w": 70.18,
-        "h": 80.62
+        "x": 14.65,
+        "y": -621.66,
+        "w": 112.29,
+        "h": 129.0
       },
       {
         "cls": "MCFramedSprite",
         "varName": "_selectorFrame",
-        "x": 9.15,
-        "y": -428.85,
-        "w": 70.18,
-        "h": 120.94
+        "x": 14.65,
+        "y": -686.16,
+        "w": 112.29,
+        "h": 193.5
       },
       {
         "cls": "MCScrollList",
         "varName": "_selector",
-        "x": 9.15,
-        "y": -379.58,
-        "w": 70.18,
-        "h": 66.29
+        "x": 14.65,
+        "y": -607.33,
+        "w": 112.29,
+        "h": 106.07
       }
     ],
     "PauseButton": [
@@ -5864,26 +5960,26 @@
       {
         "cls": "MCMenuItemNodeRGBAStaticWithSounds",
         "varName": "_pauseButton",
-        "x": 9.15,
-        "y": 9.15,
-        "w": 70.18,
-        "h": 70.18
+        "x": 14.65,
+        "y": 14.65,
+        "w": 112.29,
+        "h": 112.29
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 9.15,
-        "y": 9.15,
-        "w": 70.18,
-        "h": 70.18
+        "x": 14.65,
+        "y": 14.65,
+        "w": 112.29,
+        "h": 112.29
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 16.48,
-        "y": 15.13,
-        "w": 55.54,
-        "h": 58.23
+        "x": 26.36,
+        "y": 24.21,
+        "w": 88.87,
+        "h": 93.17
       }
     ],
     "LeaderboardWidget": [
@@ -5898,66 +5994,66 @@
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 1122.73,
-        "y": 9.15,
-        "w": 244.12,
-        "h": 70.18
+        "x": 970.76,
+        "y": 14.65,
+        "w": 390.59,
+        "h": 112.29
       },
       {
         "cls": "CCHybridMenu",
         "varName": "_toggleMenu",
-        "x": 1122.73,
-        "y": 9.15,
-        "w": 244.12,
-        "h": 70.18
+        "x": 970.76,
+        "y": 14.65,
+        "w": 390.59,
+        "h": 112.29
       },
       {
         "cls": "MCFramedSprite",
         "varName": "_elasticFrame",
-        "x": 1296.66,
-        "y": 9.15,
-        "w": 70.18,
-        "h": 70.18
+        "x": 1249.06,
+        "y": 14.65,
+        "w": 112.29,
+        "h": 112.29
       },
       {
         "cls": "MCMenuItemNodeRGBAStaticWithSounds",
         "varName": "",
-        "x": 1261.57,
-        "y": 44.25,
-        "w": 70.18,
-        "h": 70.18
+        "x": 1192.91,
+        "y": 70.79,
+        "w": 112.29,
+        "h": 112.29
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 1263.07,
-        "y": 45.3,
-        "w": 67.19,
-        "h": 68.08
+        "x": 1195.31,
+        "y": 72.47,
+        "w": 107.5,
+        "h": 108.93
       },
       {
         "cls": "CCBFile",
         "varName": "_friendsCounter",
-        "x": 1275.3,
-        "y": -25.94,
-        "w": 244.12,
-        "h": 70.18
+        "x": 1214.88,
+        "y": -41.5,
+        "w": 390.59,
+        "h": 112.29
       },
       {
         "cls": "CCSprite",
         "varName": "_friendsCounterSprite",
-        "x": 1368.02,
-        "y": 20.95,
-        "w": 56.44,
-        "h": 46.58
+        "x": 1363.24,
+        "y": 33.53,
+        "w": 90.3,
+        "h": 74.53
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_friendsCounterLabel",
-        "x": 1273.51,
-        "y": 9.15,
-        "w": 244.12,
-        "h": 70.18
+        "x": 1212.02,
+        "y": 14.65,
+        "w": 390.59,
+        "h": 112.29
       }
     ],
     "MenuPause": [
@@ -5972,10 +6068,10 @@
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 687.1,
-        "y": 515.1,
-        "w": 1.79,
-        "h": 1.79
+        "x": 686.57,
+        "y": 514.57,
+        "w": 2.87,
+        "h": 2.87
       },
       {
         "cls": "CCNodeRGBA",
@@ -5988,130 +6084,130 @@
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 488.23,
-        "y": 367.29,
-        "w": 399.54,
-        "h": 297.42
+        "x": 368.37,
+        "y": 278.07,
+        "w": 639.27,
+        "h": 475.87
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 488.23,
-        "y": 367.29,
-        "w": 399.54,
-        "h": 297.42
+        "x": 368.37,
+        "y": 278.07,
+        "w": 639.27,
+        "h": 475.87
       },
       {
         "cls": "MCLabelTTF",
         "varName": "",
-        "x": 488.23,
-        "y": 284.02,
-        "w": 399.54,
-        "h": 297.42
+        "x": 368.37,
+        "y": 144.82,
+        "w": 639.27,
+        "h": 475.87
       },
       {
         "cls": "CCHybridMenu",
         "varName": "",
-        "x": 488.23,
-        "y": 367.29,
-        "w": 399.54,
-        "h": 297.42
+        "x": 368.37,
+        "y": 278.07,
+        "w": 639.27,
+        "h": 475.87
       },
       {
         "cls": "MCMenuItemNodeRGBAStaticWithSounds",
         "varName": "_noButton",
-        "x": 534.78,
-        "y": 529.04,
-        "w": 129.24,
-        "h": 92.88
+        "x": 442.85,
+        "y": 536.87,
+        "w": 206.79,
+        "h": 148.61
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 534.78,
-        "y": 529.04,
-        "w": 129.24,
-        "h": 92.88
+        "x": 442.85,
+        "y": 536.87,
+        "w": 206.79,
+        "h": 148.61
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 534.78,
-        "y": 529.04,
-        "w": 129.24,
-        "h": 92.88
+        "x": 442.85,
+        "y": 536.87,
+        "w": 206.79,
+        "h": 148.61
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 605.87,
-        "y": 540.1,
-        "w": 70.77,
-        "h": 70.77
+        "x": 556.59,
+        "y": 554.56,
+        "w": 113.23,
+        "h": 113.23
       },
       {
         "cls": "MCLabelTTF",
         "varName": "",
-        "x": 470.16,
-        "y": 529.04,
-        "w": 129.24,
-        "h": 92.88
+        "x": 339.46,
+        "y": 536.87,
+        "w": 206.79,
+        "h": 148.61
       },
       {
         "cls": "MCMenuItemNodeRGBAStaticWithSounds",
         "varName": "_yesButton",
-        "x": 711.97,
-        "y": 529.04,
-        "w": 129.24,
-        "h": 92.88
+        "x": 726.36,
+        "y": 536.87,
+        "w": 206.79,
+        "h": 148.61
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 711.97,
-        "y": 529.04,
-        "w": 129.24,
-        "h": 92.88
+        "x": 726.36,
+        "y": 536.87,
+        "w": 206.79,
+        "h": 148.61
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 711.97,
-        "y": 529.04,
-        "w": 129.24,
-        "h": 92.88
+        "x": 726.36,
+        "y": 536.87,
+        "w": 206.79,
+        "h": 148.61
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 783.06,
-        "y": 540.55,
-        "w": 88.69,
-        "h": 69.88
+        "x": 840.09,
+        "y": 555.27,
+        "w": 141.9,
+        "h": 111.8
       },
       {
         "cls": "MCLabelTTF",
         "varName": "",
-        "x": 647.35,
-        "y": 529.04,
-        "w": 129.24,
-        "h": 92.88
+        "x": 622.96,
+        "y": 536.87,
+        "w": 206.79,
+        "h": 148.61
       },
       {
         "cls": "CCMenuItem",
         "varName": "",
-        "x": 488.23,
-        "y": 367.29,
-        "w": 399.54,
-        "h": 297.42
+        "x": 368.37,
+        "y": 278.07,
+        "w": 639.27,
+        "h": 475.87
       },
       {
         "cls": "CCMenuItem",
         "varName": "",
-        "x": 488.23,
-        "y": 367.29,
-        "w": 399.54,
-        "h": 297.42
+        "x": 368.37,
+        "y": 278.07,
+        "w": 639.27,
+        "h": 475.87
       }
     ],
     "ContinueGame": [
@@ -6134,177 +6230,177 @@
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 464.04,
-        "y": 274.12,
-        "w": 447.92,
-        "h": 483.75
+        "x": 329.67,
+        "y": 129.0,
+        "w": 716.67,
+        "h": 774.0
       },
       {
         "cls": "MCMenuItemNodeRGBAStaticWithSounds",
         "varName": "_closeButton",
-        "x": 872.54,
-        "y": 248.15,
-        "w": 71.67,
-        "h": 71.67
+        "x": 983.27,
+        "y": 87.43,
+        "w": 114.67,
+        "h": 114.67
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 870.75,
-        "y": 246.35,
-        "w": 75.25,
-        "h": 75.25
+        "x": 980.4,
+        "y": 84.57,
+        "w": 120.4,
+        "h": 120.4
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_title",
-        "x": 464.04,
-        "y": 70.95,
-        "w": 447.92,
-        "h": 483.75
+        "x": 329.67,
+        "y": -196.08,
+        "w": 716.67,
+        "h": 774.0
       },
       {
         "cls": "MCFramedSprite",
         "varName": "_innerFrame",
-        "x": 486.44,
-        "y": 349.38,
-        "w": 403.13,
-        "h": 309.6
+        "x": 365.5,
+        "y": 249.4,
+        "w": 645.0,
+        "h": 495.36
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 486.44,
-        "y": 377.59,
-        "w": 403.13,
-        "h": 122.73
+        "x": 365.5,
+        "y": 294.55,
+        "w": 645.0,
+        "h": 196.37
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 592.15,
-        "y": 305.03,
-        "w": 191.71,
-        "h": 267.85
+        "x": 534.63,
+        "y": 178.45,
+        "w": 306.73,
+        "h": 428.57
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_innerFrameText",
-        "x": 485.54,
-        "y": 396.67,
-        "w": 403.13,
-        "h": 309.6
+        "x": 364.07,
+        "y": 325.08,
+        "w": 645.0,
+        "h": 495.36
       },
       {
         "cls": "CCBFile",
         "varName": "_timerbar",
         "x": 688.0,
-        "y": 313.54,
-        "w": 403.13,
-        "h": 309.6
+        "y": 192.07,
+        "w": 645.0,
+        "h": 495.36
       },
       {
         "cls": "TimerBar",
         "varName": "",
-        "x": 486.44,
-        "y": 605.22,
-        "w": 403.13,
-        "h": 35.83
+        "x": 365.5,
+        "y": 658.76,
+        "w": 645.0,
+        "h": 57.33
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 486.44,
-        "y": 613.29,
-        "w": 403.13,
-        "h": 19.71
+        "x": 365.5,
+        "y": 671.66,
+        "w": 645.0,
+        "h": 31.53
       },
       {
         "cls": "RenderStencil",
         "varName": "",
-        "x": 488.23,
-        "y": 615.08,
-        "w": 399.54,
-        "h": 16.13
+        "x": 368.37,
+        "y": 674.53,
+        "w": 639.27,
+        "h": 25.8
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 488.23,
-        "y": 615.08,
-        "w": 399.54,
-        "h": 16.13
+        "x": 368.37,
+        "y": 674.53,
+        "w": 639.27,
+        "h": 25.8
       },
       {
         "cls": "MCColorNode",
         "varName": "_fillNode",
-        "x": 488.23,
-        "y": 615.97,
-        "w": 199.77,
-        "h": 14.33
+        "x": 368.37,
+        "y": 675.96,
+        "w": 319.63,
+        "h": 22.93
       },
       {
         "cls": "MCFramedSprite",
         "varName": "",
-        "x": 486.44,
-        "y": 613.29,
-        "w": 403.13,
-        "h": 19.71
+        "x": 365.5,
+        "y": 671.66,
+        "w": 645.0,
+        "h": 31.53
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 456.06,
-        "y": 594.47,
-        "w": 54.65,
-        "h": 57.33
+        "x": 316.9,
+        "y": 641.56,
+        "w": 87.43,
+        "h": 91.73
       },
       {
         "cls": "MCMenuItemNodeRGBAWithSounds",
         "varName": "_watchVideoButton",
-        "x": 464.04,
-        "y": 465.83,
-        "w": 447.92,
-        "h": 483.75
+        "x": 329.67,
+        "y": 435.73,
+        "w": 716.67,
+        "h": 774.0
       },
       {
         "cls": "MCFramedSprite",
         "varName": "_buyButton",
-        "x": 464.04,
-        "y": 886.88,
-        "w": 232.92,
-        "h": 62.71
+        "x": 329.67,
+        "y": 1109.4,
+        "w": 372.67,
+        "h": 100.33
       },
       {
         "cls": "MCAlignmentNodeStatic",
         "varName": "",
-        "x": 464.04,
-        "y": 886.88,
-        "w": 232.92,
-        "h": 62.71
+        "x": 329.67,
+        "y": 1109.4,
+        "w": 372.67,
+        "h": 100.33
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 460.32,
-        "y": 879.78,
-        "w": 63.6,
-        "h": 68.98
+        "x": 323.72,
+        "y": 1098.05,
+        "w": 101.77,
+        "h": 110.37
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_watchVideoLabel",
-        "x": 484.65,
-        "y": 886.88,
-        "w": 232.92,
-        "h": 62.71
+        "x": 362.63,
+        "y": 1109.4,
+        "w": 372.67,
+        "h": 100.33
       }
     ],
     "MenuBattleResultPopup": [
       {
         "cls": "MenuBattleResultPopupView",
         "varName": "",
-        "x": 6.6,
+        "x": 10.57,
         "y": 0.0,
         "w": 1376.0,
         "h": 1032.0
@@ -6312,282 +6408,282 @@
       {
         "cls": "MCFramedSprite",
         "varName": "_mainFrame",
-        "x": 376.58,
-        "y": 258.48,
-        "w": 636.04,
-        "h": 515.05
+        "x": 189.73,
+        "y": 103.96,
+        "w": 1017.67,
+        "h": 824.07
       },
       {
         "cls": "CCHybridMenu",
         "varName": "",
-        "x": 376.58,
-        "y": 258.48,
-        "w": 636.04,
-        "h": 515.05
+        "x": 189.73,
+        "y": 103.96,
+        "w": 1017.67,
+        "h": 824.07
       },
       {
         "cls": "MCMenuItemNodeRGBAStaticWithSounds",
         "varName": "",
-        "x": 978.99,
-        "y": 236.31,
-        "w": 61.16,
-        "h": 61.16
+        "x": 1153.58,
+        "y": 68.49,
+        "w": 97.85,
+        "h": 97.85
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 971.94,
-        "y": 229.26,
-        "w": 75.25,
-        "h": 75.25
+        "x": 1142.31,
+        "y": 57.22,
+        "w": 120.4,
+        "h": 120.4
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 383.75,
-        "y": 324.95,
-        "w": 326.08,
-        "h": 423.31
+        "x": 201.2,
+        "y": 210.31,
+        "w": 521.73,
+        "h": 677.3
       },
       {
         "cls": "MCAutoScalableSprite",
         "varName": "_celebrationPellets",
-        "x": 383.75,
-        "y": 315.99,
-        "w": 326.08,
-        "h": 423.31
+        "x": 201.2,
+        "y": 195.98,
+        "w": 521.73,
+        "h": 677.3
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 402.58,
-        "y": 324.95,
-        "w": 290.49,
-        "h": 423.31
+        "x": 231.32,
+        "y": 210.31,
+        "w": 464.78,
+        "h": 677.3
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 402.58,
-        "y": 324.95,
-        "w": 290.49,
-        "h": 125.42
+        "x": 231.32,
+        "y": 210.31,
+        "w": 464.78,
+        "h": 200.67
       },
       {
         "cls": "CCBFile",
         "varName": "_battleResult",
-        "x": 547.82,
-        "y": 199.53,
-        "w": 290.49,
-        "h": 125.42
+        "x": 463.71,
+        "y": 9.65,
+        "w": 464.78,
+        "h": 200.67
       },
       {
         "cls": "BattleResultNode",
         "varName": "",
-        "x": 402.58,
-        "y": 324.95,
-        "w": 290.49,
-        "h": 125.42
+        "x": 231.32,
+        "y": 210.31,
+        "w": 464.78,
+        "h": 200.67
       },
       {
         "cls": "MCFramedSprite",
         "varName": "_innerFrame",
-        "x": 402.58,
-        "y": 324.95,
-        "w": 290.49,
-        "h": 125.42
+        "x": 231.32,
+        "y": 210.31,
+        "w": 464.78,
+        "h": 200.67
       },
       {
         "cls": "MCAlignmentNodeStatic",
         "varName": "",
-        "x": 377.61,
-        "y": 324.95,
-        "w": 340.42,
-        "h": 125.42
+        "x": 191.38,
+        "y": 210.31,
+        "w": 544.67,
+        "h": 200.67
       },
       {
         "cls": "MCAlignmentNodeStatic",
         "varName": "",
-        "x": 394.63,
-        "y": 350.03,
-        "w": 306.37,
-        "h": 75.25
+        "x": 218.61,
+        "y": 250.45,
+        "w": 490.2,
+        "h": 120.4
       },
       {
         "cls": "MCAlignmentNodeStatic",
         "varName": "",
-        "x": 422.4,
-        "y": 312.4,
-        "w": 116.46,
-        "h": 150.5
+        "x": 263.04,
+        "y": 190.25,
+        "w": 186.33,
+        "h": 240.8
       },
       {
         "cls": "MCLabelTTF",
         "varName": "",
-        "x": 422.4,
-        "y": 281.14,
-        "w": 116.46,
-        "h": 150.5
+        "x": 263.04,
+        "y": 140.22,
+        "w": 186.33,
+        "h": 240.8
       },
       {
         "cls": "CCBFile",
         "varName": "_finalPositionBadge",
-        "x": 480.63,
-        "y": 307.91,
-        "w": 81.52,
-        "h": 105.35
+        "x": 356.21,
+        "y": 183.05,
+        "w": 130.43,
+        "h": 168.56
       },
       {
         "cls": "RankBadge",
         "varName": "",
-        "x": 406.73,
-        "y": 371.15,
-        "w": 147.81,
-        "h": 84.21
+        "x": 237.96,
+        "y": 284.24,
+        "w": 236.5,
+        "h": 134.73
       },
       {
         "cls": "CCSprite",
         "varName": "_goldBadge",
-        "x": 348.94,
-        "y": 338.45,
-        "w": 263.38,
-        "h": 149.6
+        "x": 145.51,
+        "y": 231.93,
+        "w": 421.4,
+        "h": 239.37
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_firstPositionLabel",
-        "x": 414.79,
-        "y": 338.45,
-        "w": 263.38,
-        "h": 149.6
+        "x": 250.86,
+        "y": 231.93,
+        "w": 421.4,
+        "h": 239.37
       },
       {
         "cls": "MCAlignmentNodeStatic",
         "varName": "",
-        "x": 556.78,
-        "y": 312.4,
-        "w": 116.46,
-        "h": 150.5
+        "x": 478.04,
+        "y": 190.25,
+        "w": 186.33,
+        "h": 240.8
       },
       {
         "cls": "MCAlignmentNode",
         "varName": "",
-        "x": 556.78,
-        "y": 285.95,
-        "w": 116.46,
-        "h": 150.5
+        "x": 478.04,
+        "y": 147.91,
+        "w": 186.33,
+        "h": 240.8
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_valueToConsiderLabel",
-        "x": 550.9,
-        "y": 319.04,
-        "w": 116.46,
-        "h": 150.5
+        "x": 468.64,
+        "y": 200.87,
+        "w": 186.33,
+        "h": 240.8
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_highestValue",
-        "x": 550.9,
-        "y": 346.84,
-        "w": 116.46,
-        "h": 150.5
+        "x": 468.64,
+        "y": 245.35,
+        "w": 186.33,
+        "h": 240.8
       },
       {
         "cls": "MCAlignmentNode",
         "varName": "",
-        "x": 556.78,
-        "y": 338.86,
-        "w": 116.46,
-        "h": 150.5
+        "x": 478.04,
+        "y": 232.58,
+        "w": 186.33,
+        "h": 240.8
       },
       {
         "cls": "MCLabelTTF",
         "varName": "",
-        "x": 553.51,
-        "y": 371.96,
-        "w": 116.46,
-        "h": 150.5
+        "x": 472.81,
+        "y": 285.53,
+        "w": 186.33,
+        "h": 240.8
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_playersEaten",
-        "x": 553.51,
-        "y": 399.76,
-        "w": 116.46,
-        "h": 150.5
+        "x": 472.81,
+        "y": 330.02,
+        "w": 186.33,
+        "h": 240.8
       },
       {
         "cls": "MCAlignmentNode",
         "varName": "_leaderboardAlignmentNode",
-        "x": 402.58,
-        "y": 464.64,
-        "w": 290.49,
-        "h": 423.31
+        "x": 231.32,
+        "y": 433.82,
+        "w": 464.78,
+        "h": 677.3
       },
       {
         "cls": "MCFramedSprite",
         "varName": "_emptyLeaderBoard",
-        "x": 403.46,
-        "y": 466.46,
-        "w": 290.49,
-        "h": 281.79
+        "x": 232.74,
+        "y": 436.74,
+        "w": 464.78,
+        "h": 450.87
       },
       {
         "cls": "MCLabelTTF",
         "varName": "",
-        "x": 403.46,
-        "y": 466.46,
-        "w": 290.49,
-        "h": 281.79
+        "x": 232.74,
+        "y": 436.74,
+        "w": 464.78,
+        "h": 450.87
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "_rewardContainer",
-        "x": 718.72,
-        "y": 360.78,
-        "w": 267.91,
-        "h": 351.64
+        "x": 737.15,
+        "y": 267.65,
+        "w": 428.66,
+        "h": 562.63
       },
       {
         "cls": "CCNodeRGBA",
         "varName": "",
-        "x": 718.72,
-        "y": 360.78,
-        "w": 267.91,
-        "h": 351.64
+        "x": 737.15,
+        "y": 267.65,
+        "w": 428.66,
+        "h": 562.63
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_title",
-        "x": 718.72,
-        "y": 237.7,
-        "w": 267.91,
-        "h": 351.64
+        "x": 737.15,
+        "y": 70.73,
+        "w": 428.66,
+        "h": 562.63
       },
       {
         "cls": "CCSprite",
         "varName": "",
-        "x": 692.32,
-        "y": 402.67,
-        "w": 320.71,
-        "h": 267.85
+        "x": 694.92,
+        "y": 334.68,
+        "w": 513.13,
+        "h": 428.57
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_description",
-        "x": 718.72,
-        "y": 466.27,
-        "w": 267.91,
-        "h": 351.64
+        "x": 737.15,
+        "y": 436.44,
+        "w": 428.66,
+        "h": 562.63
       },
       {
         "cls": "MCLabelTTF",
         "varName": "_titleLabel",
-        "x": 376.58,
-        "y": 42.16,
-        "w": 636.04,
-        "h": 515.05
+        "x": 189.73,
+        "y": -242.15,
+        "w": 1017.67,
+        "h": 824.07
       }
     ]
   }

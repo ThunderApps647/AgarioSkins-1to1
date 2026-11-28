@@ -519,8 +519,7 @@ struct OnlineGameView: View {
                         .zIndex(1)
                     }
                     actionButtons
-                    // No floating mod-menu launcher: the original HUD only has
-                    // the Controls-*.ccbi split/shoot buttons.
+                    modMenuIcon(geometry: geometry)
                     if showModMenu { modMenuPanel(geometry: geometry) }
                 }
                 if connectionPhase == .playing && leavePopupMounted {
@@ -735,11 +734,12 @@ struct OnlineGameView: View {
     }
 
     private func modMenuIcon(geometry: GeometryProxy) -> some View {
-        Image("mod-menu-btn")
-            .resizable().scaledToFit().frame(width: 50, height: 50)
+        let modScale = OriginalGameplay.uiScale(for: geometry.size)
+        return Image("mod-menu-btn")
+            .resizable().scaledToFit().frame(width: 40 * modScale, height: 40 * modScale)
             .contentShape(Rectangle())
             .offset(modMenuIconOffset)
-            .position(x: geometry.size.width - 50, y: 150)
+            .position(x: geometry.size.width - 44 * modScale, y: 128 * modScale)
             .gesture(
                 DragGesture(coordinateSpace: .global)
                     .onChanged { val in
@@ -749,6 +749,7 @@ struct OnlineGameView: View {
                     .onEnded { _ in lastModMenuIconOffset = modMenuIconOffset }
             )
             .onTapGesture { withAnimation(.easeInOut(duration: 0.5)) { showModMenu.toggle() } }
+            .accessibilityIdentifier("hud.modMenu")
             .zIndex(99)
     }
 
