@@ -4575,9 +4575,9 @@ struct ContentView: View {
     private let teamFriendlyFireEnabled: Bool = true
     
     // Start Menu Modifiable Settings
-    @State private var targetBotCount: Int = 25
+    @State private var targetBotCount: Int = 20
     @State private var targetFeedBotCount: Int = 15
-    @State private var botStartMass: CGFloat = 132
+    @State private var botStartMass: CGFloat = 95
     /// "Randomize Bot Start Mass": the lobby's opening wave of bots spawns anywhere from
     /// 40 to 10,000 mass (skewed toward the low/mid range like a real in-progress server),
     /// while every bot that dies and respawns afterwards re-enters at a fresh-spawn
@@ -4586,7 +4586,7 @@ struct ContentView: View {
     /// True while the match's opening bot wave is still filling to targetBotCount; flips
     /// false the moment the lobby is full so later spawns count as respawns.
     @State private var initialBotFillActive: Bool = true
-    @State private var playerStartMass: CGFloat = 294
+    @State private var playerStartMass: CGFloat = 10
     
     @State private var isPlaying = false
     /// PLAY ONLINE full-screen cover (server-hosted multiplayer).
@@ -11478,7 +11478,10 @@ struct ContentView: View {
     private func spawnInitialViruses() {
         for _ in 0..<16 { viruses.append(spawnSingleVirusSafely()) }
     }
-    private func spawnInitialTokens() { for _ in 0..<200 { tokens.append(spawnSingleToken(existing: tokens)) } }
+    private func spawnInitialTokens() {
+        // Offline `foodPerArenaAreaUnit` 1.0005e-05 x 7905^2 = 625 pellets.
+        for _ in 0..<625 { tokens.append(spawnSingleToken(existing: tokens)) }
+    }
     
     /// Exact Agar.io virus shatter distribution (`AgarCell::eatVirus`): the cell
     /// recursively binary-splits, so the piece count is the largest power of two
@@ -13582,12 +13585,7 @@ struct MainMenu: View {
                                         )
                                         .frame(width: 120 * s, height: 80 * s)
 
-                                        Button(action: {
-                                            SoundManager.shared.play(.menuClick)
-                                            // One secondary mode is implemented in this build; the
-                                            // authentic entry point opens the live server browser.
-                                            onPlayOnline()
-                                        }) {
+                                        ZStack {
                                             CCBISceneView(
                                                 ccbFile: "MoreGameModesButton.ccbi",
                                                 centerRoot: true,
@@ -13597,9 +13595,23 @@ struct MainMenu: View {
                                             )
                                             .frame(width: 120 * s, height: 80 * s)
                                             .allowsHitTesting(false)
+
+                                            // The CCBI menu item owns a UIKit touch handler;
+                                            // disable that view and put a transparent SwiftUI
+                                            // button above it so the entry point is reliably
+                                            // hittable from both touch and UI tests.
+                                            Button(action: {
+                                                SoundManager.shared.play(.menuClick)
+                                                onPlayOnline()
+                                            }) {
+                                                Color.clear
+                                                    .contentShape(Rectangle())
+                                            }
+                                            .buttonStyle(.plain)
+                                            .frame(width: 120 * s, height: 80 * s)
+                                            .accessibilityIdentifier("menu.playOnline")
+                                            .accessibilityLabel("More")
                                         }
-                                        .buttonStyle(CCBIMenuItemButtonStyle())
-                                        .accessibilityIdentifier("menu.playOnline")
                                     }
                                     .frame(width: 250 * s, height: 80 * s)
                                 )
