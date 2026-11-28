@@ -4775,6 +4775,9 @@ struct ContentView: View {
     @State private var matchLeaderboardSeconds: Double = 0
     @State private var matchBestRank: Int = 99
     @State private var lastMatchStats: MatchSummaryStats? = nil
+    // One-shot MenuMain parameter matching the original state machine slideOutMatchStats
+    // after onGameOver. Cleared when the menu consumes it.
+    @State private var forceMatchStatsSlideOut: Bool = false
     @State private var showEmotePicker: Bool = false
     @State private var emojiToggleCount: Int = 0
     @State private var activeEmoteAsset: String? = nil
@@ -4902,6 +4905,8 @@ struct ContentView: View {
                         feedBotCount: $targetFeedBotCount,
                         botSkill: $botSkill,
                         lastMatchStats: lastMatchStats,
+                        forceMatchStatsExpanded: forceMatchStatsSlideOut,
+                        onForceMatchStatsConsumed: { forceMatchStatsSlideOut = false },
                         onPlayOnline: { showOnlinePlay = true }
                     )
                 }
@@ -10011,7 +10016,7 @@ struct ContentView: View {
                         return
                     }
                     isDeathSequencePending = false
-                    exitMatchToMainMenu()
+                    exitMatchToMainMenu(presentMatchStats: true)
                 }
             }
         }
@@ -11513,7 +11518,7 @@ struct ContentView: View {
     /// Shared by the confirmation popup and final-cell death. Keeping this synchronous lets the
     /// current display-link callback detect `isPlaying == false` and return before any remaining
     /// gameplay systems touch the now-empty player array.
-    private func exitMatchToMainMenu() {
+    private func exitMatchToMainMenu(presentMatchStats: Bool = false) {
         let elapsedSec = matchStartTime > 0 ? max(matchSurvivalSeconds, Int(CACurrentMediaTime() - matchStartTime)) : matchSurvivalSeconds
         if highScore > 0 || elapsedSec >= 2 {
             lastMatchStats = MatchSummaryStats(
@@ -11542,6 +11547,9 @@ struct ContentView: View {
         resetRecruitmentMotion()
         resetForcedFeedMotion()
         lastFrameTimestamp = 0
+        // -[MenuMain handleParameters:] consumes slideOutMatchStats on the next
+        // menu entry; only onGameOver sets it. A manual leave keeps it unset.
+        if presentMatchStats { forceMatchStatsSlideOut = true }
         // Retail switches Cocos menu states directly; there is no scene fade.
         isPlaying = false
         displayLink.stop()
@@ -11825,31 +11833,36 @@ struct TopBarHUD: View, Equatable {
                     .frame(width: 240 * s, height: 52 * s)
                     .allowsHitTesting(false)
 
-                    CCBISceneView(
-                        ccbFile: "TokenCounter.ccbi",
-                        context: CCBIBindingContext(
-                            labelOverrides: ["_countLabel": "\(tokenCount)"],
-                            replacingSlotViews: [
-                                "_tokenNode": AnyView(
-                                    Group {
-                                        if let art = ArenaSpriteArt.image(named: "token-snowflake") {
-                                            Image(uiImage: art)
-                                                .resizable()
-                                                .aspectRatio(contentMode: .fit)
-                                        } else {
-                                            Image("token-snowflake")
-                                                .resizable()
-                                                .aspectRatio(contentMode: .fit)
+                    // Arena uses CollectibleCounter.ccbi, not TokenCounter.ccbi.
+                    // CollectibleCounter sits at (56, 24.75) below/right of the score
+                    // (TokenCounter's (56.2, 35) row overlaps the 15 pt score label).
+                    if tokenCount > 0 {
+                        CCBISceneView(
+                            ccbFile: "CollectibleCounter.ccbi",
+                            context: CCBIBindingContext(
+                                labelOverrides: ["_countLabel": "\(tokenCount)"],
+                                replacingSlotViews: [
+                                    "_visualNode": AnyView(
+                                        Group {
+                                            if let art = ArenaSpriteArt.image(named: "token-snowflake") {
+                                                Image(uiImage: art)
+                                                    .resizable()
+                                                    .aspectRatio(contentMode: .fit)
+                                            } else {
+                                                Image("token-snowflake")
+                                                    .resizable()
+                                                    .aspectRatio(contentMode: .fit)
+                                            }
                                         }
-                                    }
-                                    .frame(width: 20 * s, height: 20 * s)
-                                )
-                            ],
-                            designScaleModifier: { _ in s }
+                                        .frame(width: 20 * s, height: 20 * s)
+                                    )
+                                ],
+                                designScaleModifier: { _ in s }
+                            )
                         )
-                    )
-                    .frame(width: 240 * s, height: 52 * s)
-                    .allowsHitTesting(false)
+                        .frame(width: 240 * s, height: 52 * s)
+                        .allowsHitTesting(false)
+                    }
 
                     if showFPS {
                         Text("\(fps) FPS")
@@ -12739,6 +12752,11 @@ struct MainMenu: View {
     @Binding var feedBotCount: Int
     @Binding var botSkill: Double
     var lastMatchStats: MatchSummaryStats? = nil
+    /// One-shot replacement for MenuMain's slideOutMatchStats parameter: the
+    /// match-stats drawer enters expanded after a death (runSlideOutAnimation),
+    /// while a normal menu visit leaves it collapsed. Consumed on first appearance.
+    var forceMatchStatsExpanded: Bool = false
+    var onForceMatchStatsConsumed: () -> Void = {}
     
     private var menuBotSkillLabel: String {
         let name = botSkill < 0.65 ? "Chill" : botSkill < 0.95 ? "Normal"
@@ -12790,6 +12808,7 @@ struct MainMenu: View {
     @State private var requestedShopSection: ShopTab? = nil
     @State private var matchStatsExpanded: Bool = false
     @State private var matchStatsSeqID: Int = 0
+    private var statsDrawerExpanded: Bool { matchStatsExpanded || forceMatchStatsExpanded }
     @State private var mainMenuEnterID: Int = 0
     /// Injected by ContentView; opens the PLAY ONLINE server browser.
     var onPlayOnline: () -> Void = {}
@@ -13538,7 +13557,7 @@ struct MainMenu: View {
                         ],
                         activeSequenceName: "enter",
                         sequencePlayID: mainMenuEnterID,
-                        subSceneSequenceNames: ["_matchStatsView": matchStatsExpanded ? "SlideOut" : "SlideIn"],
+                        subSceneSequenceNames: ["_matchStatsView": statsDrawerExpanded ? "SlideOut" : "SlideIn"],
                         subSceneSequenceIDs: ["_matchStatsView": matchStatsSeqID],
                         slotViews: {
                             var slots: [String: AnyView] = [
@@ -13650,6 +13669,12 @@ struct MainMenu: View {
                 .accessibilityElement(children: hasModalOverlay ? .ignore : .contain)
                 .accessibilityHidden(hasModalOverlay)
                 .zIndex(1)
+                .onAppear {
+                    if forceMatchStatsExpanded {
+                        matchStatsExpanded = true
+                        DispatchQueue.main.async { onForceMatchStatsConsumed() }
+                    }
+                }
 
                 if showPartyMenu { partyOverlay(scale: s, containerSize: geometry.size).zIndex(2) }
                 if showSkinsModal { skinsModalOverlay(scale: s, containerSize: geometry.size).zIndex(2) }
