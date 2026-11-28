@@ -257,7 +257,7 @@ final class AgarParityTests: XCTestCase {
             lastMatchStats: MatchSummaryStats(highestMass: 1840, foodEaten: 412, cellsEaten: 9, timeAliveSec: 268, leaderboardTimeSec: 112, topPosition: 2),
             onPlayOnline: {}
         )
-        try saveSnapshot(renderSwiftUI(menuView, size: phoneSize), name: "01_MenuMain.png")
+        try saveSnapshot(renderSwiftUI(menuView, size: phoneSize, waitSec: 1.5), name: "01_MenuMain.png")
 
         // 2. Settings
         try saveSnapshot(renderSwiftUI(menuView.settingsModalOverlay(scale: s, sideInset: 48, containerSize: phoneSize), size: phoneSize), name: "02_Settings.png")
