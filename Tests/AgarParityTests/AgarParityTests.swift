@@ -1101,7 +1101,11 @@ final class AgarParityTests: XCTestCase {
                                    mass: 100, targetMass: 100, color: .green, name: "V")
         var pArr = [virusCell]
         var bArr: [PlayerCell] = []
-        var virArr = [Virus(position: CGPoint(x: 4090, y: 4000))]
+        // Touch the virus at its rim (r_player + r_virus - 10 world points).
+        // Placing its centre inside the player's radius trips the client's
+        // coincident-centre guard (d² >= 0.2 * reach²), which intentionally
+        // ignores fully overlapping pairs.
+        var virArr = [Virus(position: CGPoint(x: 4190, y: 4000))]
         for _ in 0..<3 {
             AgarPhysicsCore.deformArena(playerCells: &pArr, botCells: &bArr, viruses: &virArr,
                                         visibleWorldRect: vis, worldSize: ws,

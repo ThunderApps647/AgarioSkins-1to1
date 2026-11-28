@@ -17,10 +17,12 @@ enum AgarPhysicsCore {
         return 30.0 + Double(mass) * 0.02
     }
 
-    /// Places a split piece one mitosis offset along `direction`.  At a wall the
-    /// child is clamped to the arena and the parent is shifted inland by the lost
-    /// distance, so the pair keeps the same separation at every angle instead of
-    /// collapsing on top of each other in a corner.
+    /// Places the new split piece one mitosis offset along `direction`.
+    ///
+    /// The parent does not move: the original cell keeps simulating from the
+    /// position the player was already at. Only the new piece is wall-clamped,
+    /// which is what makes a split at the boundary behave the same at every
+    /// angle instead of teleporting the parent inland.
     static func splitPositions(parent: CGPoint,
                                direction: CGSize,
                                offset: CGFloat,
@@ -32,12 +34,7 @@ enum AgarPhysicsCore {
         let rawChild = CGPoint(x: parent.x + dir.width * offset,
                                y: parent.y + dir.height * offset)
         let child = clampSquashPosition(rawChild, radius: radius, worldSize: worldSize)
-        let lost = hypot(rawChild.x - child.x, rawChild.y - child.y)
-        guard lost > 0.01 else { return (child, parent) }
-        let rawParent = CGPoint(x: parent.x - dir.width * lost,
-                                y: parent.y - dir.height * lost)
-        let shiftedParent = clampSquashPosition(rawParent, radius: radius, worldSize: worldSize)
-        return (child, shiftedParent)
+        return (child, parent)
     }
 
     /// Wall squash clamp (`0x10004C888`): `[0.4 * r, worldSize - 0.4 * r]`.

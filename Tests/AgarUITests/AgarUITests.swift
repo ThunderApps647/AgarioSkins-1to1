@@ -4,7 +4,9 @@ final class AgarUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = true
-        XCUIDevice.shared.orientation = .landscapeRight
+        // Orientation is applied once after launch (line 80).  Setting it here
+        // too made the simulator occasionally time out before the app existed,
+        // failing the whole run without capturing a single screen.
     }
 
     private func capture(_ app: XCUIApplication, name: String) {

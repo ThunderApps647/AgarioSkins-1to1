@@ -10866,9 +10866,9 @@ struct ContentView: View {
                     let direction = CGSize(width: CGFloat(cos(angle)), height: CGFloat(sin(angle)))
                     let childMass = massList[k]
                     let childRadius = OriginalGameplay.radius(forMass: childMass)
-                    // Push the parent inland when the border clips the child; otherwise
-                    // the two pieces lose their separation and spawn on top of each other
-                    // at the wall (and at every angle where the child would cross it).
+                    // Only the new piece is wall-clamped. The parent keeps the
+                    // position the player was already simulating from, so a split
+                    // at the boundary behaves the same at every angle.
                     let split = AgarPhysicsCore.splitPositions(
                         parent: botCells[action.cellIndex].position,
                         direction: direction,
