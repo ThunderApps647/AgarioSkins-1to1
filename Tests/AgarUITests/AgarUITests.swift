@@ -127,14 +127,16 @@ final class AgarUITests: XCTestCase {
             XCTFail("Skins button missing on MenuMain")
         }
 
-        // 3. Shop, Quests, Potions, Leagues, Profile, Play Online routing verification
+        // 3. Shop, Quests, Potions, Leagues, Play Online, Profile routing verification.
+        // Play Online is checked before the full-screen Profile card: SwiftUI can leave the
+        // main menu briefly non-hit-testable while the profile overlay animates out.
         let modalRoutes: [(label: String, ids: [String], verifyIds: [String], closeIds: [String])] = [
             ("Shop", ["ccbi.shopButtonCallback"], ["ccbi.coinsButtonCallback", "Coins"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
             ("Quests", ["ccbi._dailyQuestButtonNode.pressedCallback", "ccbi._dailyQuestButtonNode"], ["Milestone Chest: 0 / 3", "ccbi.backButtonCallback"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
             ("Potions", ["ccbi._mysteryPotionsButtonNode.pressedCallback", "ccbi._mysteryPotionsButtonNode"], ["ccbi.helpButtonCallback", "ccbi.backButtonCallback"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
             ("Leagues", ["ccbi._leaguesButtonNode.pressedCallback", "ccbi._leaguesButtonNode"], ["ccbi.myLeagueButtonCallback", "ccbi.backButtonCallback"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
-            ("Profile", ["ccbi.profileButtonCallback"], ["ccbi.achievementsButtonCallback", "ccbi.backButtonCallback"], ["ccbi.backButtonCallback", "ccbi._backButton"]),
-            ("Play Online", ["menu.playOnline"], ["online.close"], ["online.close"])
+            ("Play Online", ["menu.playOnline"], ["online.close"], ["online.close"]),
+            ("Profile", ["ccbi.profileButtonCallback"], ["ccbi.achievementsButtonCallback", "ccbi.backButtonCallback"], ["ccbi.backButtonCallback", "ccbi._backButton"])
         ]
         for route in modalRoutes {
             let trigger = try XCTUnwrap(firstExisting(app, ids: route.ids, timeout: 3.0), "\(route.label) button must exist on MenuMain")

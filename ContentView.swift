@@ -11598,23 +11598,18 @@ struct LeavePopupModal: View {
         case yes
     }
 
-    private enum MotionPhase {
-        case belowScreen
-        case entranceOvershoot
-        case resting
-        case exitAnticipation
-    }
-
-    @State private var motionPhase: MotionPhase = .belowScreen
+    /// 0 = just below the screen, 1 = centred. `MenuView` `sub_100281830` moves the
+    /// popup from (safeX, -height) to (safeX, safeY) over 0.4 s with `CCEaseElasticOut`.
+    @State private var slideProgress: CGFloat = 0
     @State private var dimmerOpacity: Double = 0
     @State private var entranceComplete = false
     @State private var actionLocked = false
-    @State private var dimBothButtons = false
 
     var body: some View {
         GeometryReader { geometry in
             let s = OriginalGameplay.uiScale(for: geometry.size)
             let popupHeight = 166.0 * s
+            let slideDistance = (geometry.size.height + popupHeight) / 2.0
 
             ZStack {
                 Color.black
@@ -11635,14 +11630,8 @@ struct LeavePopupModal: View {
                     )
                 )
                 .frame(width: geometry.size.width, height: geometry.size.height)
-                .opacity(dimBothButtons ? 0.55 : 1.0)
                 .allowsHitTesting(entranceComplete && !actionLocked)
-                .offset(
-                    y: verticalOffset(
-                        containerHeight: geometry.size.height,
-                        popupHeight: popupHeight
-                    )
-                )
+                .offset(y: slideDistance * (1.0 - slideProgress))
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .allowsHitTesting(!actionLocked)
@@ -11651,96 +11640,42 @@ struct LeavePopupModal: View {
             }
         }
     }
-    
-    private func verticalOffset(containerHeight: CGFloat, popupHeight: CGFloat) -> CGFloat {
-        switch motionPhase {
-        case .belowScreen:
-            return (containerHeight + popupHeight) / 2.0 + 24
-        case .entranceOvershoot:
-            return -popupHeight * 0.06
-        case .resting:
-            return 0
-        case .exitAnticipation:
-            return -popupHeight * 0.08
-        }
-    }
-    
+
     private func startEntrance() {
-        motionPhase = .belowScreen
+        slideProgress = 0
         dimmerOpacity = 0
         entranceComplete = false
         actionLocked = false
-        dimBothButtons = false
-        
+
         DispatchQueue.main.async {
-            // V15: every movement phase is another 20% shorter than V14.
-            // Phase 1: bottom -> slightly above centre (0.192 seconds).
-            withAnimation(.easeOut(duration: 0.192)) {
-                motionPhase = .entranceOvershoot
-                dimmerOpacity = 0.56
+            // MenuPause enter: background fades over 0.2 s; sub_100281830 slides the
+            // popup 0.4 s with CCEaseElasticOut (period 0.3).
+            withAnimation(.easeOut(duration: 0.2)) {
+                dimmerOpacity = 0.55
             }
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.192) {
+            withAnimation(.timingCurve(0.18, 1.32, 0.34, 1.0, duration: 0.4)) {
+                slideProgress = 1
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                 guard !actionLocked else { return }
-                
-                // Phase 2: overshoot -> centred rest (0.128 seconds).
-                withAnimation(.easeInOut(duration: 0.128)) {
-                    motionPhase = .resting
-                }
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.128) {
-                    guard !actionLocked else { return }
-                    entranceComplete = true
-                }
+                entranceComplete = true
             }
         }
     }
-    
+
     private func commit(_ choice: Choice) {
         guard entranceComplete, !actionLocked else { return }
-        
-        // Button fires on release and both painted buttons dim immediately. No gets a very
-        // short 50 ms response beat; destructive Yes deliberately retains 200 ms.
         actionLocked = true
         entranceComplete = false
-        dimBothButtons = true
-        
-        if choice == .no {
-            // Gameplay resumes accepting input right now: `actionLocked` already disabled hit
-            // testing for this whole overlay, so a hold that starts during the remaining exit
-            // animation lands directly on the returned HUD instead of dying here. The dimmer
-            // also starts clearing immediately so the live game is not shown dimmed.
+        // MenuPause leaves the application state directly: No calls
+        // quitCancelButtonCallback / dismissPopupCallback, Yes calls
+        // quitConfirmButtonCallback. Neither runs a popup exit animation.
+        switch choice {
+        case .no:
             onNo()
-            withAnimation(.easeOut(duration: 0.22)) {
-                dimmerOpacity = 0
-            }
-        }
-        
-        let confirmationDelay: Double = choice == .no ? 0.05 : 0.20
-        DispatchQueue.main.asyncAfter(deadline: .now() + confirmationDelay) {
-            // Shared phase: centre -> upward anticipation nudge (0.128 seconds).
-            withAnimation(.easeOut(duration: 0.128)) {
-                motionPhase = .exitAnticipation
-            }
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.128) {
-                let dropDuration: Double = choice == .no ? 0.160 : 0.096
-                
-                // No: 0.160 s drop (0.288 s motion total).
-                // Yes: 0.096 s drop (0.224 s motion total).
-                withAnimation(.easeIn(duration: dropDuration)) {
-                    motionPhase = .belowScreen
-                    dimmerOpacity = 0
-                }
-                
-                DispatchQueue.main.asyncAfter(deadline: .now() + dropDuration) {
-                    if choice == .no {
-                        onNoExitComplete()
-                    } else {
-                        onYes()
-                    }
-                }
-            }
+            onNoExitComplete()
+        case .yes:
+            onYes()
         }
     }
 }
