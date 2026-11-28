@@ -17,6 +17,29 @@ enum AgarPhysicsCore {
         return 30.0 + Double(mass) * 0.02
     }
 
+    /// Places a split piece one mitosis offset along `direction`.  At a wall the
+    /// child is clamped to the arena and the parent is shifted inland by the lost
+    /// distance, so the pair keeps the same separation at every angle instead of
+    /// collapsing on top of each other in a corner.
+    static func splitPositions(parent: CGPoint,
+                               direction: CGSize,
+                               offset: CGFloat,
+                               radius: CGFloat,
+                               worldSize: CGFloat) -> (child: CGPoint, parent: CGPoint) {
+        let length = hypot(direction.width, direction.height)
+        guard length > 0.0001, offset > 0 else { return (parent, parent) }
+        let dir = CGSize(width: direction.width / length, height: direction.height / length)
+        let rawChild = CGPoint(x: parent.x + dir.width * offset,
+                               y: parent.y + dir.height * offset)
+        let child = clampSquashPosition(rawChild, radius: radius, worldSize: worldSize)
+        let lost = hypot(rawChild.x - child.x, rawChild.y - child.y)
+        guard lost > 0.01 else { return (child, parent) }
+        let rawParent = CGPoint(x: parent.x - dir.width * lost,
+                                y: parent.y - dir.height * lost)
+        let shiftedParent = clampSquashPosition(rawParent, radius: radius, worldSize: worldSize)
+        return (child, shiftedParent)
+    }
+
     /// Wall squash clamp (`0x10004C888`): `[0.4 * r, worldSize - 0.4 * r]`.
     @inline(__always)
     static func clampSquashPosition(_ pos: CGPoint, radius: CGFloat, worldSize: CGFloat) -> CGPoint {
@@ -514,4 +537,336 @@ private enum SoftBodyTrigCache {
         cache[count] = out
         return out
     }
+
+    // MARK: - Exact SoftBodyCellView collision deformation
+
+    /// One nearby cell or virus the soft-body vertex solver can squash against.
+    private struct DeformTarget {
+        var center: CGPoint
+        var radius: CGFloat
+        var vertices: [CGPoint]
+        var isVirus: Bool
+    }
+
+    /// Port of `SoftBodyCellView::checkCollisionsInto:` +
+    /// `processCollisionWithCollidingCells:radiusDisplacement:x:y:`.
+    /// Collisions are sampled per vertex, not per cell circle, and include every visible
+    /// cell (own team, other bots, and viruses) exactly like the original parent-child scan.
+    static func deformArena(
+        playerCells: inout [PlayerCell],
+        botCells: inout [PlayerCell],
+        viruses: inout [Virus],
+        visibleWorldRect: CGRect,
+        worldSize: CGFloat,
+        dt: CGFloat,
+        cocosZoom: CGFloat = 1.0
+    ) {
+        let playerCount = playerCells.count
+        var allCells = playerCells + botCells
+        deformCellsExact(cells: &allCells, viruses: viruses,
+                         visibleWorldRect: visibleWorldRect, worldSize: worldSize,
+                         dt: dt, cocosZoom: cocosZoom)
+        playerCells = Array(allCells.prefix(playerCount))
+        botCells = Array(allCells.dropFirst(playerCount))
+        deformVirusesExact(viruses: &viruses, cells: allCells,
+                           visibleWorldRect: visibleWorldRect, worldSize: worldSize,
+                           dt: dt, cocosZoom: cocosZoom)
+    }
+
+    private static func collisionTargets(
+        center: CGPoint,
+        radius: CGFloat,
+        cellIndex: Int,
+        cells: [PlayerCell],
+        viruses: [Virus],
+        pad: CGFloat
+    ) -> [DeformTarget] {
+        var out: [DeformTarget] = []
+        out.reserveCapacity(8)
+        var owner: UUID? = nil
+        if cellIndex >= 0 && cellIndex < cells.count { owner = cells[cellIndex].ownerID }
+        for j in cells.indices where j != cellIndex {
+            let other = cells[j]
+            // Own pieces are merging/pushing through each other; deforming them
+            // against their siblings makes the split look rubbery.  Only rival
+            // cells and viruses indent the silhouette.
+            if let owner, other.ownerID == owner { continue }
+            let otherRadius = other.cachedVisualRadius
+            let reach = radius + otherRadius + pad * 2
+            let dx = center.x - other.position.x
+            let dy = center.y - other.position.y
+            let d2 = dx * dx + dy * dy
+            // The client records a candidate when the two expanded circles overlap,
+            // but drops nearly-coincident centres (the >= 20% guard).
+            guard d2 <= reach * reach, d2 >= reach * reach * 0.2 else { continue }
+            out.append(DeformTarget(center: other.position, radius: otherRadius,
+                                    vertices: other.deformedVertices, isVirus: false))
+        }
+        for v in viruses {
+            let reach = radius + v.radius + pad * 2
+            let dx = center.x - v.position.x
+            let dy = center.y - v.position.y
+            let d2 = dx * dx + dy * dy
+            guard d2 <= reach * reach, d2 >= reach * reach * 0.2 else { continue }
+            out.append(DeformTarget(center: v.position, radius: v.radius,
+                                    vertices: v.deformedVertices, isVirus: true))
+        }
+        return out
+    }
+
+    private static func deformCellsExact(
+        cells: inout [PlayerCell],
+        viruses: [Virus],
+        visibleWorldRect: CGRect,
+        worldSize: CGFloat,
+        dt: CGFloat,
+        cocosZoom: CGFloat
+    ) {
+        let count = cells.count
+        guard count > 0 else { return }
+        let stepScale = min(CGFloat(1.5), max(CGFloat(0.25), dt * 60.0))
+        let decay = pow(CGFloat(0.7), stepScale)
+        let pad = CGFloat(6.0)
+        let visRect = visibleWorldRect
+
+        for i in cells.indices {
+            let pos = cells[i].position
+            let visualRadius = max(CGFloat(1.0), cells[i].cachedVisualRadius)
+
+            if !visRect.isEmpty && !visRect.intersects(
+                CGRect(x: pos.x - visualRadius, y: pos.y - visualRadius,
+                       width: visualRadius * 2, height: visualRadius * 2)
+            ) {
+                if !cells[i].deformedVertices.isEmpty {
+                    cells[i].deformedVertices.removeAll(keepingCapacity: false)
+                    cells[i].vertexDisplacements.removeAll(keepingCapacity: false)
+                    cells[i].vertexRadii.removeAll(keepingCapacity: false)
+                }
+                continue
+            }
+
+            let vertexCount = max(24, min(72, (Int(floor(max(1.0, visualRadius * cocosZoom))) & ~1)))
+            let trig = SoftBodyTrigCache.get(count: vertexCount)
+
+            if cells[i].deformedVertices.count != vertexCount ||
+               cells[i].vertexDisplacements.count != vertexCount ||
+               cells[i].vertexRadii.count != vertexCount {
+                let prevDisp = cells[i].vertexDisplacements
+                let prevRadii = cells[i].vertexRadii
+                cells[i].deformedVertices = [CGPoint](repeating: .zero, count: vertexCount)
+                if prevDisp.count >= 8 && prevRadii.count == prevDisp.count {
+                    cells[i].vertexDisplacements = resampleRing(prevDisp, to: vertexCount)
+                    cells[i].vertexRadii = resampleRing(prevRadii, to: vertexCount)
+                } else {
+                    cells[i].vertexDisplacements = [CGFloat](repeating: 0, count: vertexCount)
+                    cells[i].vertexRadii = [CGFloat](repeating: visualRadius, count: vertexCount)
+                }
+                for k in 0..<vertexCount {
+                    let r = cells[i].vertexRadii[k]
+                    cells[i].deformedVertices[k] = CGPoint(x: trig[k].cos * r, y: trig[k].sin * r)
+                }
+                if prevDisp.count < 8 { continue }
+            }
+
+            let oldDisp = cells[i].vertexDisplacements
+            var disp = oldDisp
+            for k in 0..<vertexCount {
+                let prev = oldDisp[(k - 1 + vertexCount) % vertexCount]
+                let next = oldDisp[(k + 1) % vertexCount]
+                let jittered = min(CGFloat(10.0),
+                                   max(CGFloat(-10.0),
+                                       (oldDisp[k] + CGFloat.random(in: -0.5...0.5) * stepScale) * decay))
+                disp[k] = (prev + next + jittered * 8.0) / 10.0
+            }
+
+            let targets = collisionTargets(center: pos, radius: visualRadius, cellIndex: i,
+                                           cells: cells, viruses: viruses, pad: pad)
+            let nearWall = (pos.x - visualRadius) < 0 || (pos.y - visualRadius) < 0
+                || (pos.x + visualRadius) > worldSize || (pos.y + visualRadius) > worldSize
+
+            if visualRadius > 18.0 && (!targets.isEmpty || nearWall) {
+                for k in 0..<vertexCount {
+                    let vertexRadius = max(CGFloat(0.0), cells[i].vertexRadii[k] + disp[k])
+                    let wx = pos.x + trig[k].cos * vertexRadius
+                    let wy = pos.y + trig[k].sin * vertexRadius
+                    var collided = false
+
+                    for target in targets {
+                        if target.isVirus {
+                            let reach = target.radius + pad
+                            let dx = wx - target.center.x
+                            let dy = wy - target.center.y
+                            if dx * dx + dy * dy <= reach * reach {
+                                collided = true
+                                break
+                            }
+                        } else if !target.vertices.isEmpty {
+                            for v in target.vertices {
+                                let dx = wx - (target.center.x + v.x)
+                                let dy = wy - (target.center.y + v.y)
+                                if dx * dx + dy * dy < pad * pad {
+                                    collided = true
+                                    break
+                                }
+                            }
+                            if collided { break }
+                        } else {
+                            // Off-screen neighbours have no ring yet; fall back to their bounds.
+                            let reach = target.radius + pad
+                            let dx = wx - target.center.x
+                            let dy = wy - target.center.y
+                            if dx * dx + dy * dy < reach * reach {
+                                collided = true
+                                break
+                            }
+                        }
+                    }
+
+                    if !collided && nearWall {
+                        if wx < 0 || wy < 0 || wx > worldSize || wy > worldSize {
+                            collided = true
+                        }
+                    }
+
+                    if collided {
+                        disp[k] = disp[k] <= 0 ? disp[k] - 1.0 : -1.0
+                    }
+                }
+            }
+
+            cells[i].vertexDisplacements = disp
+            let oldRadii = cells[i].vertexRadii
+            var nextRadii = oldRadii
+            let blend = min(CGFloat(1.0), stepScale)
+            for k in 0..<vertexCount {
+                let prev = oldRadii[(k - 1 + vertexCount) % vertexCount]
+                let next = oldRadii[(k + 1) % vertexCount]
+                let candidate = max(CGFloat(0.0), oldRadii[k] + disp[k])
+                let driven = (visualRadius + candidate * 12.0) / 13.0
+                let smoothed = (prev + next + driven * 8.0) / 10.0
+                nextRadii[k] = oldRadii[k] + (smoothed - oldRadii[k]) * blend
+                cells[i].deformedVertices[k] = CGPoint(x: trig[k].cos * nextRadii[k],
+                                                       y: trig[k].sin * nextRadii[k])
+            }
+            cells[i].vertexRadii = nextRadii
+        }
+    }
+
+    private static func deformVirusesExact(
+        viruses: inout [Virus],
+        cells: [PlayerCell],
+        visibleWorldRect: CGRect,
+        worldSize: CGFloat,
+        dt: CGFloat,
+        cocosZoom: CGFloat
+    ) {
+        guard !viruses.isEmpty else { return }
+        let stepScale = min(CGFloat(1.5), max(CGFloat(0.25), dt * 60.0))
+        let decay = pow(CGFloat(0.7), stepScale)
+        let pad = CGFloat(6.0)
+        let visRect = visibleWorldRect
+
+        for i in viruses.indices {
+            let pos = viruses[i].position
+            let visualRadius = max(CGFloat(1.0), viruses[i].radius)
+
+            if !visRect.isEmpty && !visRect.intersects(
+                CGRect(x: pos.x - visualRadius - 12, y: pos.y - visualRadius - 12,
+                       width: visualRadius * 2 + 24, height: visualRadius * 2 + 24)
+            ) {
+                if !viruses[i].deformedVertices.isEmpty {
+                    viruses[i].deformedVertices.removeAll(keepingCapacity: false)
+                    viruses[i].vertexDisplacements.removeAll(keepingCapacity: false)
+                    viruses[i].vertexRadii.removeAll(keepingCapacity: false)
+                }
+                continue
+            }
+
+            let vertexCount = min(120, max(30, (2 * Int(floor(max(1.0, visualRadius * cocosZoom)))) & ~1))
+            let trig = SoftBodyTrigCache.get(count: vertexCount)
+            if viruses[i].deformedVertices.count != vertexCount ||
+               viruses[i].vertexDisplacements.count != vertexCount ||
+               viruses[i].vertexRadii.count != vertexCount {
+                let prevDisp = viruses[i].vertexDisplacements
+                let prevRadii = viruses[i].vertexRadii
+                viruses[i].deformedVertices = [CGPoint](repeating: .zero, count: vertexCount)
+                if prevDisp.count >= 8 && prevRadii.count == prevDisp.count {
+                    viruses[i].vertexDisplacements = resampleRing(prevDisp, to: vertexCount)
+                    viruses[i].vertexRadii = resampleRing(prevRadii, to: vertexCount)
+                } else {
+                    viruses[i].vertexDisplacements = [CGFloat](repeating: 0, count: vertexCount)
+                    viruses[i].vertexRadii = [CGFloat](repeating: visualRadius, count: vertexCount)
+                }
+                for k in 0..<vertexCount {
+                    let r = viruses[i].vertexRadii[k]
+                    viruses[i].deformedVertices[k] = CGPoint(x: trig[k].cos * r, y: trig[k].sin * r)
+                }
+                if prevDisp.count < 8 { continue }
+            }
+
+            let oldDisp = viruses[i].vertexDisplacements
+            var disp = oldDisp
+            for k in 0..<vertexCount {
+                let prev = oldDisp[(k - 1 + vertexCount) % vertexCount]
+                let next = oldDisp[(k + 1) % vertexCount]
+                let jittered = min(CGFloat(10.0),
+                                   max(CGFloat(-10.0),
+                                       (oldDisp[k] + CGFloat.random(in: -0.5...0.5) * stepScale) * decay))
+                disp[k] = (prev + next + jittered * 8.0) / 10.0
+            }
+
+            let targets = collisionTargets(center: pos, radius: visualRadius, cellIndex: -1,
+                                           cells: cells, viruses: viruses, pad: pad)
+            let nearWall = (pos.x - visualRadius) < 0 || (pos.y - visualRadius) < 0
+                || (pos.x + visualRadius) > worldSize || (pos.y + visualRadius) > worldSize
+
+            if !targets.isEmpty || nearWall {
+                for k in 0..<vertexCount {
+                    let vertexRadius = max(CGFloat(0.0), viruses[i].vertexRadii[k] + disp[k])
+                    let wx = pos.x + trig[k].cos * vertexRadius
+                    let wy = pos.y + trig[k].sin * vertexRadius
+                    var collided = false
+                    for target in targets {
+                        if target.isVirus {
+                            let reach = target.radius + pad
+                            let dx = wx - target.center.x
+                            let dy = wy - target.center.y
+                            if dx * dx + dy * dy <= reach * reach { collided = true; break }
+                        } else if !target.vertices.isEmpty {
+                            for v in target.vertices {
+                                let dx = wx - (target.center.x + v.x)
+                                let dy = wy - (target.center.y + v.y)
+                                if dx * dx + dy * dy < pad * pad { collided = true; break }
+                            }
+                            if collided { break }
+                        }
+                    }
+                    if !collided && nearWall &&
+                        (wx < 0 || wy < 0 || wx > worldSize || wy > worldSize) {
+                        collided = true
+                    }
+                    if collided {
+                        disp[k] = disp[k] <= 0 ? disp[k] - 1.0 : -1.0
+                    }
+                }
+            }
+
+            viruses[i].vertexDisplacements = disp
+            let oldRadii = viruses[i].vertexRadii
+            var nextRadii = oldRadii
+            let blend = min(CGFloat(1.0), stepScale)
+            for k in 0..<vertexCount {
+                let prev = oldRadii[(k - 1 + vertexCount) % vertexCount]
+                let next = oldRadii[(k + 1) % vertexCount]
+                let candidate = max(CGFloat(0.0), oldRadii[k] + disp[k])
+                let driven = (visualRadius + candidate * 12.0) / 13.0
+                let smoothed = (prev + next + driven * 8.0) / 10.0
+                nextRadii[k] = oldRadii[k] + (smoothed - oldRadii[k]) * blend
+                viruses[i].deformedVertices[k] = CGPoint(x: trig[k].cos * nextRadii[k],
+                                                         y: trig[k].sin * nextRadii[k])
+            }
+            viruses[i].vertexRadii = nextRadii
+        }
+    }
+
 }

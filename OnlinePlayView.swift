@@ -1207,18 +1207,10 @@ struct OnlineGameView: View {
         let worldSize: CGFloat = OriginalGameplay.arenaSideLengthCGFloat
         let visRect = visibleWorldRect
         let cocosZoom = zoomLevel / OriginalGameplay.uiScale(for: UIScreen.main.bounds.size)
-        AgarPhysicsCore.deformVertices(
-            cells: &playerCells,
-            neighborsByOwner: true,
-            visibleWorldRect: visRect,
-            worldSize: worldSize,
-            dt: dt,
-            cocosZoom: cocosZoom,
-            massManager: world.massManager
-        )
-        AgarPhysicsCore.deformVertices(
-            cells: &botCells,
-            neighborsByOwner: false,
+        AgarPhysicsCore.deformArena(
+            playerCells: &playerCells,
+            botCells: &botCells,
+            viruses: &viruses,
             visibleWorldRect: visRect,
             worldSize: worldSize,
             dt: dt,

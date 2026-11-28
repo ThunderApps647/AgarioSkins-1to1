@@ -1048,16 +1048,9 @@ final class ArenaMetalCoordinator: NSObject, MTKViewDelegate {
                 //     own colour.
                 // Skinned non-player cells return before this pass in the client.
                 if skinTex != nil {
-                    if isLocal {
-                        let wash = SIMD4<Float>(0xC0 / 255.0, 0xC0 / 255.0, 0xC0 / 255.0, fillSIMD.w * 0.75)
-                        if c.deformedVertices.count >= 8 {
-                            appendScaledFan(cx: sx, cy: sy, verts: c.deformedVertices, zoomPx: zoomPx,
-                                            scale: 1.0, color: wash)
-                        } else {
-                            appendDiskFan(cx: sx, cy: sy, radius: max(1.5, rW * zoomPx), count: segCount, color: wash)
-                        }
-                        flushSolid(enc: enc, viewportSize: vpPx)
-                    }
+                    // The skin already carries the cell artwork.  The client's 0xC0C0C0
+                    // player-owned fill is a dimming wash only for the untextured body;
+                    // painting it over a skin produced the grey veil seen in game.
                 } else if isLocal {
                     let wash = SIMD4<Float>(0xC0 / 255.0, 0xC0 / 255.0, 0xC0 / 255.0, fillSIMD.w * 0.75)
                     if c.deformedVertices.count >= 8 {

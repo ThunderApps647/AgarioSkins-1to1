@@ -974,12 +974,21 @@ final class SrvWorld {
                               y: targetPoint.y - cells[index].position.y)
                 launchDirection = (abs(tv.x) >= 0.1 || abs(tv.y) >= 0.1) ? tv.normalized() : .zero
             }
-            let spawnOffset = OriginalGameplay.mitosisPositionFactor
-            var spawnPos = cells[index].position
-            spawnPos.x += launchDirection.x * spawnOffset
-            spawnPos.y += launchDirection.y * spawnOffset
-            spawnPos.x = AgarPhysicsCore.clampSquashCoordinate(spawnPos.x, radius: visualRadius, worldSize: ws)
-            spawnPos.y = AgarPhysicsCore.clampSquashCoordinate(spawnPos.y, radius: visualRadius, worldSize: ws)
+            let spawnOffset = CGFloat(OriginalGameplay.mitosisPositionFactor)
+            let split = AgarPhysicsCore.splitPositions(
+                parent: CGPoint(x: cells[index].position.x, y: cells[index].position.y),
+                direction: CGSize(width: launchDirection.x, height: launchDirection.y),
+                offset: spawnOffset,
+                radius: CGFloat(visualRadius),
+                worldSize: CGFloat(ws)
+            )
+            cells[index].position = SrvVec2(x: Double(split.parent.x), y: Double(split.parent.y))
+            let spawnPos = SrvVec2(x: Double(split.child.x), y: Double(split.child.y))
+            let actual = SrvVec2(x: spawnPos.x - Double(split.parent.x),
+                                 y: spawnPos.y - Double(split.parent.y))
+            if (actual.x * actual.x + actual.y * actual.y).squareRoot() > 0.01 {
+                launchDirection = actual.normalized()
+            }
 
             var newCell = SrvCell(id: newID(), ownerID: ownerID, position: spawnPos,
                                mass: newMass, targetMass: newMass,

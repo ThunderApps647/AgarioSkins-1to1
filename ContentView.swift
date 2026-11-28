@@ -10533,10 +10533,22 @@ struct ContentView: View {
                 }
                 
                 let spawnOffset = CGFloat(OriginalGameplay.mitosisPositionFactor)
-                var spawnPos = cells[index].position
-                spawnPos.x += launchDirection.width * spawnOffset
-                spawnPos.y += launchDirection.height * spawnOffset
-                spawnPos = AgarPhysicsCore.clampSquashPosition(spawnPos, radius: visualRadius, worldSize: worldSize)
+                let split = AgarPhysicsCore.splitPositions(
+                    parent: cells[index].position,
+                    direction: launchDirection,
+                    offset: spawnOffset,
+                    radius: visualRadius,
+                    worldSize: worldSize
+                )
+                let spawnPos = split.child
+                cells[index].position = split.parent
+                // If the wall clamped the child, aim the impulse along the actual
+                // parent->child separation rather than into the wall.
+                let actual = CGSize(width: spawnPos.x - split.parent.x,
+                                    height: spawnPos.y - split.parent.y)
+                if hypot(actual.width, actual.height) > 0.01 {
+                    launchDirection = actual.normalized()
+                }
                 
                 var newCell = PlayerCell(
                     ownerID: cells[index].ownerID,
@@ -10614,31 +10626,14 @@ struct ContentView: View {
     private func updateCellDeformation(dt: CGFloat) {
         let worldSize: CGFloat = OriginalGameplay.offlineArenaSideLength
         let cocosZoom = zoomLevel / OriginalGameplay.arenaScreenScale(for: UIScreen.main.bounds.size)
-        AgarPhysicsCore.deformVertices(
-            cells: &playerCells,
-            neighborsByOwner: true,
-            visibleWorldRect: visibleWorldRect,
-            worldSize: worldSize,
-            dt: dt,
-            cocosZoom: cocosZoom,
-            massManager: massManager
-        )
-        AgarPhysicsCore.deformVertices(
-            cells: &botCells,
-            neighborsByOwner: true,
-            visibleWorldRect: visibleWorldRect,
-            worldSize: worldSize,
-            dt: dt,
-            cocosZoom: cocosZoom,
-            massManager: massManager
-        )
-        AgarPhysicsCore.deformViruses(
+        AgarPhysicsCore.deformArena(
+            playerCells: &playerCells,
+            botCells: &botCells,
             viruses: &viruses,
             visibleWorldRect: visibleWorldRect,
             worldSize: worldSize,
             dt: dt,
-            cocosZoom: cocosZoom,
-            massManager: massManager
+            cocosZoom: cocosZoom
         )
     }
     
